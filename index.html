@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hexdek</title>
+<style>
+:root {
+  --bg: #f3f1ec; --panel: #ffffff; --ink: #1d1f24; --muted: #62666f;
+  --cell: #dcd7cb; --cell-edge: #c2bcad; --accent: #2563eb; --good: #15803d;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171c; --panel: #1f232b; --ink: #eceef2; --muted: #a0a6b1;
+    --cell: #2b313c; --cell-edge: #3b4350; --accent: #7aa7ff; --good: #4ade80;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15171c; --panel: #1f232b; --ink: #eceef2; --muted: #a0a6b1;
+  --cell: #2b313c; --cell-edge: #3b4350; --accent: #7aa7ff; --good: #4ade80;
+}
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+  font: 15px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif; }
+body { display: flex; flex-direction: column; overscroll-behavior: none; }
+header { display: flex; align-items: center; gap: 10px 14px; padding: 10px 16px 4px; flex-wrap: wrap; }
+h1 { font-size: 19px; margin: 0; letter-spacing: .04em; }
+.stat { font-variant-numeric: tabular-nums; color: var(--muted); }
+.stat b { color: var(--ink); }
+.spacer { flex: 1; }
+button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--cell-edge);
+  background: var(--panel); color: var(--ink); cursor: pointer; }
+button:disabled { opacity: .4; cursor: default; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#status { padding: 2px 16px 6px; color: var(--muted); min-height: 1.4em; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+#status.flash { color: var(--good); font-weight: 600; }
+#giveup { display: none; padding: 2px 10px; }
+#wrap { position: relative; flex: 1; min-height: 0; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+#over { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.45); }
+#over.show { display: flex; }
+.card { background: var(--panel); color: var(--ink); padding: 20px 24px; border-radius: 12px; text-align: center; max-width: 320px; margin: 16px; }
+.card h2 { margin: 0 0 6px; font-size: 20px; }
+.card p { margin: 0 0 14px; }
+.card button { margin: 0 4px; }
+dialog { border: none; border-radius: 12px; background: var(--panel); color: var(--ink); max-width: 420px; padding: 18px 22px; }
+dialog::backdrop { background: rgba(0,0,0,.45); }
+dialog h2 { margin: 0 0 8px; font-size: 18px; }
+dialog ul { padding-left: 20px; margin: 0 0 12px; }
+dialog li { margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>HEXDEK</h1>
+  <span class="stat">Score <b id="score">0</b></span>
+  <span class="stat">Best <b id="best">0</b></span>
+  <span class="stat">Turn <b id="turn">0</b></span>
+  <span class="spacer"></span>
+  <button id="undo" title="Undo a pour (Ctrl/Cmd+Z)">Undo</button>
+  <button id="help">How to play</button>
+  <button id="new">New game</button>
+</header>
+<div id="status" aria-live="polite"><span id="msg"></span><button id="giveup">Give up</button></div>
+<div id="wrap">
+  <canvas id="c" aria-label="Hexdek board"></canvas>
+  <div id="over"><div class="card">
+    <h2>No room left</h2>
+    <p id="overtext"></p>
+    <button id="overundo">Undo last pour</button>
+    <button id="overnew">New game</button>
+  </div></div>
+</div>
+<dialog id="rules">
+  <h2>How to play</h2>
+  <ul>
+    <li><b>Pour:</b> tap a stack, then tap a neighbouring cell (or drag the stack there). Its top run, the same-coloured tiles on top, moves onto a stack with the same top colour, or onto an empty cell. Pours are free.</li>
+    <li><b>Place:</b> drag a stack from the tray onto an empty cell, or tap it and then tap the cell. Placing ends your turn.</li>
+    <li><b>Hexdek:</b> a stack holds at most 12 tiles. A full stack of one colour clears: 120 points, ×2 for a second clear in the same turn, ×3 for a third.</li>
+    <li>The game ends when there's no empty cell and no pour can make one.</li>
+    <li>Undo takes back pours until you place. The game saves itself as you go.</li>
+  </ul>
+  <form method="dialog" style="text-align:right"><button>OK</button></form>
+</dialog>
+
+<script>
+'use strict';
+
+// ---- tuning: change these and reload ----
+const CFG = {
+  radius: 2,          // board: a hexagon of 19 cells
+  colours: 5,
+  minTiles: 2, maxTiles: 6, maxBands: 3,   // tray stacks
+  hexdek: 12,         // height limit; a full stack of one colour clears
+  pointsPerTile: 10,
+  traySize: 3,
+};
+const COLOURS = [   // colour and symbol, so colours can be told apart without colour vision
+  ['#e5484d', 'circle'], ['#f2b705', 'triangle'], ['#2fa86a', 'square'],
+  ['#3b82e6', 'star'], ['#9b5de5', 'diamond'],
+];
+
+// ---- rules: plain data, no drawing ----
+const DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+const CELLS = makeCells(CFG.radius);
+
+function makeCells(R) {
+  const out = [];
+  for (let r = -R; r <= R; r++)
+    for (let q = -R; q <= R; q++)
+      if (Math.abs(q + r) <= R) out.push(q + ',' + r);
+  return out;
+}
+function neighbours(k) {
+  const [q, r] = k.split(',').map(Number);
+  return DIRS.map(([dq, dr]) => (q + dq) + ',' + (r + dr));
+}
+function topOf(st) { return st.length ? st[st.length - 1] : -1; }
+function runLen(st) {
+  let n = 0;
+  for (let i = st.length - 1; i >= 0 && st[i] === topOf(st); i--) n++;
+  return n;
+}
+function rand(g) {   // mulberry32; the seed lives in the game so a saved game carries on the same
+  let t = g.seed = (g.seed + 0x6D2B79F5) | 0;
+  t = Math.imul(t ^ t >>> 15, t | 1);
+  t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+  return ((t ^ t >>> 14) >>> 0) / 4294967296;
+}
+function newStack(g) {
+  const n = CFG.minTiles + Math.floor(rand(g) * (CFG.maxTiles - CFG.minTiles + 1));
+  const bands = 1 + Math.floor(rand(g) * Math.min(CFG.maxBands, n));
+  const cuts = new Set();
+  while (cuts.size < bands - 1) cuts.add(1 + Math.floor(rand(g) * (n - 1)));
+  const st = [];
+  let c = -1;
+  for (let i = 0; i < n; i++) {
+    if (i === 0 || cuts.has(i)) {
+      let d;
+      do d = Math.floor(rand(g) * CFG.colours); while (d === c);
+      c = d;
+    }
+    st.push(c);
+  }
+  return st;
+}
+function newGame(seed) {
+  const g = { seed: seed | 0, board: {}, tray: [], next: null, score: 0, turn: 0,
+              clearsThisTurn: 0, history: [] };
+  for (const k of CELLS) g.board[k] = [];
+  for (let i = 0; i < CFG.traySize; i++) g.tray.push(newStack(g));
+  g.next = newStack(g);
+  return g;
+}
+// What pouring a's top run onto b would do, or null if it isn't allowed.
+function pourResult(board, a, b) {
+  const A = board[a], B = board[b];
+  if (a === b || !A || !B || !A.length || !neighbours(a).includes(b)) return null;
+  if (B.length && topOf(B) !== topOf(A)) return null;
+  const room = CFG.hexdek - B.length;
+  if (room <= 0) return null;
+  const n = Math.min(runLen(A), room);
+  const after = (B.length ? runLen(B) : 0) + n;
+  return { n, after, clears: after === CFG.hexdek, emptiesFrom: n === A.length };
+}
+function legalTargets(board, a) { return neighbours(a).filter(b => pourResult(board, a, b)); }
+function pour(g, a, b) {
+  const res = pourResult(g.board, a, b);
+  if (!res) return null;
+  g.history.push(JSON.stringify({ board: g.board, score: g.score, clearsThisTurn: g.clearsThisTurn }));
+  const A = g.board[a], B = g.board[b];
+  res.colour = topOf(A); res.baseTo = B.length;
+  B.push(...A.splice(A.length - res.n, res.n));
+  res.fromLen = A.length;
+  if (res.clears) {
+    g.board[b] = [];
+    g.clearsThisTurn++;
+    res.mult = g.clearsThisTurn;
+    res.points = CFG.hexdek * CFG.pointsPerTile * res.mult;
+    g.score += res.points;
+  }
+  return res;
+}
+function undo(g) {
+  if (!g.history.length) return false;
+  const s = JSON.parse(g.history.pop());
+  g.board = s.board; g.score = s.score; g.clearsThisTurn = s.clearsThisTurn;
+  return true;
+}
+function place(g, slot, cell) {
+  if (!g.tray[slot] || !g.board[cell] || g.board[cell].length) return false;
+  g.board[cell] = g.tray[slot];
+  g.tray[slot] = g.next;
+  g.next = newStack(g);
+  g.turn++; g.history = []; g.clearsThisTurn = 0;
+  return true;
+}
+// 'ok': an empty cell; 'full': none, but some pours make one; 'over': no way to make one.
+function roomState(board) {
+  if (CELLS.some(k => !board[k].length)) return 'ok';
+  return canMakeRoom(board) ? 'full' : 'over';
+}
+function canMakeRoom(start, limit) {
+  limit = limit || 3000;
+  const key = b => CELLS.map(k => b[k].join('')).join('|');
+  const seen = new Set([key(start)]);
+  let frontier = [start], nodes = 0;
+  while (frontier.length) {
+    const next = [];
+    for (const b of frontier)
+      for (const a of CELLS)
+        for (const c of legalTargets(b, a)) {
+          const r = pourResult(b, a, c);
+          if (r.emptiesFrom || r.clears) return true;
+          const nb = {};
+          for (const k of CELLS) nb[k] = b[k].slice();
+          nb[c].push(...nb[a].splice(nb[a].length - r.n));
+          const kk = key(nb);
+          if (seen.has(kk)) continue;
+          seen.add(kk);
+          if (++nodes > limit) return true;   // too many to check: don't end the game on a guess
+          next.push(nb);
+        }
+    frontier = next;
+  }
+  return false;
+}
+
+// ---- the page ----
+function start() {
+  const SAVE = 'hexdek.save.v1', BEST = 'hexdek.best';
+  const TILE = 0.12;      // tile thickness, as a share of the hex size
+  const R3 = Math.sqrt(3);
+  const $ = id => document.getElementById(id);
+  const canvas = $('c'), ctx = canvas.getContext('2d');
+
+  let g = load() || newGame(Date.now());
+  let best = 0;
+  try { best = Number(localStorage.getItem(BEST)) || 0; } catch (e) {}
+  let state = roomState(g.board);
+  const ui = { sel: null, trayPick: null, press: null, drag: null, hover: null, pos: null, touch: false };
+  let anims = [], flash = null, dirty = true;
+  let W = 0, H = 0, S = 0, BX = 0, BY = 0, TY = 0, SLOT = 0, theme = {};
+  const ORDER = CELLS.slice().sort((a, b) => {
+    const [qa, ra] = a.split(',').map(Number), [qb, rb] = b.split(',').map(Number);
+    return ra - rb || qa - qb;
+  });
+
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(SAVE));
+      if (s && s.board && CELLS.every(k => Array.isArray(s.board[k])) && s.tray && s.next) return s;
+    } catch (e) {}
+    return null;
+  }
+  function save() {
+    try { localStorage.setItem(SAVE, JSON.stringify(g)); } catch (e) {}
+    if (g.score > best) {
+      best = g.score;
+      try { localStorage.setItem(BEST, String(best)); } catch (e) {}
+    }
+  }
+
+  // ---- geometry ----
+  function resize() {
+    const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    W = r.width; H = r.height;
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const R = CFG.radius, rows = 1.6 + (3 * R + 2) + 3.6;
+    S = Math.min(W * 0.94 / (R3 * (2 * R + 1)), H / rows);
+    const oy = Math.max(0, (H - rows * S) / 2);
+    BX = W / 2;
+    BY = oy + S * 1.6 + S * (1.5 * R + 1);
+    TY = BY + S * (1.5 * R + 1) + S * 2.1;
+    SLOT = Math.min(W / 4.3, S * 2.4);
+    const css = getComputedStyle(document.documentElement);
+    for (const v of ['cell', 'cell-edge', 'accent', 'ink', 'muted', 'panel']) theme[v] = css.getPropertyValue('--' + v).trim();
+    dirty = true;
+  }
+  function cellXY(k) {
+    const [q, r] = k.split(',').map(Number);
+    return [BX + S * R3 * (q + r / 2), BY + S * 1.5 * r];
+  }
+  function slotXY(i) { return [W / 2 + (i - 1.5) * SLOT, TY]; }
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  function distToColumn(p, x, y, h) {   // distance from p to the line from a stack's base up to its top
+    const yy = Math.max(y - h, Math.min(y, p.y));
+    return Math.hypot(p.x - x, p.y - yy);
+  }
+  function stackAt(p) {   // the frontmost stack drawn under p, tall ones included
+    for (let i = ORDER.length - 1; i >= 0; i--) {
+      const k = ORDER[i], st = g.board[k];
+      if (!st.length) continue;
+      const [x, y] = cellXY(k);
+      if (distToColumn(p, x, y, (st.length - 1) * S * TILE) < S * 0.85) return k;
+    }
+    return null;
+  }
+  function cellAt(p) {
+    const k = stackAt(p);
+    if (k) return k;
+    let bestK = null, bestD = S * 0.95;
+    for (const c of CELLS) {
+      const [x, y] = cellXY(c), d = Math.hypot(p.x - x, p.y - y);
+      if (d < bestD) { bestD = d; bestK = c; }
+    }
+    return bestK;
+  }
+  function traySlotAt(p) {
+    for (let i = 0; i < CFG.traySize; i++) {
+      const [x, y] = slotXY(i);
+      if (Math.abs(p.x - x) < SLOT / 2 && p.y > y - S * 1.5 && p.y < y + S * 1.1) return i;
+    }
+    return null;
+  }
+  // Where a dragged piece goes, from the point its base floats at. The highlight and the
+  // drop both use these, so what lights up is always what happens.
+  function liftPoint(p) { return ui.touch ? { x: p.x, y: p.y - S * 1.6 } : { x: p.x, y: p.y + S * 0.3 }; }
+  function dropTarget(lp) {
+    let bestK = null, bestD = S * 1.2;
+    for (const c of CELLS) {
+      if (g.board[c].length) continue;
+      const [x, y] = cellXY(c), d = Math.hypot(lp.x - x, lp.y - y);
+      if (d < bestD) { bestD = d; bestK = c; }
+    }
+    return bestK;
+  }
+  function pourTarget(from, lp) {
+    let bestK = null, bestD = S * 1.2;
+    for (const c of legalTargets(g.board, from)) {
+      const [x, y] = cellXY(c), d = distToColumn(lp, x, y, Math.max(0, g.board[c].length - 1) * S * TILE);
+      if (d < bestD) { bestD = d; bestK = c; }
+    }
+    return bestK;
+  }
+  function dragTarget() {
+    if (!ui.drag || !ui.pos) return null;
+    const lp = liftPoint(ui.pos);
+    return ui.drag.kind === 'tray' ? dropTarget(lp) : pourTarget(ui.drag.from, lp);
+  }
+
+  // ---- actions ----
+  function doPour(a, b) {
+    const res = pour(g, a, b);
+    if (!res) return;
+    const now = performance.now(), stagger = Math.min(40, 160 / res.n);
+    const pa = { type: 'pour', a, b, colour: res.colour, n: res.n, baseTo: res.baseTo, fromLen: res.fromLen,
+                 t0: now, stagger, dur: 180, cleared: res.clears };
+    anims.push(pa);
+    if (res.clears) {
+      anims.push({ type: 'clear', cell: b, colour: res.colour, keep: res.baseTo, pour: pa, t0: now,
+                   wait: pa.dur + stagger * (res.n - 1), dur: 340 });
+      setFlash('Hexdek! +' + res.points + (res.mult > 1 ? ' (×' + res.mult + ')' : ''));
+    }
+    ui.sel = null;
+    after();
+  }
+  function doPlace(slot, cell) {
+    if (!place(g, slot, cell)) return;
+    anims.push({ type: 'place', cell, t0: performance.now(), dur: 140 });
+    ui.trayPick = null; ui.sel = null;
+    after();
+  }
+  function doUndo() {
+    finishAnims();
+    if (undo(g)) { ui.sel = null; flash = null; after(); }
+  }
+  function doNew() {
+    if (g.turn > 0 && state !== 'over' && !confirm('Start a new game? This one will be lost.')) return;
+    finishAnims();
+    g = newGame(Date.now());
+    ui.sel = ui.trayPick = null;
+    flash = null;
+    after();
+  }
+  function after() {
+    state = roomState(g.board);
+    save();
+    hud();
+    dirty = true;
+  }
+  function setFlash(text) { flash = { text, until: performance.now() + 2500 }; }
+  function finishAnims() { anims = []; dirty = true; }
+
+  function hud() {
+    $('score').textContent = g.score;
+    $('best').textContent = best;
+    $('turn').textContent = g.turn;
+    $('undo').disabled = !g.history.length;
+    const st = $('status');
+    st.classList.toggle('flash', !!flash);
+    let text;
+    if (flash) text = flash.text;
+    else if (state === 'full') text = 'Board full: pour to make room.';
+    else if (ui.trayPick !== null) text = 'Tap an empty cell to place it.';
+    else if (ui.sel) text = 'Tap a highlighted neighbour to pour, or tap the stack again to let go.';
+    else if (g.turn === 0 && !g.history.length) text = 'Drag a stack from the tray onto the board to start.';
+    else text = 'Pour as you like, then place a tray stack to end the turn.';
+    $('msg').textContent = text;
+    $('giveup').style.display = state === 'full' ? 'inline-block' : 'none';
+    $('over').classList.toggle('show', state === 'over');
+    $('overtext').textContent = 'Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ')') + '.';
+    $('overundo').style.display = g.history.length ? '' : 'none';
+  }
+
+  // ---- input ----
+  function pt(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  canvas.addEventListener('pointerdown', e => {
+    finishAnims();
+    if (state === 'over') return;
+    const p = pt(e);
+    ui.pos = p; ui.touch = e.pointerType !== 'mouse';
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    const slot = traySlotAt(p);
+    ui.press = slot !== null ? { kind: 'tray', slot, start: p } : { kind: 'board', cell: cellAt(p), start: p };
+    dirty = true;
+  });
+  canvas.addEventListener('pointermove', e => {
+    const p = pt(e);
+    ui.pos = p;
+    if (e.pointerType === 'mouse') ui.hover = cellAt(p);
+    const pr = ui.press;
+    if (pr && !ui.drag && dist(p, pr.start) > 8) {
+      if (pr.kind === 'tray') ui.drag = { kind: 'tray', slot: pr.slot };
+      else if (pr.cell && g.board[pr.cell].length) ui.drag = { kind: 'pour', from: pr.cell };
+      if (ui.drag) { ui.sel = null; ui.trayPick = null; hud(); }
+    }
+    dirty = true;
+  });
+  canvas.addEventListener('pointerup', e => {
+    ui.pos = pt(e);
+    if (ui.drag) {
+      const t = dragTarget(), d = ui.drag;
+      ui.drag = null;
+      if (t) { if (d.kind === 'tray') doPlace(d.slot, t); else doPour(d.from, t); }
+    } else if (ui.press) tap(ui.press);
+    ui.press = null;
+    hud();
+    dirty = true;
+  });
+  canvas.addEventListener('pointercancel', () => { ui.press = ui.drag = null; dirty = true; });
+  canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { ui.hover = null; dirty = true; } });
+
+  function tap(pr) {
+    if (pr.kind === 'tray') {
+      ui.trayPick = ui.trayPick === pr.slot ? null : pr.slot;
+      ui.sel = null;
+      return;
+    }
+    const c = pr.cell;
+    if (!c) { ui.sel = ui.trayPick = null; return; }
+    if (ui.sel && pourResult(g.board, ui.sel, c)) { doPour(ui.sel, c); return; }
+    if (ui.trayPick !== null && !g.board[c].length) { doPlace(ui.trayPick, c); return; }
+    ui.sel = g.board[c].length && ui.sel !== c ? c : null;
+    ui.trayPick = null;
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { ui.sel = ui.trayPick = null; ui.drag = ui.press = null; hud(); dirty = true; }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); doUndo(); }
+  });
+  $('undo').onclick = doUndo;
+  $('overundo').onclick = doUndo;
+  $('new').onclick = doNew;
+  $('overnew').onclick = doNew;
+  $('giveup').onclick = () => { state = 'over'; hud(); };
+  $('help').onclick = () => $('rules').showModal();
+
+  // ---- drawing ----
+  function shade(hex, f) {   // f < 0 darkens, f > 0 lightens
+    const n = parseInt(hex.slice(1), 16), t = f < 0 ? 0 : 255, a = Math.abs(f);
+    const ch = s => Math.round(((n >> s) & 255) * (1 - a) + t * a);
+    return 'rgb(' + ch(16) + ',' + ch(8) + ',' + ch(0) + ')';
+  }
+  function hexPath(x, y, s) {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 180 * (60 * i - 90);
+      ctx.lineTo(x + s * Math.cos(a), y + s * Math.sin(a));
+    }
+    ctx.closePath();
+  }
+  function symbol(kind, x, y, r) {
+    ctx.beginPath();
+    if (kind === 'circle') ctx.arc(x, y, r * 0.8, 0, Math.PI * 2);
+    else if (kind === 'square') ctx.rect(x - r * 0.7, y - r * 0.7, r * 1.4, r * 1.4);
+    else if (kind === 'diamond') { ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.8, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r * 0.8, y); }
+    else if (kind === 'triangle') { ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.95, y + r * 0.7); ctx.lineTo(x - r * 0.95, y + r * 0.7); }
+    else for (let i = 0; i < 10; i++) {   // star
+      const a = Math.PI / 5 * i - Math.PI / 2, rr = i % 2 ? r * 0.45 : r;
+      ctx.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a));
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.fill();
+    ctx.lineWidth = Math.max(1, r * 0.14); ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.stroke();
+  }
+  function tile(x, y, s, c) {
+    const col = COLOURS[c][0];
+    hexPath(x, y + s * TILE * 0.6, s * 0.9); ctx.fillStyle = shade(col, -0.4); ctx.fill();
+    hexPath(x, y, s * 0.9); ctx.fillStyle = col; ctx.fill();
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.stroke();
+  }
+  function drawStack(x, y, s, st, count) {
+    const h = s * TILE;
+    for (let i = 0; i < count; i++) tile(x, y - i * h, s, st[i]);
+    if (!count) return;
+    const ty = y - (count - 1) * h, c = st[count - 1];
+    let n = 0;
+    for (let i = count - 1; i >= 0 && st[i] === c; i--) n++;
+    symbol(COLOURS[c][1], x, ty - s * 0.12, s * 0.3);
+    ctx.font = '700 ' + Math.round(s * 0.28) + 'px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.strokeText(n, x, ty + s * 0.42);
+    ctx.fillStyle = '#fff'; ctx.fillText(n, x, ty + s * 0.42);
+  }
+  function ring(x, y, s, strong) {
+    hexPath(x, y, s * 0.93);
+    ctx.lineWidth = strong ? 4 : 2;
+    ctx.strokeStyle = theme.accent;
+    ctx.setLineDash(strong ? [] : [5, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  function pill(text, x, y) {
+    ctx.font = '600 ' + Math.max(12, Math.round(S * 0.3)) + 'px system-ui, sans-serif';
+    const w = ctx.measureText(text).width + 16, h = Math.max(22, S * 0.5);
+    const px = Math.max(4, Math.min(W - w - 4, x - w / 2));
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(px, y - h / 2, w, h, h / 2); else ctx.rect(px, y - h / 2, w, h);
+    ctx.fillStyle = theme.ink; ctx.fill();
+    ctx.fillStyle = theme.panel; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, px + w / 2, y);
+  }
+  function previewText(a, b) {
+    const r = pourResult(g.board, a, b);
+    let t = r.after + ' / ' + CFG.hexdek;
+    if (r.clears) t += ' · hexdek!';
+    if (r.n < runLen(g.board[a])) t += ' (moves ' + r.n + ')';
+    return t;
+  }
+  function highlights() {
+    const out = { targets: new Set(), strong: null, pill: null, ghost: null };
+    const empties = () => CELLS.forEach(k => { if (!g.board[k].length) out.targets.add(k); });
+    if (ui.drag && ui.drag.kind === 'tray') {
+      empties();
+      const t = dragTarget();
+      if (t) { out.strong = t; out.ghost = { cell: t, st: g.tray[ui.drag.slot] }; }
+    } else if (ui.drag) {
+      legalTargets(g.board, ui.drag.from).forEach(k => out.targets.add(k));
+      const t = dragTarget();
+      if (t) { out.strong = t; out.pill = { cell: t, from: ui.drag.from }; }
+    } else if (ui.sel) {
+      legalTargets(g.board, ui.sel).forEach(k => out.targets.add(k));
+      if (ui.hover && out.targets.has(ui.hover))
+        out.pill = { cell: ui.hover, from: ui.sel };
+    } else if (ui.trayPick !== null) {
+      empties();
+      if (ui.hover && out.targets.has(ui.hover)) { out.strong = ui.hover; out.ghost = { cell: ui.hover, st: g.tray[ui.trayPick] }; }
+    }
+    return out;
+  }
+  const ease = t => 1 - Math.pow(1 - t, 3);
+  function arrived(pa, now) {
+    let n = 0;
+    for (let k = 0; k < pa.n; k++) if (now >= pa.t0 + k * pa.stagger + pa.dur) n++;
+    return n;
+  }
+
+  function render(now) {
+    anims = anims.filter(a => now < a.t0 + (a.wait || 0) + a.dur + (a.type === 'pour' ? a.stagger * (a.n - 1) : 0));
+    ctx.clearRect(0, 0, W, H);
+    const h = S * TILE, hl = highlights();
+    const hidden = {}, drop = {};
+    for (const a of anims) {
+      if (a.type === 'pour' && !a.cleared) hidden[a.b] = (hidden[a.b] || 0) + a.n - arrived(a, now);
+      if (a.type === 'place') drop[a.cell] = (1 - ease(Math.min(1, (now - a.t0) / a.dur))) * S * 0.7;
+    }
+    for (const k of ORDER) {   // the floor
+      const [x, y] = cellXY(k);
+      hexPath(x, y, S * 0.95);
+      ctx.fillStyle = theme.cell; ctx.fill();
+      ctx.lineWidth = 1; ctx.strokeStyle = theme['cell-edge']; ctx.stroke();
+      if (!g.board[k].length && hl.targets.has(k)) ring(x, y, S, k === hl.strong);
+    }
+    for (const k of ORDER) {
+      const st = g.board[k];
+      let [x, y] = cellXY(k);
+      if (hl.ghost && hl.ghost.cell === k) {
+        ctx.globalAlpha = 0.45; drawStack(x, y, S, hl.ghost.st, hl.ghost.st.length); ctx.globalAlpha = 1;
+      }
+      if (!st.length) continue;
+      let count = st.length - (hidden[k] || 0);
+      if (ui.drag && ui.drag.kind === 'pour' && ui.drag.from === k) count -= runLen(st);
+      if (ui.sel === k) y -= S * 0.15;
+      y -= drop[k] || 0;
+      drawStack(x, y, S, st, count);
+      const ty = y - Math.max(0, count - 1) * h;
+      if (hl.targets.has(k)) ring(x, ty, S, k === hl.strong || (hl.pill && hl.pill.cell === k));
+      if (ui.sel === k) { hexPath(x, ty, S * 0.93); ctx.lineWidth = 4; ctx.strokeStyle = theme.ink; ctx.stroke(); }
+    }
+    for (const a of anims) {
+      if (a.type === 'clear') {
+        const [x, y] = cellXY(a.cell), t = (now - a.t0 - a.wait) / a.dur;
+        if (t < 0) {
+          for (let i = 0; i < a.keep + arrived(a.pour, now); i++) tile(x, y - i * h, S, a.colour);
+        } else {
+          ctx.globalAlpha = Math.max(0, 1 - t);
+          const grow = 1 + 0.25 * t;
+          for (let i = 0; i < CFG.hexdek; i++) tile(x, y - i * h * grow, S * grow, a.colour);
+          ctx.globalAlpha = 1;
+        }
+      } else if (a.type === 'pour') {
+        const [x0, y0] = cellXY(a.a), [x1, y1] = cellXY(a.b);
+        for (let k = 0; k < a.n; k++) {
+          const t = (now - a.t0 - k * a.stagger) / a.dur;
+          if (t >= 1) continue;
+          const u = ease(Math.max(0, t));
+          const ys = y0 - (a.fromLen + a.n - 1 - k) * h, ye = y1 - (a.baseTo + k) * h;
+          tile(x0 + (x1 - x0) * u, ys + (ye - ys) * u - Math.sin(Math.PI * u) * S * 0.7, S, a.colour);
+        }
+      }
+    }
+    // the tray: three to choose from, and the next one
+    for (let i = 0; i <= CFG.traySize; i++) {
+      const [x, y] = slotXY(i), isNext = i === CFG.traySize, st = isNext ? g.next : g.tray[i];
+      const s = S * (isNext ? 0.55 : 0.8);
+      if (ui.trayPick === i) {
+        ctx.beginPath();
+        ctx.lineWidth = 3; ctx.strokeStyle = theme.accent;
+        if (ctx.roundRect) ctx.roundRect(x - SLOT * 0.45, y - S * 1.45, SLOT * 0.9, S * 2.45, 10);
+        else ctx.rect(x - SLOT * 0.45, y - S * 1.45, SLOT * 0.9, S * 2.45);
+        ctx.stroke();
+      }
+      if (ui.drag && ui.drag.kind === 'tray' && ui.drag.slot === i) {
+        hexPath(x, y, s * 0.9); ctx.setLineDash([5, 4]); ctx.lineWidth = 2; ctx.strokeStyle = theme['cell-edge']; ctx.stroke(); ctx.setLineDash([]);
+        continue;
+      }
+      if (isNext) ctx.globalAlpha = 0.75;
+      drawStack(x, y, s, st, st.length);
+      ctx.globalAlpha = 1;
+      if (isNext) {
+        ctx.font = Math.max(11, Math.round(S * 0.26)) + 'px system-ui, sans-serif';
+        ctx.fillStyle = theme.muted; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText('next', x, y + s + 6);
+      }
+    }
+    if (ui.drag && ui.pos) {   // the piece being dragged floats where its base will land
+      const lp = liftPoint(ui.pos);
+      if (ui.drag.kind === 'tray') { const st = g.tray[ui.drag.slot]; drawStack(lp.x, lp.y, S, st, st.length); }
+      else {
+        const st = g.board[ui.drag.from], run = st.slice(st.length - runLen(st));
+        drawStack(lp.x, lp.y, S, run, run.length);
+      }
+    }
+    if (hl.pill) {   // the preview: a ghost of the tiles that would land, and the result on top of them
+      const [x, y] = cellXY(hl.pill.cell), len = g.board[hl.pill.cell].length;
+      const r = pourResult(g.board, hl.pill.from, hl.pill.cell), c = topOf(g.board[hl.pill.from]);
+      ctx.globalAlpha = 0.55;
+      for (let i = 0; i < r.n; i++) tile(x, y - (len + i) * h, S, c);
+      ctx.globalAlpha = 1;
+      pill(previewText(hl.pill.from, hl.pill.cell), x, y - (len + r.n - 1) * h);
+    }
+  }
+
+  function frame(now) {
+    if (flash && now > flash.until) { flash = null; hud(); }
+    if (dirty || anims.length) { dirty = false; render(now); }
+    requestAnimationFrame(frame);
+  }
+  new ResizeObserver(resize).observe($('wrap'));
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', resize);
+  resize();
+  hud();
+  requestAnimationFrame(frame);
+}
+
+if (typeof document !== 'undefined') start();
+</script>
+</body>
+</html>
