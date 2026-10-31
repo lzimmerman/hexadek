@@ -137,12 +137,16 @@ dialog li { margin-bottom: 6px; }
     <li><b>Restart</b> plays the same game again from the start, with the same stacks, to try another plan.
       <b>New game</b> deals new stacks.</li>
   </ul>
-  <form method="dialog" class="row"><button type="button" id="tutor">Play the tutorial</button><span class="spacer"></span><button>Close</button></form>
+  <div class="row"><button type="button" id="tutor">Play the tutorial</button><span class="spacer"></span><button type="button" id="rulesclose">Close</button></div>
+</dialog>
+<dialog id="ask">
+  <p id="asktext"></p>
+  <div class="row"><button type="button" id="askyes">Yes</button><button type="button" id="askno" autofocus>Cancel</button></div>
 </dialog>
 <dialog id="welcome">
   <h2>Welcome to Hexadek</h2>
   <p>New to games like this? A short tutorial shows the moves, in about two minutes.</p>
-  <form method="dialog" class="row"><button type="button" id="welcometut">Play the tutorial</button><button>Just play</button></form>
+  <div class="row"><button type="button" id="welcometut">Play the tutorial</button><button type="button" id="welcomeclose">Just play</button></div>
 </dialog>
 
 <script>
@@ -469,14 +473,32 @@ function start() {
   }
   function doNew(again) {   // again: the same game from the start, with the same stacks
     if (tut) { g = realG || g; tut = realG = null; coach(); }
-    const ask = again ? 'Restart this game from the beginning?' : 'Start a new game? This one will be lost.';
-    if ((g.turn > 0 || g.history.length) && state !== 'over' && !confirm(ask)) return;
-    finishAnims();
-    g = newGame(again && g.start !== undefined ? g.start : Date.now());
-    ui.sel = ui.trayPick = null;
-    flash = null;
-    after();
+    const go = () => {
+      finishAnims();
+      g = newGame(again ? g.start : Date.now());
+      ui.sel = ui.trayPick = null;
+      flash = null;
+      after();
+    };
+    if ((g.turn > 0 || g.history.length) && state !== 'over')
+      ask(again ? 'Restart this game from the beginning, with the same stacks?' : 'Start a new game? This one will be lost.',
+          again ? 'Restart' : 'New game', go);
+    else go();
   }
+  // Our own yes/no box: browsers' confirm() is blocked inside some page viewers, and then
+  // answers "no" without showing anything. Plain buttons close it: no form, since a viewer
+  // may not allow forms either.
+  let onYes = null;
+  function ask(text, yes, then) {
+    $('asktext').textContent = text;
+    $('askyes').textContent = yes;
+    onYes = then;
+    $('ask').showModal();
+  }
+  $('askyes').onclick = () => { const then = onYes; onYes = null; $('ask').close(); if (then) then(); };
+  $('askno').onclick = () => { onYes = null; $('ask').close(); };
+  $('rulesclose').onclick = () => $('rules').close();
+  $('welcomeclose').onclick = () => $('welcome').close();
   function after() {
     state = roomState(g.board);
     save();
@@ -541,7 +563,8 @@ function start() {
     $('best').textContent = best;
     $('turn').textContent = g.turn;
     $('undo').disabled = !g.history.length || !!tut;
-    $('restart').disabled = !!tut;
+    $('restart').disabled = !!tut || g.start === undefined;
+    $('overrestart').style.display = g.start === undefined ? 'none' : '';
     const st = $('status');
     st.classList.toggle('flash', !!flash);
     let text;
