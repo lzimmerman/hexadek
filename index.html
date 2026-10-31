@@ -21,7 +21,15 @@
 }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
   font: 15px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif; }
-body { display: flex; flex-direction: column; overscroll-behavior: none; }
+body { display: flex; flex-direction: column; overscroll-behavior: none; user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent; }
+#bar { padding: 6px 16px calc(10px + env(safe-area-inset-bottom)); }   /* clear of the phone's gesture bar */
+#undo { min-width: 96px; }
+button { touch-action: manipulation; }   /* no double-tap zoom */
+@media (pointer: coarse) {   /* thumbs: bigger buttons */
+  button { min-height: 48px; padding: 10px 16px; }
+  #buttons, header { gap: 8px 10px; }
+}
 header { display: flex; align-items: center; gap: 10px 14px; padding: 10px 16px 4px; flex-wrap: wrap; }
 #buttons { padding: 4px 16px 6px; }
 h1 { font-size: 19px; margin: 0; letter-spacing: .04em; }
@@ -78,7 +86,6 @@ dialog li { margin-bottom: 6px; }
   <span class="stat"><b id="mode"></b></span>
 </header>
 <nav class="row" id="buttons">   <!-- on the left: a page viewer may put its own controls in the top-right corner -->
-  <button id="undo" title="Undo a pour (Ctrl/Cmd+Z)">Undo</button>
   <button id="restart" title="Play this game again from the start, with the same stacks">Restart</button>
   <button id="new" title="A new game with new stacks">New game</button>
   <button id="help">How to play</button>
@@ -99,6 +106,11 @@ dialog li { margin-bottom: 6px; }
     <button id="overnew">New game</button>
   </div></div>
 </div>
+<footer id="bar" class="row">   <!-- below the board, where a thumb reaches -->
+  <button id="undo" title="Undo a pour (Ctrl/Cmd+Z)">Undo</button>
+  <span class="spacer"></span>
+  <button id="haptics" aria-pressed="false" title="Vibrate on pours and hexadeks">Haptics: off</button>
+</footer>
 <dialog id="rules">
   <h2 tabindex="-1">How to play</h2>
   <p>Hexadek is a puzzle about sorting coloured tiles. Each cell of the board holds a stack of hex tiles.
@@ -141,7 +153,8 @@ dialog li { margin-bottom: 6px; }
   <h3>Controls</h3>
   <ul>
     <li>Tap or click, or drag. Tapping during an animation skips it.</li>
-    <li>Esc lets go of a selected stack. Ctrl+Z or Cmd+Z undoes a pour.</li>
+    <li>Undo is below the board. Esc lets go of a selected stack, and Ctrl+Z or Cmd+Z undoes a pour.</li>
+    <li>Haptics, also below the board, makes the phone vibrate on pours and hexadeks. It's off to start with.</li>
     <li><b>Restart</b> plays the same game again from the start, with the same stacks, to try another plan.
       <b>New game</b> deals new stacks.</li>
   </ul>
@@ -479,6 +492,7 @@ function start() {
     if (!tutAllows('pour', a, b)) { ui.sel = null; return; }
     const res = pour(g, a, b);
     if (!res) return;
+    buzz(res.clears ? [30, 40, 70] : 12);
     const now = performance.now(), stagger = Math.min(40, 160 / res.n);
     const pa = { type: 'pour', a, b, colour: res.colour, n: res.n, baseTo: res.baseTo, fromLen: res.fromLen,
                  t0: now, stagger, dur: 180, cleared: res.clears };
@@ -495,6 +509,7 @@ function start() {
   function doPlace(slot, cell) {
     if (!tutAllows('place', slot, cell)) { ui.trayPick = null; return; }
     if (!place(g, slot, cell)) return;
+    buzz(20);
     anims.push({ type: 'place', cell, t0: performance.now(), dur: 140 });
     ui.trayPick = null; ui.sel = null;
     after();
@@ -542,6 +557,27 @@ function start() {
   $('askyes').onclick = () => { const then = onYes; onYes = null; $('ask').close(); if (then) then(); };
   $('askno').onclick = () => { onYes = null; $('ask').close(); };
   $('rulesclose').onclick = () => $('rules').close();
+
+  // Haptics: off unless turned on; remembered on this device.
+  let haptics = false;
+  try { haptics = localStorage.getItem('hexadek.haptics') === 'on'; } catch (e) {}
+  function buzz(pattern) {
+    if (!haptics || !navigator.vibrate) return;
+    try { navigator.vibrate(pattern); } catch (e) {}
+  }
+  function showHaptics() {
+    const b = $('haptics');
+    b.textContent = 'Haptics: ' + (haptics ? 'on' : 'off');
+    b.setAttribute('aria-pressed', String(haptics));
+    if (!navigator.vibrate) b.style.display = 'none';   // e.g. iPhones: no vibration from web pages
+  }
+  $('haptics').onclick = () => {
+    haptics = !haptics;
+    try { localStorage.setItem('hexadek.haptics', haptics ? 'on' : 'off'); } catch (e) {}
+    showHaptics();
+    buzz(20);
+  };
+  showHaptics();
   $('welcomeclose').onclick = () => $('welcome').close();
   function after() {
     state = roomState(g.board, poursLeft(g));
