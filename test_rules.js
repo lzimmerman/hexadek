@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -45,3 +45,17 @@ console.log('full board, all stacks at 12:', roomState(full.board));
 const one = newGame(4); CELLS.forEach(k => one.board[k] = [1, 0]); one.board['0,0'] = [0];
 console.log('full board, a single-colour stack beside a match:', roomState(one.board));
 console.log('all rules tests passed');
+
+// the tutorial: every move it asks for is legal, in order, and the last pour makes a hexadek
+const tg = R.tutorialGame();
+R.TUTORIAL.forEach((st, i) => {
+  const e = st.expect;
+  if (!e) return;
+  if (e.pour) { const r = pour(tg, e.pour[0], e.pour[1]); assert(r, 'tutorial step ' + (i + 1) + ' pour is legal');
+    if (i === R.TUTORIAL.length - 2) assert(r.clears, 'the tutorial ends with a hexadek'); }
+  else assert(place(tg, e.place[0], e.place[1]), 'tutorial step ' + (i + 1) + ' place is legal');
+});
+assert.equal(tg.score, 120);
+// restart: the same seed deals the same stacks
+const ga = newGame(99); assert.equal(ga.start, 99); assert.deepEqual(newGame(ga.start).tray, ga.tray);
+console.log('tutorial and restart tests passed');

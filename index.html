@@ -23,6 +23,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
   font: 15px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif; }
 body { display: flex; flex-direction: column; overscroll-behavior: none; }
 header { display: flex; align-items: center; gap: 10px 14px; padding: 10px 16px 4px; flex-wrap: wrap; }
+#buttons { padding: 4px 16px 6px; }
 h1 { font-size: 19px; margin: 0; letter-spacing: .04em; }
 .stat { font-variant-numeric: tabular-nums; color: var(--muted); }
 .stat b { color: var(--ink); }
@@ -35,14 +36,29 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #status.flash { color: var(--good); font-weight: 600; }
 #giveup { display: none; padding: 2px 10px; }
 #wrap { position: relative; flex: 1; min-height: 0; }
-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+#c { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
 #over { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.45); }
 #over.show { display: flex; }
 .card { background: var(--panel); color: var(--ink); padding: 20px 24px; border-radius: 12px; text-align: center; max-width: 320px; margin: 16px; }
 .card h2 { margin: 0 0 6px; font-size: 20px; }
 .card p { margin: 0 0 14px; }
 .card button { margin: 0 4px; }
-dialog { border: none; border-radius: 12px; background: var(--panel); color: var(--ink); max-width: 420px; padding: 18px 22px; }
+dialog { border: none; border-radius: 12px; background: var(--panel); color: var(--ink); padding: 18px 22px;
+  max-width: 520px; width: calc(100% - 32px); max-height: 85vh; overflow: auto; box-sizing: border-box; }
+dialog h3 { font-size: 15px; margin: 14px 0 4px; }
+dialog h2:focus { outline: none; }   /* focused only so the help opens at the top */
+dialog p { margin: 0 0 8px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.fig { display: flex; align-items: center; gap: 12px; margin: 4px 0 8px; }
+.fig canvas { width: 72px; height: 96px; flex: none; }
+.fig canvas.wide { width: 140px; }
+.fig .arrow { font-size: 22px; color: var(--muted); }
+#coach { display: none; margin: 2px 16px 6px; padding: 10px 12px; border-radius: 10px; background: var(--panel);
+  border: 2px solid var(--accent); }
+#coach.show { display: block; }
+#coach .step { color: var(--muted); font-size: 13px; }
+#coach p { margin: 4px 0 8px; }
+#coachstep.hint { color: var(--accent); font-weight: 600; }
 dialog::backdrop { background: rgba(0,0,0,.45); }
 dialog h2 { margin: 0 0 8px; font-size: 18px; }
 dialog ul { padding-left: 20px; margin: 0 0 12px; }
@@ -55,31 +71,78 @@ dialog li { margin-bottom: 6px; }
   <span class="stat">Score <b id="score">0</b></span>
   <span class="stat">Best <b id="best">0</b></span>
   <span class="stat">Turn <b id="turn">0</b></span>
-  <span class="spacer"></span>
-  <button id="undo" title="Undo a pour (Ctrl/Cmd+Z)">Undo</button>
-  <button id="help">How to play</button>
-  <button id="new">New game</button>
 </header>
+<nav class="row" id="buttons">   <!-- on the left: a page viewer may put its own controls in the top-right corner -->
+  <button id="undo" title="Undo a pour (Ctrl/Cmd+Z)">Undo</button>
+  <button id="restart" title="Play this game again from the start, with the same stacks">Restart</button>
+  <button id="new" title="A new game with new stacks">New game</button>
+  <button id="help">How to play</button>
+</nav>
 <div id="status" aria-live="polite"><span id="msg"></span><button id="giveup">Give up</button></div>
+<div id="coach" aria-live="polite">
+  <div class="step" id="coachstep"></div>
+  <p id="coachtext"></p>
+  <div class="row"><button id="coachnext">Next</button><button id="coachskip">Leave the tutorial</button></div>
+</div>
 <div id="wrap">
   <canvas id="c" aria-label="Hexadek board"></canvas>
   <div id="over"><div class="card">
     <h2>No room left</h2>
     <p id="overtext"></p>
     <button id="overundo">Undo last pour</button>
+    <button id="overrestart">Restart</button>
     <button id="overnew">New game</button>
   </div></div>
 </div>
 <dialog id="rules">
-  <h2>How to play</h2>
+  <h2 tabindex="-1">How to play</h2>
+  <p>Hexadek is a puzzle about sorting coloured tiles. Each cell of the board holds a stack of hex tiles.
+    Your goal is to build <b>stacks of 12 tiles all of one colour</b>, called a hexadek. A finished hexadek
+    clears from the board and scores points.</p>
+  <h3>Stacks</h3>
+  <div class="fig"><canvas data-fig="stack"></canvas>
+    <p>The tiles on top that share a colour are the stack's <b>top run</b>. The symbol on top shows its colour,
+      and the number shows how many tiles are in it. This stack's top run is 3 blue tiles.</p></div>
+  <h3>Pouring</h3>
+  <div class="fig"><canvas class="wide" data-fig="pour1"></canvas><span class="arrow">→</span><canvas class="wide" data-fig="pour2"></canvas></div>
   <ul>
-    <li><b>Pour:</b> tap a stack, then tap a neighbouring cell (or drag the stack there). Its top run, the same-coloured tiles on top, moves onto a stack with the same top colour, or onto an empty cell. Pours are free.</li>
-    <li><b>Place:</b> drag a stack from the tray onto an empty cell, or tap it and then tap the cell. Placing ends your turn.</li>
-    <li><b>Hexadek:</b> a stack holds at most 12 tiles. A full stack of one colour clears: 120 points, ×2 for a second clear in the same turn, ×3 for a third.</li>
-    <li>The game ends when there's no empty cell and no pour can make one.</li>
-    <li>Undo takes back pours until you place. The game saves itself as you go.</li>
+    <li>Tap a stack, then tap a neighbouring cell, or drag the stack there.</li>
+    <li>Its whole top run moves: onto a stack with the same top colour, or onto an empty cell.</li>
+    <li>Only neighbours: the six cells touching it.</li>
+    <li>A stack holds at most 12 tiles. If the whole run doesn't fit, only what fits moves.</li>
+    <li>Pours are free: make as many as you like.</li>
   </ul>
-  <form method="dialog" style="text-align:right"><button>OK</button></form>
+  <h3>Placing</h3>
+  <ul>
+    <li>Below the board are three new stacks to choose from, and a preview of the next one.</li>
+    <li>Drag one onto an empty cell, or tap it and then tap the cell. <b>Placing ends your turn.</b></li>
+  </ul>
+  <h3>Clearing and scoring</h3>
+  <div class="fig"><canvas data-fig="full"></canvas>
+    <p>12 tiles of one colour clear: 120 points. A second clear in the same turn scores ×2, a third ×3.</p></div>
+  <h3>The end</h3>
+  <p>Each turn adds a stack, so the board fills up. The game ends when there's no empty cell and no pour can make one.</p>
+  <h3>Tips</h3>
+  <ul>
+    <li>Pick one or two colours to build up, and give them room: keep their neighbours free for pouring.</li>
+    <li>Use an empty cell to park a top run and uncover the colour underneath.</li>
+    <li>Try not to bury a colour under a different one.</li>
+    <li>Keep two or three cells empty when you can, and check the next stack before you place.</li>
+    <li>Undo is free until you place, so experiment.</li>
+  </ul>
+  <h3>Controls</h3>
+  <ul>
+    <li>Tap or click, or drag. Tapping during an animation skips it.</li>
+    <li>Esc lets go of a selected stack. Ctrl+Z or Cmd+Z undoes a pour.</li>
+    <li><b>Restart</b> plays the same game again from the start, with the same stacks, to try another plan.
+      <b>New game</b> deals new stacks.</li>
+  </ul>
+  <form method="dialog" class="row"><button type="button" id="tutor">Play the tutorial</button><span class="spacer"></span><button>Close</button></form>
+</dialog>
+<dialog id="welcome">
+  <h2>Welcome to Hexadek</h2>
+  <p>New to games like this? A short tutorial shows the moves, in about two minutes.</p>
+  <form method="dialog" class="row"><button type="button" id="welcometut">Play the tutorial</button><button>Just play</button></form>
 </dialog>
 
 <script>
@@ -144,7 +207,7 @@ function newStack(g) {
   return st;
 }
 function newGame(seed) {
-  const g = { seed: seed | 0, board: {}, tray: [], next: null, score: 0, turn: 0,
+  const g = { seed: seed | 0, start: seed | 0, board: {}, tray: [], next: null, score: 0, turn: 0,
               clearsThisTurn: 0, history: [] };
   for (const k of CELLS) g.board[k] = [];
   for (let i = 0; i < CFG.traySize; i++) g.tray.push(newStack(g));
@@ -225,6 +288,33 @@ function canMakeRoom(start, limit) {
   return false;
 }
 
+// ---- the tutorial: a fixed board, and one move asked for at each step ----
+function tutorialGame() {
+  const g = newGame(1);
+  Object.assign(g.board, { '-1,0': [2, 0, 0, 0], '0,0': [0, 0], '1,-1': [0, 0, 0, 0, 4],
+                           '-1,1': [3, 3, 2], '0,1': [4, 4], '-1,-1': [1, 3] });
+  g.tray = [[0, 0, 0], [2, 2, 4], [3, 3, 1]];
+  g.next = [4, 4, 1];
+  return g;
+}
+const TUTORIAL = [
+  { text: 'Each cell holds a stack of hex tiles. The symbol on top shows the top colour, and the number shows ' +
+          'how many tiles of that colour are on top: the top run. Your goal is to build a stack of 12 tiles all ' +
+          'of one colour, called a hexadek.' },
+  { text: 'Pouring moves a top run onto a neighbouring stack with the same top colour. Tap the marked red stack ' +
+          '(red circle, 3), then tap the red stack next to it.', expect: { pour: ['-1,0', '0,0'] } },
+  { text: 'All 3 red tiles moved across: that stack now has 5 reds on top. You can also pour onto an empty cell. ' +
+          'Pour the purple tile from the marked stack onto the marked empty cell.', expect: { pour: ['1,-1', '2,-1'] } },
+  { text: 'That uncovered 4 red tiles. Pour them onto the big red stack too.', expect: { pour: ['1,-1', '0,0'] } },
+  { text: 'Pours are free: make as many as you like. To end your turn, place a new stack from the tray below. ' +
+          'Drag the marked red stack onto the marked cell, or tap it and then tap the cell.', expect: { place: [0, '1,0'] } },
+  { text: 'The big stack has 9 reds, and the new one has 3. Pour the new one onto it to make 12 of one colour.',
+    expect: { pour: ['1,0', '0,0'] } },
+  { text: "A hexadek! It cleared from the board and scored 120 points. A second clear in the same turn scores ×2. " +
+          "Each turn adds a stack, so the board fills up: the game ends when there's no empty cell and no pour can " +
+          "make one. Undo is free until you place, so experiment. How to play has tips any time.", last: true },
+];
+
 // ---- the page ----
 function start() {
   const SAVE = 'hexadek.save.v1', BEST = 'hexadek.best';
@@ -232,14 +322,19 @@ function start() {
   const TILE = 0.12;      // tile thickness, as a share of the hex size
   const R3 = Math.sqrt(3);
   const $ = id => document.getElementById(id);
-  const canvas = $('c'), ctx = canvas.getContext('2d');
+  const canvas = $('c');
+  let ctx = canvas.getContext('2d');   // swapped while drawing the help pictures
 
-  let g = load() || newGame(Date.now());
+  const saved = load();
+  let g = saved || newGame(Date.now());
+  let firstVisit = false;
+  try { firstVisit = !saved && !localStorage.getItem('hexadek.seen'); localStorage.setItem('hexadek.seen', '1'); } catch (e) {}
   let best = 0;
   try { best = Number(localStorage.getItem(BEST) || localStorage.getItem(OLD + '.best')) || 0; } catch (e) {}
   let state = roomState(g.board);
   const ui = { sel: null, trayPick: null, press: null, drag: null, hover: null, pos: null, touch: false };
   let anims = [], flash = null, dirty = true;
+  let tut = null, realG = null;   // during the tutorial, the real game waits in realG
   let W = 0, H = 0, S = 0, BX = 0, BY = 0, TY = 0, SLOT = 0, theme = {};
   const ORDER = CELLS.slice().sort((a, b) => {
     const [qa, ra] = a.split(',').map(Number), [qb, rb] = b.split(',').map(Number);
@@ -254,6 +349,7 @@ function start() {
     return null;
   }
   function save() {
+    if (tut) return;   // the tutorial is never saved, and doesn't count for the best score
     try { localStorage.setItem(SAVE, JSON.stringify(g)); } catch (e) {}
     if (g.score > best) {
       best = g.score;
@@ -342,6 +438,7 @@ function start() {
 
   // ---- actions ----
   function doPour(a, b) {
+    if (!tutAllows('pour', a, b)) { ui.sel = null; return; }
     const res = pour(g, a, b);
     if (!res) return;
     const now = performance.now(), stagger = Math.min(40, 160 / res.n);
@@ -355,21 +452,27 @@ function start() {
     }
     ui.sel = null;
     after();
+    tutStep();
   }
   function doPlace(slot, cell) {
+    if (!tutAllows('place', slot, cell)) { ui.trayPick = null; return; }
     if (!place(g, slot, cell)) return;
     anims.push({ type: 'place', cell, t0: performance.now(), dur: 140 });
     ui.trayPick = null; ui.sel = null;
     after();
+    tutStep();
   }
   function doUndo() {
+    if (tut) return;
     finishAnims();
     if (undo(g)) { ui.sel = null; flash = null; after(); }
   }
-  function doNew() {
-    if (g.turn > 0 && state !== 'over' && !confirm('Start a new game? This one will be lost.')) return;
+  function doNew(again) {   // again: the same game from the start, with the same stacks
+    if (tut) { g = realG || g; tut = realG = null; coach(); }
+    const ask = again ? 'Restart this game from the beginning?' : 'Start a new game? This one will be lost.';
+    if ((g.turn > 0 || g.history.length) && state !== 'over' && !confirm(ask)) return;
     finishAnims();
-    g = newGame(Date.now());
+    g = newGame(again && g.start !== undefined ? g.start : Date.now());
     ui.sel = ui.trayPick = null;
     flash = null;
     after();
@@ -380,6 +483,56 @@ function start() {
     hud();
     dirty = true;
   }
+  // ---- the tutorial ----
+  function tutExpect() { return tut && TUTORIAL[tut.step].expect; }
+  function tutAllows(kind, a, b) {
+    if (!tut) return true;
+    const e = tutExpect();
+    if (e && e[kind] && e[kind][0] === a && e[kind][1] === b) return true;
+    const step = $('coachstep');   // the hint takes the step line's place, so nothing on the page moves
+    step.textContent = e ? 'Not that one: follow the blue arrow.' : 'Press Next to carry on.';
+    step.classList.add('hint');
+    return false;
+  }
+  function tutStep() {
+    if (!tut) return;
+    tut.step++;
+    coach();
+  }
+  function startTutorial() {
+    finishAnims();
+    if (!tut) realG = g;
+    g = tutorialGame();
+    tut = { step: 0 };
+    ui.sel = ui.trayPick = null; flash = null;
+    if ($('rules').open) $('rules').close();
+    if ($('welcome').open) $('welcome').close();
+    after();
+    coach();
+  }
+  function endTutorial() {
+    finishAnims();
+    g = realG || newGame(Date.now());
+    tut = realG = null;
+    ui.sel = ui.trayPick = null; flash = null;
+    after();
+    coach();
+  }
+  function coach() {
+    $('coach').classList.toggle('show', !!tut);
+    $('status').style.display = tut ? 'none' : '';
+    $('coachstep').classList.remove('hint');
+    dirty = true;
+    if (!tut) return;
+    const st = TUTORIAL[tut.step];
+    $('coachstep').textContent = 'Tutorial: step ' + (tut.step + 1) + ' of ' + TUTORIAL.length;
+    $('coachtext').textContent = st.text;
+    const next = $('coachnext');
+    next.style.display = st.expect ? 'none' : '';
+    next.textContent = st.last ? (realG && (realG.turn || realG.history.length) ? 'Back to my game' : 'Start playing') : 'Next';
+    $('coachskip').style.display = st.last ? 'none' : '';
+  }
+
   function setFlash(text) { flash = { text, until: performance.now() + 2500 }; }
   function finishAnims() { anims = []; dirty = true; }
 
@@ -387,7 +540,8 @@ function start() {
     $('score').textContent = g.score;
     $('best').textContent = best;
     $('turn').textContent = g.turn;
-    $('undo').disabled = !g.history.length;
+    $('undo').disabled = !g.history.length || !!tut;
+    $('restart').disabled = !!tut;
     const st = $('status');
     st.classList.toggle('flash', !!flash);
     let text;
@@ -405,7 +559,11 @@ function start() {
   }
 
   // ---- input ----
-  function pt(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  function pt(e) {
+    const r = canvas.getBoundingClientRect();
+    if (r.width !== W || r.height !== H) resize();   // the page moved (the tutorial card changed size): catch up first
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
   canvas.addEventListener('pointerdown', e => {
     finishAnims();
     if (state === 'over') return;
@@ -462,10 +620,42 @@ function start() {
   });
   $('undo').onclick = doUndo;
   $('overundo').onclick = doUndo;
-  $('new').onclick = doNew;
-  $('overnew').onclick = doNew;
+  $('new').onclick = () => doNew(false);
+  $('overnew').onclick = () => doNew(false);
+  $('restart').onclick = () => doNew(true);
+  $('overrestart').onclick = () => doNew(true);
   $('giveup').onclick = () => { state = 'over'; hud(); };
-  $('help').onclick = () => $('rules').showModal();
+  $('help').onclick = () => {
+    const d = $('rules');
+    d.showModal();
+    d.querySelector('h2').focus({ preventScroll: true });   // start at the top, not at the first button
+    d.scrollTop = 0;
+    requestAnimationFrame(() => { d.scrollTop = 0; });
+    drawFigs();
+  };
+  $('tutor').onclick = startTutorial;
+  $('welcometut').onclick = startTutorial;
+  $('coachnext').onclick = () => { if (TUTORIAL[tut.step].last) endTutorial(); else tutStep(); };
+  $('coachskip').onclick = endTutorial;
+
+  function drawOn(cv, fn) {
+    const dpr = window.devicePixelRatio || 1, r = cv.getBoundingClientRect(), keep = ctx;
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    try { fn(r.width, r.height); } finally { ctx = keep; }
+  }
+  function drawFigs() {
+    const one = st => (w, h) => { const s = Math.min(w / 2.2, h / 3.2); drawStack(w / 2, h - s * 1.1, s, st, st.length); };
+    const two = (a, b) => (w, h) => {
+      const s = Math.min(w / 4.4, h / 3.2);
+      drawStack(w * 0.28, h - s * 1.1, s, a, a.length);
+      drawStack(w * 0.72, h - s * 1.1, s, b, b.length);
+    };
+    const F = { stack: one([2, 0, 3, 3, 3]), pour1: two([2, 0, 0], [3, 0, 0, 0]), pour2: two([2], [3, 0, 0, 0, 0, 0]),
+                full: one(Array(CFG.hexadek).fill(0)) };
+    document.querySelectorAll('canvas[data-fig]').forEach(cv => drawOn(cv, F[cv.dataset.fig]));
+  }
 
   // ---- drawing ----
   function shade(hex, f) {   // f < 0 darkens, f > 0 lightens
@@ -557,6 +747,14 @@ function start() {
     } else if (ui.trayPick !== null) {
       empties();
       if (ui.hover && out.targets.has(ui.hover)) { out.strong = ui.hover; out.ghost = { cell: ui.hover, st: g.tray[ui.trayPick] }; }
+    }
+    const e = tutExpect();
+    if (e) {
+      const only = e.pour ? e.pour[1] : e.place[1];
+      for (const k of Array.from(out.targets)) if (k !== only) out.targets.delete(k);
+      if (out.strong !== only) out.strong = null;
+      if (out.pill && out.pill.cell !== only) out.pill = null;
+      if (out.ghost && out.ghost.cell !== only) out.ghost = null;
     }
     return out;
   }
@@ -653,6 +851,35 @@ function start() {
         drawStack(lp.x, lp.y, S, run, run.length);
       }
     }
+    const e = tutExpect();
+    if (e) {   // the tutorial's blue arrow: what to tap next
+      const bob = Math.sin(now / 160) * S * 0.08;
+      const arrow = (x, yTop) => {
+        const y = yTop - S * 0.95 + bob;
+        ctx.beginPath();
+        ctx.moveTo(x - S * 0.24, y - S * 0.26); ctx.lineTo(x + S * 0.24, y - S * 0.26); ctx.lineTo(x, y + S * 0.06);
+        ctx.closePath();
+        ctx.fillStyle = theme.accent; ctx.fill();
+        ctx.lineWidth = 2; ctx.strokeStyle = theme.panel; ctx.stroke();
+      };
+      const atCell = k => {
+        const [x, y0] = cellXY(k), len = g.board[k].length, y = y0 - (ui.sel === k ? S * 0.15 : 0);
+        const yTop = y - Math.max(0, len - 1) * h;
+        ring(x, yTop, S, true);
+        arrow(x, yTop);
+      };
+      if (e.pour) {
+        const picked = ui.sel === e.pour[0] || (ui.drag && ui.drag.from === e.pour[0]);
+        atCell(picked ? e.pour[1] : e.pour[0]);
+      } else {
+        const picked = ui.trayPick === e.place[0] || (ui.drag && ui.drag.kind === 'tray' && ui.drag.slot === e.place[0]);
+        if (picked) atCell(e.place[1]);
+        else {
+          const [x, y] = slotXY(e.place[0]), len = g.tray[e.place[0]].length;
+          arrow(x, y - (len - 1) * S * 0.8 * TILE - S * 0.1);
+        }
+      }
+    }
     if (hl.pill) {   // the preview: a ghost of the tiles that would land, and the result on top of them
       const [x, y] = cellXY(hl.pill.cell), len = g.board[hl.pill.cell].length;
       const r = pourResult(g.board, hl.pill.from, hl.pill.cell), c = topOf(g.board[hl.pill.from]);
@@ -665,14 +892,16 @@ function start() {
 
   function frame(now) {
     if (flash && now > flash.until) { flash = null; hud(); }
-    if (dirty || anims.length) { dirty = false; render(now); }
+    if (dirty || anims.length || tutExpect()) { dirty = false; render(now); }
     requestAnimationFrame(frame);
   }
   new ResizeObserver(resize).observe($('wrap'));
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', resize);
   resize();
   hud();
+  coach();
   requestAnimationFrame(frame);
+  if (firstVisit) $('welcome').showModal();
 }
 
 if (typeof document !== 'undefined') start();
