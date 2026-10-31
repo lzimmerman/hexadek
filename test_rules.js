@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -76,3 +76,12 @@ assert.equal(roomState(fb.board, 1), 'full'); assert.equal(roomState(fb.board, 0
 // the tutorial is a Free game; restart keeps the seed
 assert.equal(R.tutorialGame().mode, 'free');
 console.log('standard mode tests passed');
+
+// undo limit: Standard games have CFG.undos per game; Free games are unlimited
+const ug = newGame(6); ug.board['0,0'] = [1]; ug.board['1,0'] = [1]; ug.pours = 99;
+for (let i = 0; i < CFG.undos; i++) { pour(ug, '0,0', '1,0'); assert(undo(ug), 'undo ' + (i + 1)); }
+pour(ug, '0,0', '1,0'); assert(!undo(ug), 'no undos left'); assert.equal(R.undosLeft(ug), 0);
+const fg = newGame(6, 'free'); fg.board['0,0'] = [1]; fg.board['1,0'] = [1];
+for (let i = 0; i < CFG.undos + 3; i++) { pour(fg, '0,0', '1,0'); assert(undo(fg)); }
+const legacy = newGame(6); delete legacy.undos; assert.equal(R.undosLeft(legacy), CFG.undos);
+console.log('undo limit tests passed');

@@ -128,8 +128,8 @@ dialog li { margin-bottom: 6px; }
     <li>Only neighbours: the six cells touching it.</li>
     <li>A stack holds at most 12 tiles. If the whole run doesn't fit, only what fits moves.</li>
     <li><b>Standard</b> game: each pour uses one. You start with 3, get 3 more for each stack you place and 1 for
-      each hexadek, and can save up to 9. Undo gives the pour back.</li>
-    <li><b>Free</b> game: pours are free, so make as many as you like. Choose the mode under New game.</li>
+      each hexadek, and can save up to 9. Undo gives the pour back, and you have 5 undos per game.</li>
+    <li><b>Free</b> game: pours and undos are unlimited. Choose the mode under New game.</li>
   </ul>
   <h3>Placing</h3>
   <ul>
@@ -191,6 +191,7 @@ const CFG = {
   pointsPerTile: 10,
   traySize: 3,
   pours: { start: 3, perPlace: 3, perClear: 1, max: 9 },   // Standard games; in Free games pours are free
+  undos: 5,           // per Standard game; unlimited in Free games
 };
 const COLOURS = [   // colour and symbol, so colours can be told apart without colour vision
   ['#e5484d', 'circle'], ['#f2b705', 'triangle'], ['#2fa86a', 'square'],
@@ -242,7 +243,7 @@ function newStack(g) {
   return st;
 }
 function newGame(seed, mode) {
-  const g = { seed: seed | 0, start: seed | 0, mode: mode || 'standard', pours: CFG.pours.start,
+  const g = { seed: seed | 0, start: seed | 0, mode: mode || 'standard', pours: CFG.pours.start, undos: CFG.undos,
               board: {}, tray: [], next: null, score: 0, turn: 0, clearsThisTurn: 0, history: [] };
   for (const k of CELLS) g.board[k] = [];
   for (let i = 0; i < CFG.traySize; i++) g.tray.push(newStack(g));
@@ -250,6 +251,9 @@ function newGame(seed, mode) {
   return g;
 }
 function poursLeft(g) { return g.mode === 'standard' ? g.pours : Infinity; }
+function undosLeft(g) {   // a game saved before the limit starts with the full set
+  return g.mode === 'standard' ? (g.undos === undefined ? CFG.undos : g.undos) : Infinity;
+}
 function addPours(g, n) { if (g.mode === 'standard') g.pours = Math.min(CFG.pours.max, g.pours + n); }
 // What pouring a's top run onto b would do, or null if it isn't allowed.
 function pourResult(board, a, b) {
@@ -283,7 +287,8 @@ function pour(g, a, b) {
   return res;
 }
 function undo(g) {
-  if (!g.history.length) return false;
+  if (!g.history.length || undosLeft(g) < 1) return false;
+  if (g.mode === 'standard') g.undos = undosLeft(g) - 1;
   const s = JSON.parse(g.history.pop());
   g.board = s.board; g.score = s.score; g.clearsThisTurn = s.clearsThisTurn;
   if ('pours' in s) g.pours = s.pours;
@@ -646,7 +651,8 @@ function start() {
     $('mode').textContent = g.mode === 'standard' ? 'Standard' : 'Free';
     $('poursstat').style.display = g.mode === 'standard' ? '' : 'none';
     $('pours').textContent = g.pours + ' / ' + CFG.pours.max;
-    $('undo').disabled = !g.history.length || !!tut;
+    $('undo').disabled = !g.history.length || !!tut || undosLeft(g) < 1;
+    $('undo').textContent = g.mode === 'standard' && !tut ? 'Undo (' + undosLeft(g) + ')' : 'Undo';
     $('restart').disabled = !!tut || g.start === undefined;
     $('overrestart').style.display = g.start === undefined ? 'none' : '';
     const st = $('status');
@@ -664,7 +670,7 @@ function start() {
     $('giveup').style.display = state === 'full' ? 'inline-block' : 'none';
     $('over').classList.toggle('show', state === 'over');
     $('overtext').textContent = (g.mode === 'standard' ? 'Standard' : 'Free') + ' game. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ')') + '.';
-    $('overundo').style.display = g.history.length ? '' : 'none';
+    $('overundo').style.display = g.history.length && undosLeft(g) > 0 ? '' : 'none';
   }
 
   // ---- input ----
