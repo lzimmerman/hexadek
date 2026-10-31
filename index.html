@@ -25,6 +25,10 @@ body { display: flex; flex-direction: column; overscroll-behavior: none; user-se
   -webkit-tap-highlight-color: transparent; }
 #bar { padding: 6px 16px calc(10px + env(safe-area-inset-bottom)); }   /* clear of the phone's gesture bar */
 #undo { min-width: 96px; }
+#deck { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.deckbar { flex: 1; height: 10px; border-radius: 5px; background: var(--cell); overflow: hidden; }
+#deckfill { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+#decktext { color: var(--muted); font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 button { touch-action: manipulation; }   /* no double-tap zoom */
 @media (pointer: coarse) {   /* thumbs: bigger buttons */
   button { min-height: 48px; padding: 10px 16px; }
@@ -40,9 +44,12 @@ button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid
   background: var(--panel); color: var(--ink); cursor: pointer; }
 button:disabled { opacity: .4; cursor: default; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-#status { padding: 2px 16px 6px; color: var(--muted); min-height: 1.4em; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+/* always one line tall, so a new message never moves the board; messages are kept short to fit */
+#status { padding: 2px 16px 6px; color: var(--muted); height: calc(1.35em + 8px); box-sizing: border-box;
+  display: flex; gap: 10px; align-items: flex-start; overflow: hidden; }
+#msg { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #status.flash { color: var(--good); font-weight: 600; }
-#giveup { display: none; padding: 2px 10px; }
+#giveup { display: none; flex: none; padding: 0 10px; min-height: 0; font-size: 14px; }
 #wrap { position: relative; flex: 1; min-height: 0; }
 #c { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
 #over { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.45); }
@@ -57,6 +64,9 @@ dialog h3 { font-size: 15px; margin: 14px 0 4px; }
 dialog h2:focus { outline: none; }   /* focused only so the help opens at the top */
 dialog p { margin: 0 0 8px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--cell-edge);
+  background: var(--panel); color: var(--ink); min-height: 40px; }
+.hint { color: var(--muted); font-size: 13px; }
 .choices { display: grid; gap: 8px; margin: 4px 0 12px; }
 .choices button { text-align: left; padding: 10px 12px; }
 .choices span { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
@@ -99,7 +109,7 @@ dialog li { margin-bottom: 6px; }
 <div id="wrap">
   <canvas id="c" aria-label="Hexadek board"></canvas>
   <div id="over"><div class="card">
-    <h2>No room left</h2>
+    <h2 id="overtitle">No room left</h2>
     <p id="overtext"></p>
     <button id="overundo">Undo last pour</button>
     <button id="overrestart">Restart</button>
@@ -108,7 +118,7 @@ dialog li { margin-bottom: 6px; }
 </div>
 <footer id="bar" class="row">   <!-- below the board, where a thumb reaches -->
   <button id="undo" title="Undo a pour (Ctrl/Cmd+Z)">Undo</button>
-  <span class="spacer"></span>
+  <div id="deck" aria-label="Deck progress"><div class="deckbar"><div id="deckfill"></div></div><span id="decktext"></span></div>
   <button id="haptics" aria-pressed="false" title="Vibrate on pours and hexadeks">Haptics: off</button>
 </footer>
 <dialog id="rules">
@@ -129,7 +139,10 @@ dialog li { margin-bottom: 6px; }
     <li>A stack holds at most 12 tiles. If the whole run doesn't fit, only what fits moves.</li>
     <li><b>Standard</b> game: each pour uses one. You start with 3, get 3 more for each stack you place and 1 for
       each hexadek, and can save up to 9. Undo gives the pour back, and you have 5 undos per game.</li>
-    <li><b>Free</b> game: pours and undos are unlimited. Choose the mode under New game.</li>
+    <li><b>Survive</b> game: pours and undos as in Standard, with a deck of 30 stacks. Place them all without
+      running out of room. The bar below the board shows how far through the deck you are.</li>
+    <li><b>Free</b> game: pours and undos are unlimited.</li>
+    <li>Choose the mode under New game, and the number of colours: 4 to 7. Fewer is easier.</li>
   </ul>
   <h3>Placing</h3>
   <ul>
@@ -152,7 +165,8 @@ dialog li { margin-bottom: 6px; }
   </ul>
   <h3>Controls</h3>
   <ul>
-    <li>Tap or click, or drag. Tapping during an animation skips it.</li>
+    <li>Tap or click, or drag. Tapping during an animation skips it. If your phone is set to reduce motion,
+      the game skips its animations.</li>
     <li>Undo is below the board. Esc lets go of a selected stack, and Ctrl+Z or Cmd+Z undoes a pour.</li>
     <li>Haptics, also below the board, makes the phone vibrate on pours and hexadeks. It's off to start with.</li>
     <li><b>Restart</b> plays the same game again from the start, with the same stacks, to try another plan.
@@ -167,9 +181,13 @@ dialog li { margin-bottom: 6px; }
 <dialog id="newgame">
   <h2>New game</h2>
   <p id="newwarn"></p>
+  <label class="row" for="newcolours">Colours
+    <select id="newcolours"><option>4</option><option>5</option><option>6</option><option>7</option></select>
+    <span class="hint">fewer is easier; 5 is usual</span></label>
   <div class="choices">
     <button type="button" id="newstandard"><b>Standard</b><span></span></button>
-    <button type="button" id="newfree"><b>Free</b><span>Pours are free: make as many as you like.</span></button>
+    <button type="button" id="newsurvive"><b>Survive</b><span></span></button>
+    <button type="button" id="newfree"><b>Free</b><span>Pours and undos are unlimited.</span></button>
   </div>
   <div class="row"><span class="spacer"></span><button type="button" id="newcancel">Cancel</button></div>
 </dialog>
@@ -185,7 +203,8 @@ dialog li { margin-bottom: 6px; }
 // ---- tuning: change these and reload ----
 const CFG = {
   radius: 2,          // board: a hexagon of 19 cells
-  colours: 5,
+  colours: 5,         // the default; New game offers 4 to 7
+  deck: 30,           // stacks in a Survive game's deck
   minTiles: 2, maxTiles: 6, maxBands: 3,   // tray stacks
   hexadek: 12,         // height limit; a full stack of one colour clears
   pointsPerTile: 10,
@@ -195,7 +214,7 @@ const CFG = {
 };
 const COLOURS = [   // colour and symbol, so colours can be told apart without colour vision
   ['#e5484d', 'circle'], ['#f2b705', 'triangle'], ['#2fa86a', 'square'],
-  ['#3b82e6', 'star'], ['#9b5de5', 'diamond'],
+  ['#3b82e6', 'star'], ['#9b5de5', 'diamond'], ['#14b8a6', 'hexagon'], ['#f472b6', 'heart'],
 ];
 
 // ---- rules: plain data, no drawing ----
@@ -235,26 +254,33 @@ function newStack(g) {
   for (let i = 0; i < n; i++) {
     if (i === 0 || cuts.has(i)) {
       let d;
-      do d = Math.floor(rand(g) * CFG.colours); while (d === c);
+      do d = Math.floor(rand(g) * (g.colours || CFG.colours)); while (d === c);
       c = d;
     }
     st.push(c);
   }
   return st;
 }
-function newGame(seed, mode) {
-  const g = { seed: seed | 0, start: seed | 0, mode: mode || 'standard', pours: CFG.pours.start, undos: CFG.undos,
+function newGame(seed, mode, colours) {
+  mode = mode || 'standard';
+  const g = { seed: seed | 0, start: seed | 0, mode, colours: colours || CFG.colours,
+              pours: CFG.pours.start, undos: CFG.undos, deckSize: mode === 'survive' ? CFG.deck : null,
               board: {}, tray: [], next: null, score: 0, turn: 0, clearsThisTurn: 0, history: [] };
   for (const k of CELLS) g.board[k] = [];
   for (let i = 0; i < CFG.traySize; i++) g.tray.push(newStack(g));
   g.next = newStack(g);
+  if (g.deckSize) g.deckLeft = g.deckSize - CFG.traySize - 1;   // stacks still to come, after the tray and next
   return g;
 }
-function poursLeft(g) { return g.mode === 'standard' ? g.pours : Infinity; }
+// A deck: the game is won once every stack in it has been placed.
+function isWon(g) { return !!g.deckSize && g.turn >= g.deckSize; }
+const MODE_NAMES = { standard: 'Standard', free: 'Free', survive: 'Survive' };
+function gameName(g) { return MODE_NAMES[g.mode] + (g.colours !== CFG.colours ? ' · ' + g.colours + ' colours' : ''); }
+function poursLeft(g) { return g.mode !== 'free' ? g.pours : Infinity; }
 function undosLeft(g) {   // a game saved before the limit starts with the full set
-  return g.mode === 'standard' ? (g.undos === undefined ? CFG.undos : g.undos) : Infinity;
+  return g.mode !== 'free' ? (g.undos === undefined ? CFG.undos : g.undos) : Infinity;
 }
-function addPours(g, n) { if (g.mode === 'standard') g.pours = Math.min(CFG.pours.max, g.pours + n); }
+function addPours(g, n) { if (g.mode !== 'free') g.pours = Math.min(CFG.pours.max, g.pours + n); }
 // What pouring a's top run onto b would do, or null if it isn't allowed.
 function pourResult(board, a, b) {
   const A = board[a], B = board[b];
@@ -271,7 +297,7 @@ function pour(g, a, b) {
   const res = pourResult(g.board, a, b);
   if (!res || poursLeft(g) < 1) return null;
   g.history.push(JSON.stringify({ board: g.board, score: g.score, clearsThisTurn: g.clearsThisTurn, pours: g.pours }));
-  if (g.mode === 'standard') g.pours--;
+  if (g.mode !== 'free') g.pours--;
   const A = g.board[a], B = g.board[b];
   res.colour = topOf(A); res.baseTo = B.length;
   B.push(...A.splice(A.length - res.n, res.n));
@@ -288,7 +314,7 @@ function pour(g, a, b) {
 }
 function undo(g) {
   if (!g.history.length || undosLeft(g) < 1) return false;
-  if (g.mode === 'standard') g.undos = undosLeft(g) - 1;
+  if (g.mode !== 'free') g.undos = undosLeft(g) - 1;
   const s = JSON.parse(g.history.pop());
   g.board = s.board; g.score = s.score; g.clearsThisTurn = s.clearsThisTurn;
   if ('pours' in s) g.pours = s.pours;
@@ -297,8 +323,11 @@ function undo(g) {
 function place(g, slot, cell) {
   if (!g.tray[slot] || !g.board[cell] || g.board[cell].length) return false;
   g.board[cell] = g.tray[slot];
-  g.tray[slot] = g.next;
-  g.next = newStack(g);
+  g.tray[slot] = g.next;   // null once a deck has run out: the slot stays empty
+  if (!g.deckSize || g.deckLeft > 0) {
+    g.next = newStack(g);
+    if (g.deckSize) g.deckLeft--;
+  } else g.next = null;
   g.turn++; g.history = []; g.clearsThisTurn = 0;
   addPours(g, CFG.pours.perPlace);
   return true;
@@ -376,18 +405,23 @@ function start() {
   const saved = load();
   let g = saved || newGame(Date.now());
   if (!g.mode) g.mode = 'free';   // saved before there were modes, when every game was free
+  if (!g.colours) g.colours = CFG.colours;
   let firstVisit = false;
   try { firstVisit = !saved && !localStorage.getItem('hexadek.seen'); localStorage.setItem('hexadek.seen', '1'); } catch (e) {}
-  function readBest(mode) {   // a best score for each mode; the old single best was from Free games
+  // a best score for each mode and colour count; the old single best was from Free games
+  const bestKey = gm => BEST + '.' + gm.mode + (gm.colours !== CFG.colours ? '.' + gm.colours + 'c' : '');
+  function readBest(gm) {
     try {
-      return Number(localStorage.getItem(BEST + '.' + mode) ||
-                    (mode === 'free' ? localStorage.getItem(BEST) || localStorage.getItem(OLD + '.best') : 0)) || 0;
+      return Number(localStorage.getItem(bestKey(gm)) || (gm.mode === 'free' && gm.colours === CFG.colours ?
+        localStorage.getItem(BEST) || localStorage.getItem(OLD + '.best') : 0)) || 0;
     } catch (e) { return 0; }
   }
-  let best = readBest(g.mode);
-  let state = roomState(g.board, poursLeft(g));
+  let best = readBest(g);
+  let state = isWon(g) ? 'won' : roomState(g.board, poursLeft(g));
   const ui = { sel: null, trayPick: null, press: null, drag: null, hover: null, pos: null, touch: false };
   let anims = [], flash = null, dirty = true;
+  const lessMotion = window.matchMedia('(prefers-reduced-motion: reduce)');   // the phone's "reduce motion" setting
+  const still = () => lessMotion.matches;
   let tut = null, realG = null;   // during the tutorial, the real game waits in realG
   let W = 0, H = 0, S = 0, BX = 0, BY = 0, TY = 0, SLOT = 0, theme = {};
   const ORDER = CELLS.slice().sort((a, b) => {
@@ -398,7 +432,7 @@ function start() {
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(SAVE) || localStorage.getItem(OLD + '.save.v1'));
-      if (s && s.board && CELLS.every(k => Array.isArray(s.board[k])) && s.tray && s.next) return s;
+      if (s && s.board && CELLS.every(k => Array.isArray(s.board[k])) && Array.isArray(s.tray) && 'next' in s) return s;   // next is null at the end of a deck
     } catch (e) {}
     return null;
   }
@@ -407,7 +441,7 @@ function start() {
     try { localStorage.setItem(SAVE, JSON.stringify(g)); } catch (e) {}
     if (g.score > best) {
       best = g.score;
-      try { localStorage.setItem(BEST + '.' + g.mode, String(best)); } catch (e) {}
+      try { localStorage.setItem(bestKey(g), String(best)); } catch (e) {}
     }
   }
 
@@ -501,9 +535,9 @@ function start() {
     const now = performance.now(), stagger = Math.min(40, 160 / res.n);
     const pa = { type: 'pour', a, b, colour: res.colour, n: res.n, baseTo: res.baseTo, fromLen: res.fromLen,
                  t0: now, stagger, dur: 180, cleared: res.clears };
-    anims.push(pa);
+    if (!still()) anims.push(pa);
     if (res.clears) {
-      anims.push({ type: 'clear', cell: b, colour: res.colour, keep: res.baseTo, pour: pa, t0: now,
+      if (!still()) anims.push({ type: 'clear', cell: b, colour: res.colour, keep: res.baseTo, pour: pa, t0: now,
                    wait: pa.dur + stagger * (res.n - 1), dur: 340 });
       setFlash('Hexadek! +' + res.points + (res.mult > 1 ? ' (×' + res.mult + ')' : ''));
     }
@@ -515,7 +549,7 @@ function start() {
     if (!tutAllows('place', slot, cell)) { ui.trayPick = null; return; }
     if (!place(g, slot, cell)) return;
     buzz(20);
-    anims.push({ type: 'place', cell, t0: performance.now(), dur: 140 });
+    if (!still()) anims.push({ type: 'place', cell, t0: performance.now(), dur: 180 });
     ui.trayPick = null; ui.sel = null;
     after();
     tutStep();
@@ -525,29 +559,34 @@ function start() {
     finishAnims();
     if (undo(g)) { ui.sel = null; flash = null; after(); }
   }
-  function startGame(seed, mode) {
+  function startGame(seed, mode, colours) {
     finishAnims();
-    g = newGame(seed, mode);
+    g = newGame(seed, mode, colours);
     ui.sel = ui.trayPick = null;
     flash = null;
     after();
   }
   function doNew(again) {   // again: the same game from the start, with the same stacks and mode
     if (tut) { g = realG || g; tut = realG = null; coach(); }
-    const busy = (g.turn > 0 || g.history.length) && state !== 'over';
+    const busy = (g.turn > 0 || g.history.length) && state !== 'over' && state !== 'won';
     if (again) {
-      const go = () => startGame(g.start, g.mode);
+      const go = () => startGame(g.start, g.mode, g.colours);
       if (busy) ask('Restart this game from the beginning, with the same stacks?', 'Restart', go); else go();
       return;
     }
     $('newwarn').textContent = busy ? 'Choose a mode. The game you are playing will be lost.' : 'Choose a mode.';
+    $('newcolours').value = String(g.colours);
     $('newgame').showModal();
   }
+  const chosen = mode => () => { $('newgame').close(); startGame(Date.now(), mode, Number($('newcolours').value)); };
   const P = CFG.pours;
   $('newstandard').querySelector('span').textContent = 'Pours are limited. Start with ' + P.start + ', get ' + P.perPlace +
     ' more for each stack you place and ' + P.perClear + ' for each hexadek, up to ' + P.max + ' saved.';
-  $('newstandard').onclick = () => { $('newgame').close(); startGame(Date.now(), 'standard'); };
-  $('newfree').onclick = () => { $('newgame').close(); startGame(Date.now(), 'free'); };
+  $('newsurvive').querySelector('span').textContent = 'Place all ' + CFG.deck +
+    ' stacks of a deck without running out of room. Pours and undos as in Standard.';
+  $('newstandard').onclick = chosen('standard');
+  $('newfree').onclick = chosen('free');
+  $('newsurvive').onclick = chosen('survive');
   $('newcancel').onclick = () => $('newgame').close();
   // Our own yes/no box: browsers' confirm() is blocked inside some page viewers, and then
   // answers "no" without showing anything. Plain buttons close it: no form, since a viewer
@@ -585,8 +624,8 @@ function start() {
   showHaptics();
   $('welcomeclose').onclick = () => $('welcome').close();
   function after() {
-    state = roomState(g.board, poursLeft(g));
-    best = readBest(g.mode);
+    state = isWon(g) ? 'won' : roomState(g.board, poursLeft(g));
+    best = readBest(g);
     save();
     hud();
     dirty = true;
@@ -648,11 +687,11 @@ function start() {
     $('score').textContent = g.score;
     $('best').textContent = best;
     $('turn').textContent = g.turn;
-    $('mode').textContent = g.mode === 'standard' ? 'Standard' : 'Free';
-    $('poursstat').style.display = g.mode === 'standard' ? '' : 'none';
+    $('mode').textContent = gameName(g);
+    $('poursstat').style.display = g.mode !== 'free' ? '' : 'none';
     $('pours').textContent = g.pours + ' / ' + CFG.pours.max;
     $('undo').disabled = !g.history.length || !!tut || undosLeft(g) < 1;
-    $('undo').textContent = g.mode === 'standard' && !tut ? 'Undo (' + undosLeft(g) + ')' : 'Undo';
+    $('undo').textContent = g.mode !== 'free' && !tut ? 'Undo (' + undosLeft(g) + ')' : 'Undo';
     $('restart').disabled = !!tut || g.start === undefined;
     $('overrestart').style.display = g.start === undefined ? 'none' : '';
     const st = $('status');
@@ -660,17 +699,26 @@ function start() {
     let text;
     if (flash) text = flash.text;
     else if (state === 'full') text = 'Board full: pour to make room.';
-    else if (poursLeft(g) < 1 && state !== 'over') text = 'No pours left: place a stack to earn ' + CFG.pours.perPlace + ' more.';
+    else if (poursLeft(g) < 1 && state !== 'over') text = 'No pours left: place a stack for ' + CFG.pours.perPlace + ' more.';
     else if (ui.trayPick !== null) text = 'Tap an empty cell to place it.';
-    else if (ui.sel) text = 'Tap a highlighted neighbour to pour, or tap the stack again to let go.';
-    else if (g.turn === 0 && !g.history.length) text = 'Drag a stack from the tray onto the board to start.';
-    else if (g.mode === 'standard') text = 'Pour (each uses one), then place a tray stack to end the turn and earn ' + CFG.pours.perPlace + ' more.';
-    else text = 'Pour as you like, then place a tray stack to end the turn.';
+    else if (ui.sel) text = 'Tap a glowing neighbour to pour.';
+    else if (g.turn === 0 && !g.history.length) text = 'Drag a tray stack onto the board to start.';
+    else if (g.deckSize && g.turn === 0 && !g.history.length) text = 'Place all ' + g.deckSize + ' stacks in the deck to win.';
+    else if (g.mode !== 'free') text = 'Pour, then place a stack (+' + CFG.pours.perPlace + ' pours).';
+    else text = 'Pour as you like, then place a stack.';
     $('msg').textContent = text;
     $('giveup').style.display = state === 'full' ? 'inline-block' : 'none';
-    $('over').classList.toggle('show', state === 'over');
-    $('overtext').textContent = (g.mode === 'standard' ? 'Standard' : 'Free') + ' game. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ')') + '.';
-    $('overundo').style.display = g.history.length && undosLeft(g) > 0 ? '' : 'none';
+    $('over').classList.toggle('show', state === 'over' || state === 'won');
+    $('overtitle').textContent = state === 'won' ? 'Deck complete!' : 'No room left';
+    $('deck').style.visibility = g.deckSize ? 'visible' : 'hidden';
+    if (g.deckSize) {
+      const placed = Math.min(g.turn, g.deckSize);
+      $('deckfill').style.width = (100 * placed / g.deckSize) + '%';
+      $('decktext').textContent = placed + ' / ' + g.deckSize;
+      $('deck').title = (g.deckSize - placed) + ' stacks left to place';
+    }
+    $('overtext').textContent = gameName(g) + ' game. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ')') + '.';
+    $('overundo').style.display = g.history.length && undosLeft(g) > 0 && state !== 'won' ? '' : 'none';
   }
 
   // ---- input ----
@@ -681,7 +729,7 @@ function start() {
   }
   canvas.addEventListener('pointerdown', e => {
     finishAnims();
-    if (state === 'over') return;
+    if (state === 'over' || state === 'won') return;
     const p = pt(e);
     ui.pos = p; ui.touch = e.pointerType !== 'mouse';
     try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
@@ -695,7 +743,7 @@ function start() {
     if (e.pointerType === 'mouse') ui.hover = cellAt(p);
     const pr = ui.press;
     if (pr && !ui.drag && dist(p, pr.start) > 8) {
-      if (pr.kind === 'tray') ui.drag = { kind: 'tray', slot: pr.slot };
+      if (pr.kind === 'tray') { if (g.tray[pr.slot]) ui.drag = { kind: 'tray', slot: pr.slot }; }
       else if (pr.cell && g.board[pr.cell].length) ui.drag = { kind: 'pour', from: pr.cell };
       if (ui.drag) { ui.sel = null; ui.trayPick = null; hud(); }
     }
@@ -717,6 +765,7 @@ function start() {
 
   function tap(pr) {
     if (pr.kind === 'tray') {
+      if (!g.tray[pr.slot]) return;
       ui.trayPick = ui.trayPick === pr.slot ? null : pr.slot;
       ui.sel = null;
       return;
@@ -792,6 +841,15 @@ function start() {
     else if (kind === 'square') ctx.rect(x - r * 0.7, y - r * 0.7, r * 1.4, r * 1.4);
     else if (kind === 'diamond') { ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.8, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r * 0.8, y); }
     else if (kind === 'triangle') { ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.95, y + r * 0.7); ctx.lineTo(x - r * 0.95, y + r * 0.7); }
+    else if (kind === 'hexagon') for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 3 * i;
+      ctx.lineTo(x + r * 0.85 * Math.cos(a), y + r * 0.85 * Math.sin(a));
+    }
+    else if (kind === 'heart') {
+      ctx.moveTo(x, y + r * 0.85);
+      ctx.bezierCurveTo(x - r * 1.3, y - r * 0.1, x - r * 0.55, y - r * 1.05, x, y - r * 0.4);
+      ctx.bezierCurveTo(x + r * 0.55, y - r * 1.05, x + r * 1.3, y - r * 0.1, x, y + r * 0.85);
+    }
     else for (let i = 0; i < 10; i++) {   // star
       const a = Math.PI / 5 * i - Math.PI / 2, rr = i % 2 ? r * 0.45 : r;
       ctx.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a));
@@ -884,10 +942,10 @@ function start() {
     anims = anims.filter(a => now < a.t0 + (a.wait || 0) + a.dur + (a.type === 'pour' ? a.stagger * (a.n - 1) : 0));
     ctx.clearRect(0, 0, W, H);
     const h = S * TILE, hl = highlights();
-    const hidden = {}, drop = {};
+    const hidden = {}, fadeIn = {};
     for (const a of anims) {
       if (a.type === 'pour' && !a.cleared) hidden[a.b] = (hidden[a.b] || 0) + a.n - arrived(a, now);
-      if (a.type === 'place') drop[a.cell] = (1 - ease(Math.min(1, (now - a.t0) / a.dur))) * S * 0.7;
+      if (a.type === 'place') fadeIn[a.cell] = ease(Math.min(1, (now - a.t0) / a.dur));
     }
     for (const k of ORDER) {   // the floor
       const [x, y] = cellXY(k);
@@ -906,8 +964,10 @@ function start() {
       let count = st.length - (hidden[k] || 0);
       if (ui.drag && ui.drag.kind === 'pour' && ui.drag.from === k) count -= runLen(st);
       if (ui.sel === k) y -= S * 0.15;
-      y -= drop[k] || 0;
-      drawStack(x, y, S, st, count);
+      const f = fadeIn[k];   // a stack just placed fades and grows in where it lands
+      if (f !== undefined) ctx.globalAlpha = 0.2 + 0.8 * f;
+      drawStack(x, y, f !== undefined ? S * (0.92 + 0.08 * f) : S, st, count);
+      ctx.globalAlpha = 1;
       const ty = y - Math.max(0, count - 1) * h;
       if (hl.targets.has(k)) ring(x, ty, S, k === hl.strong || (hl.pill && hl.pill.cell === k));
       if (ui.sel === k) { hexPath(x, ty, S * 0.93); ctx.lineWidth = 4; ctx.strokeStyle = theme.ink; ctx.stroke(); }
@@ -949,6 +1009,10 @@ function start() {
         hexPath(x, y, s * 0.9); ctx.setLineDash([5, 4]); ctx.lineWidth = 2; ctx.strokeStyle = theme['cell-edge']; ctx.stroke(); ctx.setLineDash([]);
         continue;
       }
+      if (!st) {   // the deck has run out
+        hexPath(x, y, s * 0.9); ctx.setLineDash([5, 4]); ctx.lineWidth = 2; ctx.strokeStyle = theme['cell-edge']; ctx.stroke(); ctx.setLineDash([]);
+        continue;
+      }
       if (isNext) ctx.globalAlpha = 0.75;
       drawStack(x, y, s, st, st.length);
       ctx.globalAlpha = 1;
@@ -968,7 +1032,7 @@ function start() {
     }
     const e = tutExpect();
     if (e) {   // the tutorial's blue arrow: what to tap next
-      const bob = Math.sin(now / 160) * S * 0.08;
+      const bob = still() ? 0 : Math.sin(now / 160) * S * 0.08;
       const arrow = (x, yTop) => {
         const y = yTop - S * 0.95 + bob;
         ctx.beginPath();

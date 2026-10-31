@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -85,3 +85,22 @@ const fg = newGame(6, 'free'); fg.board['0,0'] = [1]; fg.board['1,0'] = [1];
 for (let i = 0; i < CFG.undos + 3; i++) { pour(fg, '0,0', '1,0'); assert(undo(fg)); }
 const legacy = newGame(6); delete legacy.undos; assert.equal(R.undosLeft(legacy), CFG.undos);
 console.log('undo limit tests passed');
+
+// colours: 4 to 7, and every colour has its own symbol
+assert(R.COLOURS.length >= 7); assert.equal(new Set(R.COLOURS.map(c => c[1])).size, R.COLOURS.length);
+for (const n of [4, 5, 6, 7]) {
+  const cg = newGame(3, 'standard', n); assert.equal(cg.colours, n); const seen = new Set();
+  for (let i = 0; i < 500; i++) R.newStack(cg).forEach(c => seen.add(c));
+  assert.equal(seen.size, n, n + ' colours used');
+}
+assert.deepEqual(newGame(3, 'standard', 6).tray, newGame(3, 'standard', 6).tray, 'restart keeps the colours');
+// Survive: a deck of CFG.deck stacks, won once all are placed
+const sg = newGame(12, 'survive'); assert.equal(sg.deckSize, CFG.deck); assert(R.poursLeft(sg) === CFG.pours.start);
+for (let i = 0; i < CFG.deck; i++) {
+  const slot = sg.tray.findIndex(t => t); assert(slot >= 0, 'a stack to place at turn ' + i);
+  assert(place(sg, slot, '0,0')); sg.board['0,0'] = [];
+  if (i === CFG.deck - CFG.traySize - 1) assert.equal(sg.next, null, 'next runs out first');
+}
+assert(R.isWon(sg)); assert(sg.tray.every(t => t === null)); assert(!place(sg, 0, '0,0'));
+assert(!R.isWon(newGame(12, 'standard')));
+console.log('colour and deck tests passed');
