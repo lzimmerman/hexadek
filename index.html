@@ -49,6 +49,9 @@ dialog h3 { font-size: 15px; margin: 14px 0 4px; }
 dialog h2:focus { outline: none; }   /* focused only so the help opens at the top */
 dialog p { margin: 0 0 8px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.choices { display: grid; gap: 8px; margin: 4px 0 12px; }
+.choices button { text-align: left; padding: 10px 12px; }
+.choices span { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
 .fig { display: flex; align-items: center; gap: 12px; margin: 4px 0 8px; }
 .fig canvas { width: 72px; height: 96px; flex: none; }
 .fig canvas.wide { width: 140px; }
@@ -71,6 +74,8 @@ dialog li { margin-bottom: 6px; }
   <span class="stat">Score <b id="score">0</b></span>
   <span class="stat">Best <b id="best">0</b></span>
   <span class="stat">Turn <b id="turn">0</b></span>
+  <span class="stat" id="poursstat" title="Each pour uses one; placing a stack earns more">Pours <b id="pours">0</b></span>
+  <span class="stat"><b id="mode"></b></span>
 </header>
 <nav class="row" id="buttons">   <!-- on the left: a page viewer may put its own controls in the top-right corner -->
   <button id="undo" title="Undo a pour (Ctrl/Cmd+Z)">Undo</button>
@@ -110,7 +115,9 @@ dialog li { margin-bottom: 6px; }
     <li>Its whole top run moves: onto a stack with the same top colour, or onto an empty cell.</li>
     <li>Only neighbours: the six cells touching it.</li>
     <li>A stack holds at most 12 tiles. If the whole run doesn't fit, only what fits moves.</li>
-    <li>Pours are free: make as many as you like.</li>
+    <li><b>Standard</b> game: each pour uses one. You start with 3, get 3 more for each stack you place and 1 for
+      each hexadek, and can save up to 9. Undo gives the pour back.</li>
+    <li><b>Free</b> game: pours are free, so make as many as you like. Choose the mode under New game.</li>
   </ul>
   <h3>Placing</h3>
   <ul>
@@ -128,6 +135,7 @@ dialog li { margin-bottom: 6px; }
     <li>Use an empty cell to park a top run and uncover the colour underneath.</li>
     <li>Try not to bury a colour under a different one.</li>
     <li>Keep two or three cells empty when you can, and check the next stack before you place.</li>
+    <li>In a Standard game, spend pours where they finish or set up a hexadek, and save the rest for a crowded board.</li>
     <li>Undo is free until you place, so experiment.</li>
   </ul>
   <h3>Controls</h3>
@@ -142,6 +150,15 @@ dialog li { margin-bottom: 6px; }
 <dialog id="ask">
   <p id="asktext"></p>
   <div class="row"><button type="button" id="askyes">Yes</button><button type="button" id="askno" autofocus>Cancel</button></div>
+</dialog>
+<dialog id="newgame">
+  <h2>New game</h2>
+  <p id="newwarn"></p>
+  <div class="choices">
+    <button type="button" id="newstandard"><b>Standard</b><span></span></button>
+    <button type="button" id="newfree"><b>Free</b><span>Pours are free: make as many as you like.</span></button>
+  </div>
+  <div class="row"><span class="spacer"></span><button type="button" id="newcancel">Cancel</button></div>
 </dialog>
 <dialog id="welcome">
   <h2>Welcome to Hexadek</h2>
@@ -160,6 +177,7 @@ const CFG = {
   hexadek: 12,         // height limit; a full stack of one colour clears
   pointsPerTile: 10,
   traySize: 3,
+  pours: { start: 3, perPlace: 3, perClear: 1, max: 9 },   // Standard games; in Free games pours are free
 };
 const COLOURS = [   // colour and symbol, so colours can be told apart without colour vision
   ['#e5484d', 'circle'], ['#f2b705', 'triangle'], ['#2fa86a', 'square'],
@@ -210,14 +228,16 @@ function newStack(g) {
   }
   return st;
 }
-function newGame(seed) {
-  const g = { seed: seed | 0, start: seed | 0, board: {}, tray: [], next: null, score: 0, turn: 0,
-              clearsThisTurn: 0, history: [] };
+function newGame(seed, mode) {
+  const g = { seed: seed | 0, start: seed | 0, mode: mode || 'standard', pours: CFG.pours.start,
+              board: {}, tray: [], next: null, score: 0, turn: 0, clearsThisTurn: 0, history: [] };
   for (const k of CELLS) g.board[k] = [];
   for (let i = 0; i < CFG.traySize; i++) g.tray.push(newStack(g));
   g.next = newStack(g);
   return g;
 }
+function poursLeft(g) { return g.mode === 'standard' ? g.pours : Infinity; }
+function addPours(g, n) { if (g.mode === 'standard') g.pours = Math.min(CFG.pours.max, g.pours + n); }
 // What pouring a's top run onto b would do, or null if it isn't allowed.
 function pourResult(board, a, b) {
   const A = board[a], B = board[b];
@@ -232,8 +252,9 @@ function pourResult(board, a, b) {
 function legalTargets(board, a) { return neighbours(a).filter(b => pourResult(board, a, b)); }
 function pour(g, a, b) {
   const res = pourResult(g.board, a, b);
-  if (!res) return null;
-  g.history.push(JSON.stringify({ board: g.board, score: g.score, clearsThisTurn: g.clearsThisTurn }));
+  if (!res || poursLeft(g) < 1) return null;
+  g.history.push(JSON.stringify({ board: g.board, score: g.score, clearsThisTurn: g.clearsThisTurn, pours: g.pours }));
+  if (g.mode === 'standard') g.pours--;
   const A = g.board[a], B = g.board[b];
   res.colour = topOf(A); res.baseTo = B.length;
   B.push(...A.splice(A.length - res.n, res.n));
@@ -244,6 +265,7 @@ function pour(g, a, b) {
     res.mult = g.clearsThisTurn;
     res.points = CFG.hexadek * CFG.pointsPerTile * res.mult;
     g.score += res.points;
+    addPours(g, CFG.pours.perClear);
   }
   return res;
 }
@@ -251,6 +273,7 @@ function undo(g) {
   if (!g.history.length) return false;
   const s = JSON.parse(g.history.pop());
   g.board = s.board; g.score = s.score; g.clearsThisTurn = s.clearsThisTurn;
+  if ('pours' in s) g.pours = s.pours;
   return true;
 }
 function place(g, slot, cell) {
@@ -259,19 +282,21 @@ function place(g, slot, cell) {
   g.tray[slot] = g.next;
   g.next = newStack(g);
   g.turn++; g.history = []; g.clearsThisTurn = 0;
+  addPours(g, CFG.pours.perPlace);
   return true;
 }
-// 'ok': an empty cell; 'full': none, but some pours make one; 'over': no way to make one.
-function roomState(board) {
+// 'ok': an empty cell; 'full': none, but some pours make one; 'over': no way to make one
+// (with at most `pours` pours, in a Standard game).
+function roomState(board, pours) {
   if (CELLS.some(k => !board[k].length)) return 'ok';
-  return canMakeRoom(board) ? 'full' : 'over';
+  return canMakeRoom(board, pours === undefined ? Infinity : pours) ? 'full' : 'over';
 }
-function canMakeRoom(start, limit) {
+function canMakeRoom(start, maxPours, limit) {
   limit = limit || 3000;
   const key = b => CELLS.map(k => b[k].join('')).join('|');
   const seen = new Set([key(start)]);
   let frontier = [start], nodes = 0;
-  while (frontier.length) {
+  for (let depth = 1; frontier.length && depth <= maxPours; depth++) {   // depth: pours used
     const next = [];
     for (const b of frontier)
       for (const a of CELLS)
@@ -294,7 +319,7 @@ function canMakeRoom(start, limit) {
 
 // ---- the tutorial: a fixed board, and one move asked for at each step ----
 function tutorialGame() {
-  const g = newGame(1);
+  const g = newGame(1, 'free');
   Object.assign(g.board, { '-1,0': [2, 0, 0, 0], '0,0': [0, 0], '1,-1': [0, 0, 0, 0, 4],
                            '-1,1': [3, 3, 2], '0,1': [4, 4], '-1,-1': [1, 3] });
   g.tray = [[0, 0, 0], [2, 2, 4], [3, 3, 1]];
@@ -310,7 +335,8 @@ const TUTORIAL = [
   { text: 'All 3 red tiles moved across: that stack now has 5 reds on top. You can also pour onto an empty cell. ' +
           'Pour the purple tile from the marked stack onto the marked empty cell.', expect: { pour: ['1,-1', '2,-1'] } },
   { text: 'That uncovered 4 red tiles. Pour them onto the big red stack too.', expect: { pour: ['1,-1', '0,0'] } },
-  { text: 'Pours are free: make as many as you like. To end your turn, place a new stack from the tray below. ' +
+  { text: 'This practice game is a Free game, where pours are free. In a Standard game each pour uses one, and ' +
+          'you earn 3 for each stack you place. To end your turn, place a new stack from the tray below. ' +
           'Drag the marked red stack onto the marked cell, or tap it and then tap the cell.', expect: { place: [0, '1,0'] } },
   { text: 'The big stack has 9 reds, and the new one has 3. Pour the new one onto it to make 12 of one colour.',
     expect: { pour: ['1,0', '0,0'] } },
@@ -331,11 +357,17 @@ function start() {
 
   const saved = load();
   let g = saved || newGame(Date.now());
+  if (!g.mode) g.mode = 'free';   // saved before there were modes, when every game was free
   let firstVisit = false;
   try { firstVisit = !saved && !localStorage.getItem('hexadek.seen'); localStorage.setItem('hexadek.seen', '1'); } catch (e) {}
-  let best = 0;
-  try { best = Number(localStorage.getItem(BEST) || localStorage.getItem(OLD + '.best')) || 0; } catch (e) {}
-  let state = roomState(g.board);
+  function readBest(mode) {   // a best score for each mode; the old single best was from Free games
+    try {
+      return Number(localStorage.getItem(BEST + '.' + mode) ||
+                    (mode === 'free' ? localStorage.getItem(BEST) || localStorage.getItem(OLD + '.best') : 0)) || 0;
+    } catch (e) { return 0; }
+  }
+  let best = readBest(g.mode);
+  let state = roomState(g.board, poursLeft(g));
   const ui = { sel: null, trayPick: null, press: null, drag: null, hover: null, pos: null, touch: false };
   let anims = [], flash = null, dirty = true;
   let tut = null, realG = null;   // during the tutorial, the real game waits in realG
@@ -357,9 +389,11 @@ function start() {
     try { localStorage.setItem(SAVE, JSON.stringify(g)); } catch (e) {}
     if (g.score > best) {
       best = g.score;
-      try { localStorage.setItem(BEST, String(best)); } catch (e) {}
+      try { localStorage.setItem(BEST + '.' + g.mode, String(best)); } catch (e) {}
     }
   }
+
+  const targetsFrom = a => poursLeft(g) > 0 ? legalTargets(g.board, a) : [];
 
   // ---- geometry ----
   function resize() {
@@ -428,7 +462,7 @@ function start() {
   }
   function pourTarget(from, lp) {
     let bestK = null, bestD = S * 1.2;
-    for (const c of legalTargets(g.board, from)) {
+    for (const c of targetsFrom(from)) {
       const [x, y] = cellXY(c), d = distToColumn(lp, x, y, Math.max(0, g.board[c].length - 1) * S * TILE);
       if (d < bestD) { bestD = d; bestK = c; }
     }
@@ -471,20 +505,30 @@ function start() {
     finishAnims();
     if (undo(g)) { ui.sel = null; flash = null; after(); }
   }
-  function doNew(again) {   // again: the same game from the start, with the same stacks
-    if (tut) { g = realG || g; tut = realG = null; coach(); }
-    const go = () => {
-      finishAnims();
-      g = newGame(again ? g.start : Date.now());
-      ui.sel = ui.trayPick = null;
-      flash = null;
-      after();
-    };
-    if ((g.turn > 0 || g.history.length) && state !== 'over')
-      ask(again ? 'Restart this game from the beginning, with the same stacks?' : 'Start a new game? This one will be lost.',
-          again ? 'Restart' : 'New game', go);
-    else go();
+  function startGame(seed, mode) {
+    finishAnims();
+    g = newGame(seed, mode);
+    ui.sel = ui.trayPick = null;
+    flash = null;
+    after();
   }
+  function doNew(again) {   // again: the same game from the start, with the same stacks and mode
+    if (tut) { g = realG || g; tut = realG = null; coach(); }
+    const busy = (g.turn > 0 || g.history.length) && state !== 'over';
+    if (again) {
+      const go = () => startGame(g.start, g.mode);
+      if (busy) ask('Restart this game from the beginning, with the same stacks?', 'Restart', go); else go();
+      return;
+    }
+    $('newwarn').textContent = busy ? 'Choose a mode. The game you are playing will be lost.' : 'Choose a mode.';
+    $('newgame').showModal();
+  }
+  const P = CFG.pours;
+  $('newstandard').querySelector('span').textContent = 'Pours are limited. Start with ' + P.start + ', get ' + P.perPlace +
+    ' more for each stack you place and ' + P.perClear + ' for each hexadek, up to ' + P.max + ' saved.';
+  $('newstandard').onclick = () => { $('newgame').close(); startGame(Date.now(), 'standard'); };
+  $('newfree').onclick = () => { $('newgame').close(); startGame(Date.now(), 'free'); };
+  $('newcancel').onclick = () => $('newgame').close();
   // Our own yes/no box: browsers' confirm() is blocked inside some page viewers, and then
   // answers "no" without showing anything. Plain buttons close it: no form, since a viewer
   // may not allow forms either.
@@ -500,7 +544,8 @@ function start() {
   $('rulesclose').onclick = () => $('rules').close();
   $('welcomeclose').onclick = () => $('welcome').close();
   function after() {
-    state = roomState(g.board);
+    state = roomState(g.board, poursLeft(g));
+    best = readBest(g.mode);
     save();
     hud();
     dirty = true;
@@ -562,6 +607,9 @@ function start() {
     $('score').textContent = g.score;
     $('best').textContent = best;
     $('turn').textContent = g.turn;
+    $('mode').textContent = g.mode === 'standard' ? 'Standard' : 'Free';
+    $('poursstat').style.display = g.mode === 'standard' ? '' : 'none';
+    $('pours').textContent = g.pours + ' / ' + CFG.pours.max;
     $('undo').disabled = !g.history.length || !!tut;
     $('restart').disabled = !!tut || g.start === undefined;
     $('overrestart').style.display = g.start === undefined ? 'none' : '';
@@ -570,14 +618,16 @@ function start() {
     let text;
     if (flash) text = flash.text;
     else if (state === 'full') text = 'Board full: pour to make room.';
+    else if (poursLeft(g) < 1 && state !== 'over') text = 'No pours left: place a stack to earn ' + CFG.pours.perPlace + ' more.';
     else if (ui.trayPick !== null) text = 'Tap an empty cell to place it.';
     else if (ui.sel) text = 'Tap a highlighted neighbour to pour, or tap the stack again to let go.';
     else if (g.turn === 0 && !g.history.length) text = 'Drag a stack from the tray onto the board to start.';
+    else if (g.mode === 'standard') text = 'Pour (each uses one), then place a tray stack to end the turn and earn ' + CFG.pours.perPlace + ' more.';
     else text = 'Pour as you like, then place a tray stack to end the turn.';
     $('msg').textContent = text;
     $('giveup').style.display = state === 'full' ? 'inline-block' : 'none';
     $('over').classList.toggle('show', state === 'over');
-    $('overtext').textContent = 'Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ')') + '.';
+    $('overtext').textContent = (g.mode === 'standard' ? 'Standard' : 'Free') + ' game. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ')') + '.';
     $('overundo').style.display = g.history.length ? '' : 'none';
   }
 
@@ -760,11 +810,11 @@ function start() {
       const t = dragTarget();
       if (t) { out.strong = t; out.ghost = { cell: t, st: g.tray[ui.drag.slot] }; }
     } else if (ui.drag) {
-      legalTargets(g.board, ui.drag.from).forEach(k => out.targets.add(k));
+      targetsFrom(ui.drag.from).forEach(k => out.targets.add(k));
       const t = dragTarget();
       if (t) { out.strong = t; out.pill = { cell: t, from: ui.drag.from }; }
     } else if (ui.sel) {
-      legalTargets(g.board, ui.sel).forEach(k => out.targets.add(k));
+      targetsFrom(ui.sel).forEach(k => out.targets.add(k));
       if (ui.hover && out.targets.has(ui.hover))
         out.pill = { cell: ui.hover, from: ui.sel };
     } else if (ui.trayPick !== null) {

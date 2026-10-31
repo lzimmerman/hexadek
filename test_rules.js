@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -16,7 +16,7 @@ assert.equal(bandsSeen.size, 3);
 // same seed, same game
 assert.deepEqual(newGame(7).tray, newGame(7).tray);
 // pours
-const g = newGame(1); const b = g.board;
+const g = newGame(1, 'free'); const b = g.board;
 b['0,0'] = [0, 1, 1, 1]; b['1,0'] = [2, 1]; b['2,0'] = [3];
 let r = pourResult(b, '0,0', '1,0'); assert.deepEqual([r.n, r.after, r.clears, r.emptiesFrom], [3, 4, false, false]);
 assert.equal(pourResult(b, '0,0', '2,0'), null, 'not a neighbour');
@@ -59,3 +59,20 @@ assert.equal(tg.score, 120);
 // restart: the same seed deals the same stacks
 const ga = newGame(99); assert.equal(ga.start, 99); assert.deepEqual(newGame(ga.start).tray, ga.tray);
 console.log('tutorial and restart tests passed');
+
+// Standard games: pours are counted
+const st = newGame(5); assert.equal(st.mode, 'standard'); assert.equal(st.pours, CFG.pours.start);
+st.board['0,0'] = [1]; st.board['1,0'] = [1]; st.board['2,0'] = [1]; st.board['2,-1'] = [1];
+pour(st, '0,0', '1,0'); assert.equal(st.pours, CFG.pours.start - 1);
+undo(st); assert.equal(st.pours, CFG.pours.start, 'undo gives the pour back');
+st.pours = 0; assert.equal(pour(st, '0,0', '1,0'), null, 'no pours, no pour');
+place(st, 0, '-1,0'); assert.equal(st.pours, CFG.pours.perPlace);
+st.pours = CFG.pours.max - 1; place(st, 0, '-2,0'); assert.equal(st.pours, CFG.pours.max, 'capped');
+st.board['0,1'] = Array(6).fill(2); st.board['1,1'] = Array(6).fill(2); st.pours = 1;
+const rc = pour(st, '0,1', '1,1'); assert(rc.clears); assert.equal(st.pours, CFG.pours.perClear, 'a hexadek gives one back');
+// game over counts pours: a full board that one pour could open is over with no pours
+const fb = newGame(4); CELLS.forEach(k => fb.board[k] = [1, 0]); fb.board['0,0'] = [0];
+assert.equal(roomState(fb.board, 1), 'full'); assert.equal(roomState(fb.board, 0), 'over');
+// the tutorial is a Free game; restart keeps the seed
+assert.equal(R.tutorialGame().mode, 'free');
+console.log('standard mode tests passed');
