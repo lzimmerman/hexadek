@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Hexdek</title>
+<title>Hexadek</title>
 <style>
 :root {
   --bg: #f3f1ec; --panel: #ffffff; --ink: #1d1f24; --muted: #62666f;
@@ -51,7 +51,7 @@ dialog li { margin-bottom: 6px; }
 </head>
 <body>
 <header>
-  <h1>HEXDEK</h1>
+  <h1>HEXADEK</h1>
   <span class="stat">Score <b id="score">0</b></span>
   <span class="stat">Best <b id="best">0</b></span>
   <span class="stat">Turn <b id="turn">0</b></span>
@@ -62,7 +62,7 @@ dialog li { margin-bottom: 6px; }
 </header>
 <div id="status" aria-live="polite"><span id="msg"></span><button id="giveup">Give up</button></div>
 <div id="wrap">
-  <canvas id="c" aria-label="Hexdek board"></canvas>
+  <canvas id="c" aria-label="Hexadek board"></canvas>
   <div id="over"><div class="card">
     <h2>No room left</h2>
     <p id="overtext"></p>
@@ -75,7 +75,7 @@ dialog li { margin-bottom: 6px; }
   <ul>
     <li><b>Pour:</b> tap a stack, then tap a neighbouring cell (or drag the stack there). Its top run, the same-coloured tiles on top, moves onto a stack with the same top colour, or onto an empty cell. Pours are free.</li>
     <li><b>Place:</b> drag a stack from the tray onto an empty cell, or tap it and then tap the cell. Placing ends your turn.</li>
-    <li><b>Hexdek:</b> a stack holds at most 12 tiles. A full stack of one colour clears: 120 points, ×2 for a second clear in the same turn, ×3 for a third.</li>
+    <li><b>Hexadek:</b> a stack holds at most 12 tiles. A full stack of one colour clears: 120 points, ×2 for a second clear in the same turn, ×3 for a third.</li>
     <li>The game ends when there's no empty cell and no pour can make one.</li>
     <li>Undo takes back pours until you place. The game saves itself as you go.</li>
   </ul>
@@ -90,7 +90,7 @@ const CFG = {
   radius: 2,          // board: a hexagon of 19 cells
   colours: 5,
   minTiles: 2, maxTiles: 6, maxBands: 3,   // tray stacks
-  hexdek: 12,         // height limit; a full stack of one colour clears
+  hexadek: 12,         // height limit; a full stack of one colour clears
   pointsPerTile: 10,
   traySize: 3,
 };
@@ -156,11 +156,11 @@ function pourResult(board, a, b) {
   const A = board[a], B = board[b];
   if (a === b || !A || !B || !A.length || !neighbours(a).includes(b)) return null;
   if (B.length && topOf(B) !== topOf(A)) return null;
-  const room = CFG.hexdek - B.length;
+  const room = CFG.hexadek - B.length;
   if (room <= 0) return null;
   const n = Math.min(runLen(A), room);
   const after = (B.length ? runLen(B) : 0) + n;
-  return { n, after, clears: after === CFG.hexdek, emptiesFrom: n === A.length };
+  return { n, after, clears: after === CFG.hexadek, emptiesFrom: n === A.length };
 }
 function legalTargets(board, a) { return neighbours(a).filter(b => pourResult(board, a, b)); }
 function pour(g, a, b) {
@@ -175,7 +175,7 @@ function pour(g, a, b) {
     g.board[b] = [];
     g.clearsThisTurn++;
     res.mult = g.clearsThisTurn;
-    res.points = CFG.hexdek * CFG.pointsPerTile * res.mult;
+    res.points = CFG.hexadek * CFG.pointsPerTile * res.mult;
     g.score += res.points;
   }
   return res;
@@ -227,7 +227,8 @@ function canMakeRoom(start, limit) {
 
 // ---- the page ----
 function start() {
-  const SAVE = 'hexdek.save.v1', BEST = 'hexdek.best';
+  const SAVE = 'hexadek.save.v1', BEST = 'hexadek.best';
+  const OLD = 'hexdek';   // the game's first name: saves made under it still load
   const TILE = 0.12;      // tile thickness, as a share of the hex size
   const R3 = Math.sqrt(3);
   const $ = id => document.getElementById(id);
@@ -235,7 +236,7 @@ function start() {
 
   let g = load() || newGame(Date.now());
   let best = 0;
-  try { best = Number(localStorage.getItem(BEST)) || 0; } catch (e) {}
+  try { best = Number(localStorage.getItem(BEST) || localStorage.getItem(OLD + '.best')) || 0; } catch (e) {}
   let state = roomState(g.board);
   const ui = { sel: null, trayPick: null, press: null, drag: null, hover: null, pos: null, touch: false };
   let anims = [], flash = null, dirty = true;
@@ -247,7 +248,7 @@ function start() {
 
   function load() {
     try {
-      const s = JSON.parse(localStorage.getItem(SAVE));
+      const s = JSON.parse(localStorage.getItem(SAVE) || localStorage.getItem(OLD + '.save.v1'));
       if (s && s.board && CELLS.every(k => Array.isArray(s.board[k])) && s.tray && s.next) return s;
     } catch (e) {}
     return null;
@@ -350,7 +351,7 @@ function start() {
     if (res.clears) {
       anims.push({ type: 'clear', cell: b, colour: res.colour, keep: res.baseTo, pour: pa, t0: now,
                    wait: pa.dur + stagger * (res.n - 1), dur: 340 });
-      setFlash('Hexdek! +' + res.points + (res.mult > 1 ? ' (×' + res.mult + ')' : ''));
+      setFlash('Hexadek! +' + res.points + (res.mult > 1 ? ' (×' + res.mult + ')' : ''));
     }
     ui.sel = null;
     after();
@@ -533,8 +534,8 @@ function start() {
   }
   function previewText(a, b) {
     const r = pourResult(g.board, a, b);
-    let t = r.after + ' / ' + CFG.hexdek;
-    if (r.clears) t += ' · hexdek!';
+    let t = r.after + ' / ' + CFG.hexadek;
+    if (r.clears) t += ' · hexadek!';
     if (r.n < runLen(g.board[a])) t += ' (moves ' + r.n + ')';
     return t;
   }
@@ -606,7 +607,7 @@ function start() {
         } else {
           ctx.globalAlpha = Math.max(0, 1 - t);
           const grow = 1 + 0.25 * t;
-          for (let i = 0; i < CFG.hexdek; i++) tile(x, y - i * h * grow, S * grow, a.colour);
+          for (let i = 0; i < CFG.hexadek; i++) tile(x, y - i * h * grow, S * grow, a.colour);
           ctx.globalAlpha = 1;
         }
       } else if (a.type === 'pour') {

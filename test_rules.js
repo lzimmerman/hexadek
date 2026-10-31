@@ -27,7 +27,7 @@ undo(g); assert.deepEqual(g.board['0,0'], [0, 1, 1, 1]); assert.deepEqual(g.boar
 // height limit: only what fits moves
 g.board['0,0'] = [4, 4, 4, 4]; g.board['1,0'] = [0,1,0,1,0,1,0,1,0,4];
 r = pour(g, '0,0', '1,0'); assert.equal(r.n, 2); assert.equal(g.board['1,0'].length, 12); assert.deepEqual(g.board['0,0'], [4, 4]); assert(!r.clears);
-// a full hexdek of one colour clears, with the turn multiplier
+// a full hexadek of one colour clears, with the turn multiplier
 g.board['0,0'] = [2,2,2,2,2,2]; g.board['1,0'] = [2,2,2,2,2,2]; g.board['-1,0'] = [3,3,3,3,3,3]; g.board['-1,1'] = [3,3,3,3,3,3];
 const s0 = g.score; r = pour(g, '0,0', '1,0'); assert(r.clears); assert.deepEqual(g.board['1,0'], []); assert.equal(g.score - s0, 120);
 r = pour(g, '-1,0', '-1,1'); assert.equal(r.points, 240, 'second clear x2');
