@@ -27,7 +27,9 @@
 // tools/contrast.js checks tiles and stones against each theme's cells.
 //
 // Chapter themes: Journey chapter n uses CHAPTER_THEMES[n - 1]. Natural palettes, soft rather
-// than neon. (Planned: not yet applied by the game; see FEATURE_IDEAS.md.)
+// than neon. index.html loads this file: a Journey level shows its chapter's theme (and the
+// level list tints each chapter), every other game uses classic. Without this file the game
+// keeps its built-in classic colours.
 
 const THEMES = {
   classic: {   // the game's colours before themes: also the fallback

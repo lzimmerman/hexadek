@@ -107,6 +107,8 @@ dialog { border: 1px solid var(--cell-edge); border-radius: 14px; background: va
   max-width: 520px; width: calc(100% - 32px); max-height: 85vh; overflow: auto; box-sizing: border-box; }
 dialog h3 { font-size: 16px; margin: 16px 0 4px; padding-top: 10px; border-top: 1px solid var(--line); }
 dialog h3.first { margin-top: 4px; padding-top: 0; border-top: 0; }
+.chap { background: var(--bg); color: var(--ink); border-radius: 10px; padding: 2px 10px 8px; margin: 8px 0; }
+.chap h3 { border-top: 0; margin-top: 8px; padding-top: 0; }
 .lvgrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 6px 0 4px; }
 .lvgrid .lv { display: flex; flex-direction: column; align-items: center; padding: 6px 0; min-height: 0; }
 .lvgrid .lv b { font-size: 16px; }
@@ -338,6 +340,7 @@ dialog li { margin-bottom: 6px; }
   <div class="row"><button type="button" id="welcometut">Play the tutorial</button><button type="button" id="welcomeclose">Just play</button></div>
 </dialog>
 
+<script src="themes.js"></script>   <!-- colour themes; without it the built-in (classic) colours stay -->
 <script>
 'use strict';
 
@@ -913,13 +916,13 @@ function start() {
   }
   function showLevels() {
     const cont = continueLevel();
-    $('levelgrid').innerHTML = CHAPTERS.map((C, c) => '<h3>Chapter ' + (c + 1) + ' · ' + C.name + '</h3><div class="lvgrid">' +
+    $('levelgrid').innerHTML = CHAPTERS.map((C, c) => '<section class="chap" style="' + chapterStyle(c) + '"><h3>Chapter ' + (c + 1) + ' · ' + C.name + '</h3><div class="lvgrid">' +
       LEVELS.slice(c * CHAPTER_SIZE, (c + 1) * CHAPTER_SIZE).map(L => {
         const open = unlocked(L.n), st = readStars(L.n);
         return '<button type="button" class="lv' + (L.n === cont ? ' primary' : '') + '" data-n="' + L.n + '"' +
           (open ? '' : ' disabled') + ' aria-label="Level ' + L.n + (open ? ', ' + st + ' stars' : ', locked') + '"><b>' + L.n +
           '</b><span>' + (open ? starText(st) : 'locked') + '</span></button>';
-      }).join('') + '</div>').join('');
+      }).join('') + '</div></section>').join('');
     $('levels').showModal();
     const cur = $('levelgrid').querySelector('.primary'); if (cur) cur.scrollIntoView({ block: 'center' });
   }
@@ -966,7 +969,23 @@ function start() {
   };
   showHaptics();
   $('welcomeclose').onclick = () => { $('welcome').close(); if (g.level === 1 && !g.turn) showIntro(); };
+  // ---- colour themes (themes.js): a Journey level shows its chapter's theme, other games the classic one ----
+  let themeNow = null;
+  function applyGameTheme() {
+    if (typeof applyTheme !== 'function') return;   // themes.js didn't load: keep the built-in colours
+    const name = g.level && !tut ? CHAPTER_THEMES[LEVELS[g.level - 1].chapter] : 'classic';
+    if (name === themeNow) return;
+    themeNow = name; applyTheme(name); resize();   // resize re-reads the colours for the board
+  }
+  const pageIsDark = () => document.documentElement.dataset.theme === 'dark' ||
+    (document.documentElement.dataset.theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  function chapterStyle(c) {   // a chapter's theme colours, for its block in the level list
+    if (typeof THEMES === 'undefined') return '';
+    const set = THEMES[CHAPTER_THEMES[c]][pageIsDark() ? 'dark' : 'light'];
+    return Object.entries(set).map(([k, v]) => '--' + k + ':' + v).join(';');
+  }
   function after() {
+    applyGameTheme();
     const was = state;
     state = isWon(g) ? 'won' : roomState(g.board, poursLeft(g));
     const done = state === 'won' || state === 'over';
@@ -1605,6 +1624,7 @@ function start() {
   new ResizeObserver(resize).observe($('wrap'));
   if (document.fonts) document.fonts.ready.then(() => { dirty = true; });   // redraw the board's numbers in the web font
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', resize);
+  applyGameTheme();
   resize();
   hud();
   coach();
