@@ -157,6 +157,7 @@ button.quiet { color: var(--danger); font-size: 13px; padding: 6px 10px; }
 #levelstable { border-collapse: collapse; font-size: 13px; margin: 4px 0 8px; }
 #levelstable th, #levelstable td { text-align: left; padding: 3px 10px 3px 0; border-bottom: 1px solid var(--line); }
 #levelstable th { color: var(--muted); font-weight: 600; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 #coach { display: none; margin: 2px 16px 6px; padding: 10px 12px; border-radius: 10px; background: var(--panel);
   border: 2px solid var(--accent); }
 #coach.show { display: block; }
@@ -208,6 +209,7 @@ dialog li { margin-bottom: 6px; }
   <button id="help">How to play</button>
 </nav>
 <div id="status" aria-live="polite"><span id="msg"></span><button id="giveup">Give up</button></div>
+<div id="peeklive" class="sr-only" aria-live="polite"></div>   <!-- a peeked stack's tiles, for screen readers -->
 <div id="coach" aria-live="polite">
   <div class="step" id="coachstep"></div>
   <p id="coachtext"></p>
@@ -252,6 +254,8 @@ dialog li { margin-bottom: 6px; }
   <div class="fig"><canvas data-fig="stack"></canvas>
     <p>The tiles on top that share a colour are the stack's <b>top run</b>. The symbol on top shows its colour,
       and the number shows how many tiles are in it. This stack's top run is 3 blue tiles.</p></div>
+  <p>To see every tile in a stack, <b>press and hold</b> it (or rest the mouse on it): a card lists its colours
+    from the top down. Letting go closes it without moving anything.</p>
   <h3>Pouring</h3>
   <div class="fig"><canvas class="wide" data-fig="pour1"></canvas><span class="arrow">→</span><canvas class="wide" data-fig="pour2"></canvas></div>
   <ul>
@@ -326,6 +330,7 @@ dialog li { margin-bottom: 6px; }
   <ul>
     <li>Tap or click, or drag. Tapping during an animation skips it. If your phone is set to reduce motion,
       the game skips its animations.</li>
+    <li>Press and hold a stack, or rest the mouse on it, to see all its tiles.</li>
     <li>Undo is below the board. Esc lets go of a selected stack, and Ctrl+Z or Cmd+Z undoes a pour.</li>
     <li>Haptics, also below the board, makes the phone vibrate on pours and hexadeks. It's off to start with.</li>
     <li><b>Restart</b> plays the same game again from the start, with the same stacks, to try another plan.
@@ -747,7 +752,7 @@ function start() {
   let best = readBest(g);
   let state = isWon(g) ? 'won' : roomState(g.board, poursLeft(g));
   const HOLD_MS = 150;   // a touch shorter than this is a tap: no preview while the finger is down
-  const ui = { ghostAt: null, sel: null, trayPick: null, press: null, drag: null, hover: null, pos: null, touch: false };
+  const ui = { ghostAt: null, sel: null, trayPick: null, press: null, drag: null, hover: null, pos: null, touch: false, peek: null };
   let anims = [], flash = null, dirty = true;
   // The end of a game, shown gently: the last move plays out, the board dims (with a burst of
   // stars after a win), and only then the card. A card that jumps in can look like an error.
@@ -1303,7 +1308,41 @@ function start() {
     if (r.width !== W || r.height !== H) resize();   // the page moved (the tutorial card changed size): catch up first
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
+  // Peek: hold a stack still (or rest the mouse on it) to see all its tiles, top first, on a card.
+  // It selects nothing; letting go after a peek does nothing, and moving starts a drag as usual.
+  const PEEK_MS = 450;
+  const peekStack = at => at.kind === 'tray' ? g.tray[at.slot] : g.board[at.cell];
+  function bands(st) {   // the stack's colour bands, top first
+    const out = [];
+    for (let i = st.length - 1; i >= 0; i--) {
+      const b = out[out.length - 1];
+      if (b && b.c === st[i]) b.n++; else out.push({ c: st[i], n: 1 });
+    }
+    return out;
+  }
+  const tileName = (c, n) => c === STONE ? (n > 1 ? 'stones' : 'stone') :
+    COLOURS[c][1] === 'leaf' ? (n > 1 ? 'leaves' : 'leaf') : COLOURS[c][1] + (n > 1 ? 's' : '');
+  function showPeek(at, p) {
+    const st = peekStack(at);
+    if (!st || !st.length) return;
+    ui.peek = { ...at, p }; dirty = true;
+    buzz(10);
+    $('peeklive').textContent = (at.kind === 'tray' ? 'Tray stack: ' : 'Stack: ') +
+      bands(st).map(b => b.n + ' ' + tileName(b.c, b.n)).join(', ') + ' (top first), ' + st.length + ' of ' + CFG.hexadek + ' tiles.';
+  }
+  function hidePeek() { if (ui.peek) { ui.peek = null; dirty = true; } }
+  let hoverTimer = null, hoverKey = '';
+  function mouseHover(p) {   // the mouse resting on a stack peeks too
+    const slot = traySlotAt(p), cell = slot === null ? cellAt(p) : null;
+    const key = slot !== null ? 'tray' + slot : cell && g.board[cell].length ? cell : '';
+    if (key === hoverKey) return;
+    hoverKey = key; clearTimeout(hoverTimer); hidePeek();
+    if (!key) return;
+    const at = slot !== null ? { kind: 'tray', slot } : { kind: 'board', cell };
+    hoverTimer = setTimeout(() => { if (!ui.press && !ui.drag && hoverKey === key) showPeek(at, ui.pos || p); }, PEEK_MS);
+  }
   canvas.addEventListener('pointerdown', e => {
+    hidePeek(); clearTimeout(hoverTimer); hoverKey = '';
     finishAnims();
     if (state === 'over' || state === 'won') return;
     const p = pt(e);
@@ -1317,12 +1356,18 @@ function start() {
     // touch: show the target only once the finger stays or slides, so a quick tap doesn't flash a preview
     const pr = ui.press;
     if (ui.touch && slot === null) setTimeout(() => { if (ui.press === pr && !ui.drag) { ui.hover = tapTarget(ui.pos); dirty = true; } }, HOLD_MS);
+    const at = slot !== null ? { kind: 'tray', slot } : pr.cell ? { kind: 'board', cell: pr.cell } : null;
+    if (at) setTimeout(() => {
+      if (ui.press === pr && !ui.drag && dist(ui.pos, pr.start) <= 12 && state !== 'over' && state !== 'won') { pr.peeked = true; showPeek(at, ui.pos); }
+    }, PEEK_MS);
     dirty = true;
   });
   canvas.addEventListener('pointermove', e => {
     const p = pt(e);
     ui.pos = p;
     const pr = ui.press;
+    if (ui.peek && pr && dist(p, pr.start) > 12) hidePeek();   // moving on: an ordinary drag
+    if (e.pointerType === 'mouse' && !pr && !ui.drag) mouseHover(p);
     if (e.pointerType === 'mouse' || (pr && pr.kind === 'board' && !ui.drag &&
         (performance.now() - pr.t0 >= HOLD_MS || dist(p, pr.start) > 12))) ui.hover = tapTarget(p);
     if (pr && !ui.drag && !pr.slide && dist(p, pr.start) > (ui.touch ? 12 : 8)) {
@@ -1335,6 +1380,9 @@ function start() {
   });
   canvas.addEventListener('pointerup', e => {
     ui.pos = pt(e);
+    if (ui.press && ui.press.peeked && !ui.drag) {   // a peek: letting go just closes it
+      hidePeek(); ui.press = null; if (ui.touch) ui.hover = null; dirty = true; return;
+    }
     if (ui.drag) {
       const t = dragTarget(), d = ui.drag;
       ui.drag = null; ui.ghostAt = t;
@@ -1348,8 +1396,10 @@ function start() {
     hud();
     dirty = true;
   });
-  canvas.addEventListener('pointercancel', () => { ui.press = ui.drag = ui.hover = null; dirty = true; });
-  canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { ui.hover = null; dirty = true; } });
+  canvas.addEventListener('pointercancel', () => { ui.press = ui.drag = ui.hover = ui.peek = null; dirty = true; });
+  canvas.addEventListener('pointerleave', e => {
+    if (e.pointerType === 'mouse') { ui.hover = null; clearTimeout(hoverTimer); hoverKey = ''; hidePeek(); dirty = true; }
+  });
 
   function tap(pr) {
     if (pr.kind === 'tray') {
@@ -1754,7 +1804,45 @@ function start() {
       ctx.globalAlpha = 1;
       pill(previewText(hl.pill.from, hl.pill.cell), x, y - (len + r.n - 1) * h);
     }
+    if (ui.peek) drawPeek();
     if (ending) drawEnding(now);
+  }
+  function drawPeek() {   // a card listing the peeked stack's bands, top first, above the finger
+    const st = peekStack(ui.peek);
+    if (!st || !st.length) { ui.peek = null; return; }
+    const B = bands(st), fs = Math.max(14, Math.round(S * 0.36)), row = Math.max(28, S * 0.66), r = row * 0.44, pad = 10;
+    ctx.font = '700 ' + fs + 'px ' + theme.font;
+    const total = st.length + ' of ' + CFG.hexadek;
+    const w = Math.max(r * 2 + 10 + ctx.measureText('× 12').width + 34, ctx.measureText(total).width) + pad * 2;
+    const h = B.length * row + fs * 1.6 + pad * 2;
+    const p = ui.peek.p;
+    let x = ui.touch ? p.x - w / 2 : p.x + 18, y = ui.touch ? p.y - S * 1.5 - h : p.y - h / 2;
+    if (y < 4 && ui.touch) y = p.y + S * 1.1;   // no room above the finger: below it
+    x = Math.max(4, Math.min(W - w - 4, x)); y = Math.max(4, Math.min(H - h - 4, y));
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, 12); else ctx.rect(x, y, w, h);
+    ctx.fillStyle = theme.panel; ctx.fill();
+    ctx.restore();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = theme.accent; ctx.stroke();
+    ctx.textBaseline = 'middle';
+    B.forEach((b, i) => {
+      const cx = x + pad + r, cy = y + pad + row * (i + 0.5);
+      hexPath(cx, cy, r); ctx.fillStyle = b.c === STONE ? STONE_COLOUR : COLOURS[b.c][0]; ctx.fill();
+      ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.stroke();
+      if (b.c === STONE) crack(cx, cy, r); else symbol(COLOURS[b.c][1], cx, cy, r * 0.62);
+      ctx.font = '700 ' + fs + 'px ' + theme.font; ctx.textAlign = 'left'; ctx.fillStyle = theme.ink;
+      ctx.fillText('× ' + b.n, cx + r + 10, cy);
+      if (i === 0 && B.length > 1) {
+        ctx.font = '500 ' + Math.round(fs * 0.75) + 'px ' + theme.font; ctx.textAlign = 'right'; ctx.fillStyle = theme.muted;
+        ctx.fillText('top', x + w - pad, cy);
+      }
+    });
+    const ly = y + pad + B.length * row + fs * 0.3;
+    ctx.beginPath(); ctx.moveTo(x + pad, ly); ctx.lineTo(x + w - pad, ly); ctx.lineWidth = 1; ctx.strokeStyle = theme['cell-edge']; ctx.stroke();
+    ctx.font = '600 ' + Math.round(fs * 0.85) + 'px ' + theme.font; ctx.textAlign = 'center'; ctx.fillStyle = theme.muted;
+    ctx.fillText(total, x + w / 2, ly + fs * 0.75);
   }
   function burst() {   // stars for a win: each with a direction, speed, size and spin
     const parts = [];
