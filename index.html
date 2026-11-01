@@ -914,12 +914,26 @@ function start() {
     const T = g.level ? levelTargets(g.level) : null;
     const rec = { t: stamp(), game: gameName(g), level: g.level || null, result,
       score: g.score, stars: g.level ? starsFor(g) : null, hexadeks: g.hexadeks || 0, M: T ? T.M : null,
-      placed: g.turn, deck: g.deckSize || null, colours: g.colours, undos: pourRule(g) ? 5 - undosLeft(g) : null };
+      placed: g.turn, deck: g.deckSize || null, colours: g.colours, undos: pourRule(g) ? 5 - undosLeft(g) : null,
+      time: g.ms ? mmss(g.ms) : null };
     try {
       const log = JSON.parse(localStorage.getItem(LOG) || '[]'); log.push(rec);
       localStorage.setItem(LOG, JSON.stringify(log.slice(-LOG_MAX)));
     } catch (e) {}
   }
+  // active play time: the gaps between inputs, each capped, so time away from the game barely counts
+  const IDLE_CAP = 60000;
+  let lastInput = null;
+  function tick() {
+    if (tut || !g || state === 'won' || state === 'over') { lastInput = null; return; }
+    const now = Date.now();
+    if (lastInput !== null) g.ms = (g.ms || 0) + Math.min(now - lastInput, IDLE_CAP);
+    lastInput = now;
+  }
+  document.addEventListener('pointerdown', tick, true);
+  document.addEventListener('keydown', tick, true);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) lastInput = null; });
+  const mmss = ms => { const t = Math.round(ms / 1000); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
   function playData() {   // a plain-text summary: best per level, then the log
     const lines = ['Hexadek play data, ' + stamp(), '', 'Journey bests (level: best score, stars):'];
     const bests = [];
@@ -927,15 +941,17 @@ function start() {
       const b = readBest({ level: n, mode: 'level' }), st = readStars(n);
       if (b || st) bests.push('L' + n + ': ' + b + ' ' + ('★'.repeat(st) || '-'));
     }
-    lines.push(bests.length ? bests.join(' | ') : '(none yet)', '', 'Games (time, game, result, score, stars, hexadeks/M, placed/deck, undos used):');
+    lines.push(bests.length ? bests.join(' | ') : '(none yet)', '',
+      'Games (date, game, result, score, stars, hexadeks/M, placed/deck, undos used, active play time m:ss):');
     let log = []; try { log = JSON.parse(localStorage.getItem(LOG) || '[]'); } catch (e) {}
     for (const r of log) lines.push([r.t, r.game, r.result, r.score, r.stars === null ? '' : r.stars + '★',
-      r.hexadeks + (r.M ? '/' + r.M : ''), r.placed + (r.deck ? '/' + r.deck : ''), r.undos === null ? '' : r.undos].join(', '));
+      r.hexadeks + (r.M ? '/' + r.M : ''), r.placed + (r.deck ? '/' + r.deck : ''), r.undos === null ? '' : r.undos, r.time || ''].join(', '));
     if (!log.length) lines.push('(none yet: the log starts with this version)');
     return lines.join('\n');
   }
   function startGame(seed, mode, colours, level, intro) {
     logGame('left');   // a game in progress that's replaced (Restart, New game, another level)
+    lastInput = Date.now();   // the clock starts with the game, so the first move's thinking counts
     finishAnims(); ending = null;
     g = newGame(seed, mode, colours, level);
     ui.sel = ui.trayPick = null;
