@@ -783,10 +783,25 @@ function start() {
     if (!tut) return true;
     const e = tutExpect();
     if (e && e[kind] && e[kind][0] === a && e[kind][1] === b) return true;
-    const step = $('coachstep');   // the hint takes the step line's place, so nothing on the page moves
-    step.textContent = e ? 'Not that one: follow the blue arrow.' : 'Press Next to carry on.';
-    step.classList.add('hint');
+    tutWrong();
     return false;
+  }
+  // A wrong move in the tutorial: say what to do, let go of any pick, and pulse the guide.
+  function tutWrong() {
+    const e = tutExpect(), step = $('coachstep');   // the hint takes the step line's place, so nothing on the page moves
+    // short enough for one line on a phone: the board must not move
+    step.textContent = e ? 'Not that one. Start at the blue arrow.' : 'Press Next to carry on.';
+    step.classList.add('hint');
+    ui.sel = ui.trayPick = null;
+    if (tut) tut.nudge = performance.now();
+    buzz([15, 60, 15]);
+    dirty = true;
+  }
+  // In the tutorial, picking anything but the marked stack is a wrong move, not a selection.
+  function tutPickOk(kind, k) {
+    const e = tutExpect();
+    if (!tut || !e) return true;
+    return kind === 'tray' ? !!e.place && e.place[0] === k : !!e.pour && e.pour[0] === k;
   }
   function tutStep() {
     if (!tut) return;
@@ -914,7 +929,8 @@ function start() {
     const pr = ui.press;
     if (e.pointerType === 'mouse' || (pr && pr.kind === 'board' && !ui.drag)) ui.hover = tapTarget(p);
     if (pr && !ui.drag && !pr.slide && dist(p, pr.start) > (ui.touch ? 12 : 8)) {
-      if (pr.kind === 'tray') { if (g.tray[pr.slot]) ui.drag = { kind: 'tray', slot: pr.slot }; }
+      if (pr.kind === 'tray') { if (g.tray[pr.slot] && tutPickOk('tray', pr.slot)) ui.drag = { kind: 'tray', slot: pr.slot }; }
+      else if (!tutPickOk('board', pr.cell)) {}
       else if (pr.cell && g.board[pr.cell].length && topOf(g.board[pr.cell]) !== STONE) ui.drag = { kind: 'pour', from: pr.cell };
       if (ui.drag) { ui.sel = null; ui.trayPick = null; hud(); }
     }
@@ -938,6 +954,7 @@ function start() {
   function tap(pr) {
     if (pr.kind === 'tray') {
       if (!g.tray[pr.slot]) return;
+      if (ui.trayPick !== pr.slot && !tutPickOk('tray', pr.slot)) { tutWrong(); return; }
       ui.trayPick = ui.trayPick === pr.slot ? null : pr.slot;
       ui.sel = null;
       return;
@@ -946,6 +963,7 @@ function start() {
     if (!c) { ui.sel = ui.trayPick = null; return; }
     if (ui.sel && pourResult(g.board, ui.sel, c)) { doPour(ui.sel, c); return; }
     if (ui.trayPick !== null && !g.board[c].length) { doPlace(ui.trayPick, c); return; }
+    if (g.board[c].length && ui.sel !== c && !tutPickOk('board', c)) { tutWrong(); return; }
     ui.sel = g.board[c].length && topOf(g.board[c]) !== STONE && ui.sel !== c ? c : null;
     ui.trayPick = null;
   }
@@ -1233,30 +1251,59 @@ function start() {
     const e = tutExpect();
     if (e) {   // the tutorial's blue arrow: what to tap next
       const bob = still() ? 0 : Math.sin(now / 160) * S * 0.08;
+      const since = tut.nudge ? now - tut.nudge : Infinity, pulse = since < 1500 && !still();   // after a mistake
       const arrow = (x, yTop) => {
-        const y = yTop - S * 0.95 + bob;
+        const y = yTop - S * 0.95 + bob, a = S * (pulse ? 0.48 : 0.38);
         ctx.beginPath();
-        ctx.moveTo(x - S * 0.24, y - S * 0.26); ctx.lineTo(x + S * 0.24, y - S * 0.26); ctx.lineTo(x, y + S * 0.06);
+        ctx.moveTo(x - a, y - a * 1.05); ctx.lineTo(x + a, y - a * 1.05); ctx.lineTo(x, y + a * 0.3);
         ctx.closePath();
         ctx.fillStyle = theme.accent; ctx.fill();
-        ctx.lineWidth = 2; ctx.strokeStyle = theme.panel; ctx.stroke();
+        ctx.lineWidth = 3; ctx.strokeStyle = theme.panel; ctx.stroke();
       };
-      const atCell = k => {
+      const topAt = k => {
         const [x, y0] = cellXY(k), len = g.board[k].length, y = y0 - (ui.sel === k ? S * 0.15 : 0);
-        const yTop = y - Math.max(0, len - 1) * h;
+        return [x, y - Math.max(0, len - 1) * h];
+      };
+      const mark = k => {
+        const [x, yTop] = topAt(k);
         ring(x, yTop, S, true);
-        arrow(x, yTop);
+        if (pulse) {   // a ring that grows and fades, to catch the eye
+          const t = (since % 750) / 750;
+          ctx.globalAlpha = 1 - t; hexPath(x, yTop, S * (0.95 + 0.5 * t));
+          ctx.lineWidth = 4; ctx.strokeStyle = theme.accent; ctx.stroke(); ctx.globalAlpha = 1;
+        }
+        return [x, yTop];
+      };
+      const line = (x0, y0, x1, y1) => {   // the whole move: a curved line with a head at the end
+        const mx = (x0 + x1) / 2, my = Math.min(y0, y1) - S * 0.9;
+        ctx.save();
+        ctx.lineCap = 'round'; ctx.setLineDash([S * 0.16, S * 0.14]);
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(mx, my, x1, y1);
+        ctx.lineWidth = S * 0.19; ctx.strokeStyle = theme.panel; ctx.stroke();
+        ctx.lineWidth = S * 0.11; ctx.strokeStyle = theme.accent; ctx.stroke();
+        ctx.setLineDash([]);
+        const ang = Math.atan2(y1 - my, x1 - mx), hl2 = S * 0.42;
+        ctx.beginPath(); ctx.moveTo(x1, y1);
+        ctx.lineTo(x1 - hl2 * Math.cos(ang - 0.5), y1 - hl2 * Math.sin(ang - 0.5));
+        ctx.lineTo(x1 - hl2 * Math.cos(ang + 0.5), y1 - hl2 * Math.sin(ang + 0.5));
+        ctx.closePath(); ctx.fillStyle = theme.accent; ctx.fill();
+        ctx.lineWidth = 2; ctx.strokeStyle = theme.panel; ctx.stroke();
+        ctx.restore();
       };
       if (e.pour) {
         const picked = ui.sel === e.pour[0] || (ui.drag && ui.drag.from === e.pour[0]);
-        atCell(picked ? e.pour[1] : e.pour[0]);
+        const [x0, y0] = topAt(e.pour[0]), [x1, y1] = topAt(e.pour[1]);
+        line(x0, y0 - S * 0.2, x1, y1 - S * 0.2);
+        const [ax, ay] = mark(picked ? e.pour[1] : e.pour[0]);
+        arrow(ax, ay);
       } else {
         const picked = ui.trayPick === e.place[0] || (ui.drag && ui.drag.kind === 'tray' && ui.drag.slot === e.place[0]);
-        if (picked) atCell(e.place[1]);
-        else {
-          const [x, y] = slotXY(e.place[0]), len = g.tray[e.place[0]].length;
-          arrow(x, y - (len - 1) * S * 0.8 * TILE - S * 0.1);
-        }
+        const [sx, sy] = slotXY(e.place[0]), len = g.tray[e.place[0]].length;
+        const trayTop = sy - (len - 1) * S * 0.8 * TILE - S * 0.1;
+        const [x1, y1] = topAt(e.place[1]);
+        line(sx, trayTop - S * 0.5, x1, y1);
+        if (picked) { const [ax, ay] = mark(e.place[1]); arrow(ax, ay); }
+        else arrow(sx, trayTop);
       }
     }
     if (hl.pill) {   // the preview: a ghost of the tiles that would land, and the result on top of them
