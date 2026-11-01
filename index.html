@@ -49,6 +49,8 @@ h1 { font-size: 20px; margin: 0; letter-spacing: .08em; font-weight: 700; }
 h1 span { color: var(--accent); }
 .chip { font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--cell);
   border: 1px solid var(--cell-edge); white-space: nowrap; }
+.chip.tap { cursor: pointer; } .chip.tap::after { content: 'ⓘ'; margin-left: 5px; color: var(--accent); }
+.chip.tap:hover { border-color: var(--accent); }
 #stats { display: flex; gap: 6px 18px; padding: 4px 16px 6px; flex-wrap: wrap; align-items: baseline;
   margin: 0 16px; padding-left: 0; padding-right: 0; padding-top: 6px;
   /* a faint line above and below: the numbers sit in a band between the title and the buttons */
@@ -250,7 +252,15 @@ dialog li { margin-bottom: 6px; }
   </ul>
   <h3>Clearing and scoring</h3>
   <div class="fig"><canvas data-fig="full"></canvas>
-    <p>12 tiles of one colour clear: 120 points. A second clear in the same turn scores ×2, a third ×3.</p></div>
+    <p>12 tiles of one colour clear: 120 points.</p></div>
+  <h3>Combos</h3>
+  <p>A turn lasts from one placement to the next, and you can pour as often as your pours allow. Each hexadek
+    you make in the same turn is worth more: the first 120, the second 240 (×2), the third 360 (×3), and so on.
+    The status line shows the multiplier.</p>
+  <ul>
+    <li>So build two or three stacks up to nearly 12, then finish them one after another before you place.</li>
+    <li>Combos are the way to ★★★ on most levels.</li>
+  </ul>
   <h3>The end</h3>
   <p>Each turn adds a stack, so the board fills up. The game ends when there's no empty cell and no pour can make one.</p>
   <h3>Journey: levels and stars</h3>
@@ -649,7 +659,8 @@ const TUTORIAL = [
           'Drag the marked red stack onto the marked cell, or tap it and then tap the cell.', expect: { place: [0, '1,0'] } },
   { text: 'The big stack has 9 reds, and the new one has 3. Pour the new one onto it to make 12 of one colour.',
     expect: { pour: ['1,0', '0,0'] } },
-  { text: "A hexadek! It cleared from the board and scored 120 points. A second clear in the same turn scores ×2. " +
+  { text: "A hexadek! It cleared from the board and scored 120 points. Combos: a second hexadek before you place " +
+          "again scores ×2 (240), a third ×3. " +
           "Each turn adds a stack, so the board fills up: the game ends when there's no empty cell and no pour can " +
           "make one. Undo is free until you place, so experiment. How to play has tips any time.", last: true },
 ];
@@ -871,12 +882,16 @@ function start() {
     $('introfacts').textContent = L.deck + ' stacks · ' + L.colours + ' colours · ' +
       (P ? 'pours: start ' + P.start + ', up to ' + P.max : 'unlimited pours');
     const goals = [['★', 'Place all ' + L.deck + ' stacks'], ['★★', 'Score ' + T.score],
-                   ['★★★', 'Score ' + T.top + (T.stones ? ' and break every stone' : ' (combos help)')]];
+                   ['★★★', 'Score ' + T.top + (T.stones ? ' and break every stone' : ' (combos: several hexadeks in one turn)')]];
     $('introgoals').innerHTML = goals.map(([s, t]) => '<li><b>' + s + '</b>' + t + '</li>').join('');
+    $('introgo').textContent = g.turn || g.score ? 'Back to the game' : 'Start';
     $('intro').classList.add('show');
     $('introgo').focus({ preventScroll: true });
   }
   const hideIntro = () => $('intro').classList.remove('show');
+  const chipIntro = () => { if (g.level && !tut && !$('over').classList.contains('show')) showIntro(); };
+  $('mode').onclick = chipIntro;
+  $('mode').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); chipIntro(); } });
   $('introgo').onclick = hideIntro;
   $('intro').addEventListener('click', e => { if (e.target === $('intro')) hideIntro(); });   // a tap beside the card
   function doNew(again) {   // again: the same game from the start, with the same stacks and mode
@@ -1070,6 +1085,10 @@ function start() {
     $('turn').textContent = g.turn;
     $('turnstat').style.display = g.deckSize ? 'none' : '';   // a deck's bar already counts the turns
     $('mode').textContent = gameName(g);
+    const tap = !!g.level && !tut;   // on a level, the chip reopens the level card
+    $('mode').classList.toggle('tap', tap);
+    if (tap) { $('mode').setAttribute('role', 'button'); $('mode').tabIndex = 0; $('mode').setAttribute('aria-label', gameName(g) + ': show the level card'); }
+    else { $('mode').removeAttribute('role'); $('mode').removeAttribute('tabindex'); $('mode').removeAttribute('aria-label'); }
     const P = pourRule(g);
     $('poursstat').style.display = P ? '' : 'none';
     if (P) $('pours').textContent = g.pours + ' / ' + P.max;
