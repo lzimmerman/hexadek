@@ -127,6 +127,9 @@ dialog p { margin: 0 0 8px; }
 select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--cell-edge);
   background: var(--panel); color: var(--ink); min-height: 40px; }
 .hint { color: var(--muted); font-size: 13px; }
+.extra { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 10px; }
+.extra.row { justify-content: space-between; }
+button.quiet { color: var(--danger); font-size: 13px; padding: 6px 10px; }
 .choices { display: grid; gap: 8px; margin: 4px 0 12px; }
 .choices button, .modebox { text-align: left; padding: 10px 12px; }
 /* a mode with its own buttons inside: framed like the mode buttons */
@@ -313,12 +316,14 @@ dialog li { margin-bottom: 6px; }
     <li><b>Restart</b> plays the same game again from the start, with the same stacks, to try another plan.
       <b>New game</b> deals new stacks.</li>
   </ul>
-  <h3>Your play data</h3>
-  <p>The game keeps a short log of your finished games on this device (score, stars, hexadeks), for testing and
-    tuning. Copy it to share it.</p>
-  <div class="row"><button type="button" id="copylog">Copy play data</button><span id="copied" class="hint"></span></div>
-  <textarea id="logtext" readonly hidden aria-label="Play data"></textarea>
   <div class="row"><button type="button" id="tutor">Play the tutorial</button><span class="spacer"></span><button type="button" id="rulesclose">Close</button></div>
+  <div class="extra">   <!-- for testing: below the buttons, out of the way -->
+    <h3>Your play data</h3>
+    <p>The game keeps a short log of your finished games on this device (score, stars, hexadeks), for testing and
+      tuning. Copy it to share it.</p>
+    <div class="row"><button type="button" id="copylog">Copy play data</button><span id="copied" class="hint"></span></div>
+    <textarea id="logtext" readonly hidden aria-label="Play data"></textarea>
+  </div>
 </dialog>
 <dialog id="ask">
   <p id="asktext"></p>
@@ -348,6 +353,8 @@ dialog li { margin-bottom: 6px; }
       <div class="row"><button type="button" id="newcustom">Play custom game</button></div></div>
   </div>
   <div class="row"><span class="spacer"></span><button type="button" id="newcancel">Cancel</button></div>
+  <div class="extra row"><span class="hint">Start over: clears every level's stars and all best scores.</span>
+    <button type="button" id="resetall" class="quiet">Reset all progress</button></div>
 </dialog>
 <dialog id="levels">
   <h2>Journey</h2>
@@ -1023,6 +1030,25 @@ function start() {
   }
   $('askyes').onclick = () => { const then = onYes; onYes = null; $('ask').close(); if (then) then(); };
   $('askno').onclick = () => { onYes = null; $('ask').close(); };
+  $('resetall').onclick = () => ask('Reset all progress? Every level\'s stars and all best scores are cleared, and ' +
+    'the game you are playing ends. This can\'t be undone.', 'Reset everything', () => {
+    logGame('left');
+    try {
+      const keep = ['hexadek.seen', 'hexadek.haptics', LOG];   // settings, and the play log (it notes the reset)
+      const gone = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if ((k.startsWith('hexadek.') || k.startsWith(OLD + '.')) && !keep.includes(k)) gone.push(k);
+      }
+      gone.forEach(k => localStorage.removeItem(k));
+      const log = JSON.parse(localStorage.getItem(LOG) || '[]');
+      log.push({ t: stamp(), game: 'All progress reset', level: null, result: 'reset', score: 0, stars: null, hexadeks: 0,
+                 M: null, placed: 0, deck: null, colours: null, undos: null });
+      localStorage.setItem(LOG, JSON.stringify(log.slice(-LOG_MAX)));
+    } catch (e) {}
+    if ($('newgame').open) $('newgame').close();
+    startGame(LEVEL_SEED + 1, 'level', null, 1, true);
+  });
   $('rulesclose').onclick = () => $('rules').close();
   $('copylog').onclick = () => {
     const t = $('logtext'); t.value = playData(); t.hidden = false; t.focus(); t.select();
