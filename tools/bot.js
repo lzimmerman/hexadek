@@ -11,6 +11,11 @@
 //     --colours C --deck D  override the level's settings, to try variations
 //     --verbose             one line per game
 //     --json                also a JSON line per level and skill, with every game (for tools/targets.js)
+//     --hub auto|point|line plays the hub strategy seen in play tests: keep a hub free (the centre, or a
+//                           line through it with more colours), place each new stack there, and pour
+//                           its colours out to home areas around it, one area per colour.
+//                           auto: the centre with up to 5 colours, a line with more. The line runs
+//                           along whichever axis has the fewest stones at the start.
 //
 // It plays by the game's own rule functions, loaded from index.html like the tests do, and
 // sees only what a player sees: the board, the tray and the next stack. Each turn it searches
@@ -44,8 +49,42 @@ const W = {        // how the player values a board
   pour: 25, pourCap: 4,        // pours left in a budget game, up to pourCap
   stone: 90,                   // each stone still standing
   over: -1e6,                  // no room left
+  // --hub only
+  zone: 6, zoneOff: 3,         // a top run at its colour's home area / elsewhere, per tile
+  hubFull: 8, hubPlace: 40,    // tiles left in the hub, per tile; placing the new stack in the hub
 };
 const ON = new Set(CELLS), NB = {}; for (const k of CELLS) NB[k] = neighbours(k).filter(n => ON.has(n));   // on the board only
+
+// ---- the hub strategy (--hub) ----
+const HUB_MODE = opt('hub', null), R3 = Math.sqrt(3);
+let HUB = new Set(), ZONE = {};   // set for each game by setupHub
+const cellAngle = k => { const [q, r] = k.split(',').map(Number); return Math.atan2(1.5 * r, R3 * (q + r / 2)); };
+function setupHub(g) {
+  HUB = new Set(); ZONE = {};
+  if (!HUB_MODE) return;
+  const mode = HUB_MODE === 'auto' ? (g.colours <= 5 ? 'point' : 'line') : HUB_MODE;
+  let axis = 0;
+  if (mode === 'point') HUB.add('0,0');
+  else {
+    const lines = [['-1,0', '0,0', '1,0'], ['0,-1', '0,0', '0,1'], ['1,-1', '0,0', '-1,1']];
+    const stones = l => l.reduce((n, k) => n + g.board[k].filter(c => c === STONE).length, 0);
+    const line = lines.slice().sort((a, b) => stones(a) - stones(b))[0];
+    line.forEach(k => HUB.add(k)); axis = cellAngle(line[2]);
+  }
+  // home areas: equal slices of the ring around the hub, one per colour
+  const C = g.colours, slice = 2 * Math.PI / C;
+  for (const k of CELLS) if (!HUB.has(k)) ZONE[k] = Math.floor(((cellAngle(k) - axis + 4 * Math.PI) % (2 * Math.PI)) / slice) % C;
+}
+function hubValue(board) {
+  let v = 0;
+  for (const k of CELLS) {
+    const st = board[k];
+    if (!st.length || topOf(st) === STONE) continue;
+    if (HUB.has(k)) { v -= W.hubFull * st.length; continue; }
+    v += ZONE[k] === topOf(st) ? W.zone * runLen(st) : -W.zoneOff * runLen(st);
+  }
+  return v;
+}
 
 function mulberry(seed) {
   return () => { let t = seed = (seed + 0x6D2B79F5) | 0; t = Math.imul(t ^ t >>> 15, t | 1);
@@ -79,6 +118,7 @@ function judge(board, pours, budget) {
   }
   v += W.empty * empty + W.emptyFew * Math.min(empty, 3);
   if (budget) v += W.pour * Math.min(pours, W.pourCap);
+  if (HUB.size) v += hubValue(board);
   return v;
 }
 
@@ -130,6 +170,7 @@ function plan(g, skill, rnd) {
         if (last) v = 1e5 + n.score * 100 + v / 100;   // the last stack: only the score counts now
         else if (roomStateCheap(n.board) === 'over' && !canPourAny(n.board, n.pours, budget)) v += W.over;
         n.board[c] = [];
+        if (HUB.has(c)) v += W.hubFull * t.length + W.hubPlace;   // the new stack belongs in the hub
         v += noise();
         if (!best || v > best.v) best = { v, seq: n.seq, slot, cell: c };
       }
@@ -141,12 +182,14 @@ const roomStateCheap = b => CELLS.some(k => !b[k].length) ? 'ok' : 'over';
 const canPourAny = (b, pours, budget) => (!budget || pours > 0) && CELLS.some(a => b[a].length && NB[a].some(x => pourResult(b, a, x)));
 
 function playGame(g, skill, rnd) {
+  setupHub(g);
   for (let guard = 0; guard < 2000; guard++) {
     if (isWon(g)) break;
     const p = plan(g, skill, rnd);
     if (!p) break;
     for (const [a, b] of p.seq) pour(g, a, b);
     g.history = [];
+    if (HUB.has(p.cell)) g.hubPlaced = (g.hubPlaced || 0) + 1;
     if (!place(g, p.slot, p.cell)) break;
   }
   return g;
@@ -178,14 +221,14 @@ for (const lv of levels) {
       const pts = CFG.hexadek * CFG.pointsPerTile, won = isWon(g);
       const stars = !random ? starsFor(g) : !won ? 0 : g.score < (M - 1) * pts ? 1 :
         (LEVELS[lv - 1].stones ? g.score >= (M + 1) * pts && !CELLS.some(k => g.board[k].includes(STONE)) : g.score >= (M + 2) * pts) ? 3 : 2;
-      res.push({ won, hx: g.hexadeks || 0, M, score: g.score, stars, placed: g.turn, ms: Date.now() - t0,
+      res.push({ won, hx: g.hexadeks || 0, M, score: g.score, stars, placed: g.turn, ms: Date.now() - t0, hubPlaced: g.hubPlaced || 0,
                  stonesLeft: CELLS.reduce((n, k) => n + g.board[k].filter(c => c === STONE).length, 0) });
       if (flag('show')) console.log(CELLS.filter(k => g.board[k].length).map(k => k + ':' + g.board[k].join('')).join('  '));
       if (verbose) console.log(`  game ${i + 1}: ${isWon(g) ? 'won ' : 'lost'} placed ${g.turn}/${g.deckSize} hexadeks ${g.hexadeks || 0}/${M} score ${g.score} stars ${res[res.length - 1].stars} (${Date.now() - t0} ms)`);
     }
-    if (flag('json')) console.log('JSON ' + JSON.stringify({ level: lv, skill: sk, games: res }));
+    if (flag('json')) console.log('JSON ' + JSON.stringify({ level: lv, skill: sk + (HUB_MODE ? '+hub' : ''), games: res }));
     const sc = res.map(r => r.score);
-    console.log(`${(lv + ' ' + LEVELS[lv - 1].name).padEnd(17)} ${sk.padEnd(7)} ${pct(res, r => r.won)}    ` +
+    console.log(`${(lv + ' ' + LEVELS[lv - 1].name).padEnd(17)} ${(sk + (HUB_MODE ? '+hub' : '')).padEnd(7)} ${pct(res, r => r.won)}    ` +
       `${median(res.map(r => r.hx))}/${median(res.map(r => r.M))}`.padEnd(18) +
       `${median(sc)} [${Math.min(...sc)}–${Math.max(...sc)}]`.padEnd(22) +
       `${pct(res, r => r.stars >= 1)} ${pct(res, r => r.stars >= 2)} ${pct(res, r => r.stars >= 3)}`);
