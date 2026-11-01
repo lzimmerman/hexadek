@@ -77,6 +77,9 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
 .fig canvas { width: 72px; height: 96px; flex: none; }
 .fig canvas.wide { width: 140px; }
 .fig .arrow { font-size: 22px; color: var(--muted); }
+#levelstable { border-collapse: collapse; font-size: 13px; margin: 4px 0 8px; }
+#levelstable th, #levelstable td { text-align: left; padding: 3px 10px 3px 0; border-bottom: 1px solid var(--cell-edge); }
+#levelstable th { color: var(--muted); font-weight: 600; }
 #coach { display: none; margin: 2px 16px 6px; padding: 10px 12px; border-radius: 10px; background: var(--panel);
   border: 2px solid var(--accent); }
 #coach.show { display: block; }
@@ -146,10 +149,8 @@ dialog li { margin-bottom: 6px; }
     <li><b>Survive</b> game: pours and undos as in Standard, with a deck of 30 stacks. Place them all without
       running out of room. The bar below the board shows how far through the deck you are.</li>
     <li><b>Free</b> game: pours and undos are unlimited.</li>
-    <li><b>Levels</b>: a fixed deck each, with its own colours and pour rules. Choose one under New game.
-      Finishing earns a star, the level's score target a second, and its extra goal a third. Your best stays.</li>
+    <li><b>Levels</b>: a fixed deck each, with its own rules. See <i>Levels and stars</i> below.</li>
     <li>Choose the mode under New game, and the number of colours: 4 to 7. Fewer is easier.</li>
-    <li><b>Stones</b> (grey) can't be poured or poured onto. A stone breaks when a neighbouring stack clears.</li>
   </ul>
   <h3>Placing</h3>
   <ul>
@@ -161,6 +162,29 @@ dialog li { margin-bottom: 6px; }
     <p>12 tiles of one colour clear: 120 points. A second clear in the same turn scores ×2, a third ×3.</p></div>
   <h3>The end</h3>
   <p>Each turn adds a stack, so the board fills up. The game ends when there's no empty cell and no pour can make one.</p>
+  <h3>Levels and stars</h3>
+  <p>Choose a level under New game. Each level is a set challenge: a fixed deck of stacks, the same every time you
+    play it, with its own number of colours and pour rules. Place every stack in the deck to finish it.</p>
+  <p>Finishing earns stars, from one to three:</p>
+  <ul>
+    <li>★ Finish the deck.</li>
+    <li>★★ Finish, and reach the level's score target.</li>
+    <li>★★★ Finish, reach the score target, and meet the level's extra goal: a number of hexadeks, or breaking
+      every stone.</li>
+  </ul>
+  <p>Each level's goals show at the start of the game, and the end screen ticks off the ones you met. Your best
+    result for each level is kept, and shown in the level list. A worse game never takes stars away.</p>
+  <table id="levelstable"></table>
+  <h3>Stones</h3>
+  <div class="fig"><canvas class="wide" data-fig="stone1"></canvas><span class="arrow">→</span><canvas class="wide" data-fig="stone2"></canvas></div>
+  <ul>
+    <li>Stones are grey tiles with a crack. Some levels start with them on the board.</li>
+    <li>A stone can't be poured, and nothing can be poured onto it.</li>
+    <li>When a stack clears, each stack next to it loses its top stone, and whatever was under it is free again.
+      Above, the full red stack clears and breaks the stone beside it, uncovering the yellow tile.</li>
+    <li>Some cells hold two stones, one on top of the other, and need two clears next to them.</li>
+    <li>Breaking stones earns no points, but it frees up cells, and on a stones level it's the way to ★★★.</li>
+  </ul>
   <h3>Tips</h3>
   <ul>
     <li>Pick one or two colours to build up, and give them room: keep their neighbours free for pouring.</li>
@@ -668,6 +692,9 @@ function start() {
   $('newstandard').onclick = chosen('standard');
   $('newfree').onclick = chosen('free');
   $('newsurvive').onclick = chosen('survive');
+  $('levelstable').innerHTML = '<tr><th>Level</th><th>Deck</th><th>★★ score</th><th>★★★ also</th></tr>' +
+    LEVELS.map((L, i) => '<tr><td>' + (i + 1) + ' · ' + L.name + '</td><td>' + L.deck + '</td><td>' + L.stars.score +
+      '</td><td>' + (L.stars.stones ? 'every stone' : L.stars.hexadeks + ' hexadeks') + '</td></tr>').join('');
   $('newlevel').onclick = () => {   // each level has a fixed deck: the same every time
     const n = Number($('newlevelnum').value);
     $('newgame').close(); startGame(1000 + n, 'level', null, n);
@@ -920,7 +947,8 @@ function start() {
       drawStack(w * 0.72, h - s * 1.1, s, b, b.length);
     };
     const F = { stack: one([2, 0, 3, 3, 3]), pour1: two([2, 0, 0], [3, 0, 0, 0]), pour2: two([2], [3, 0, 0, 0, 0, 0]),
-                full: one(Array(CFG.hexadek).fill(0)) };
+                full: one(Array(CFG.hexadek).fill(0)),
+                stone1: two([1, STONE], Array(CFG.hexadek).fill(0)), stone2: two([1], []) };
     document.querySelectorAll('canvas[data-fig]').forEach(cv => drawOn(cv, F[cv.dataset.fig]));
   }
 
