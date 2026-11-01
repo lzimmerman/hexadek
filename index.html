@@ -142,7 +142,9 @@ dialog li { margin-bottom: 6px; }
     <li><b>Survive</b> game: pours and undos as in Standard, with a deck of 30 stacks. Place them all without
       running out of room. The bar below the board shows how far through the deck you are.</li>
     <li><b>Free</b> game: pours and undos are unlimited.</li>
+    <li><b>Levels</b>: a fixed deck each, with its own colours and pour rules. Choose one under New game.</li>
     <li>Choose the mode under New game, and the number of colours: 4 to 7. Fewer is easier.</li>
+    <li><b>Stones</b> (grey) can't be poured or poured onto. A stone breaks when a neighbouring stack clears.</li>
   </ul>
   <h3>Placing</h3>
   <ul>
@@ -189,6 +191,10 @@ dialog li { margin-bottom: 6px; }
     <button type="button" id="newsurvive"><b>Survive</b><span></span></button>
     <button type="button" id="newfree"><b>Free</b><span>Pours and undos are unlimited.</span></button>
   </div>
+  <label class="row" for="newlevelnum">Level
+    <select id="newlevelnum"></select>
+    <button type="button" id="newlevel">Play level</button></label>
+  <p class="hint">Levels are a fixed deck each, with their own colours and pour rules. Being tuned.</p>
   <div class="row"><span class="spacer"></span><button type="button" id="newcancel">Cancel</button></div>
 </dialog>
 <dialog id="welcome">
@@ -215,6 +221,18 @@ const CFG = {
 const COLOURS = [   // colour and symbol, so colours can be told apart without colour vision
   ['#e5484d', 'circle'], ['#f2b705', 'triangle'], ['#2fa86a', 'square'],
   ['#3b82e6', 'star'], ['#9b5de5', 'diamond'], ['#14b8a6', 'hexagon'], ['#f472b6', 'heart'],
+];
+const STONE = 9;   // a grey stone tile: it can't be poured, and breaks when a neighbouring stack clears
+const STONE_COLOUR = '#7d8590';
+// Levels: a fixed deck (same seed every time) with its own settings. pours: undefined is
+// Standard's budget, null is free pouring. Stars are planned (see FEATURE_IDEAS.md), not built.
+const LEVELS = [
+  { name: 'First deck', deck: 20, colours: 4, bands: [1, 2], pours: null },
+  { name: 'Five colours', deck: 25, colours: 5, bands: [1, 3] },
+  { name: 'Tight budget', deck: 25, colours: 5, bands: [1, 3], pours: { start: 2, perPlace: 2, perClear: 1, max: 6 } },
+  { name: 'Stones', deck: 30, colours: 5, bands: [1, 3],
+    stones: { '0,0': [STONE, STONE], '-2,1': [STONE], '2,-1': [STONE], '1,1': [STONE] } },
+  { name: 'Long haul', deck: 40, colours: 6, bands: [2, 3] },
 ];
 
 // ---- rules: plain data, no drawing ----
@@ -246,7 +264,8 @@ function rand(g) {   // mulberry32; the seed lives in the game so a saved game c
 }
 function newStack(g) {
   const n = CFG.minTiles + Math.floor(rand(g) * (CFG.maxTiles - CFG.minTiles + 1));
-  const bands = 1 + Math.floor(rand(g) * Math.min(CFG.maxBands, n));
+  const bands = g.bands ? g.bands[0] + Math.floor(rand(g) * (Math.min(g.bands[1], n) - g.bands[0] + 1))
+                        : 1 + Math.floor(rand(g) * Math.min(CFG.maxBands, n));
   const cuts = new Set();
   while (cuts.size < bands - 1) cuts.add(1 + Math.floor(rand(g) * (n - 1)));
   const st = [];
@@ -261,12 +280,19 @@ function newStack(g) {
   }
   return st;
 }
-function newGame(seed, mode, colours) {
+function newGame(seed, mode, colours, level) {
   mode = mode || 'standard';
+  const L = mode === 'level' ? LEVELS[level - 1] : null;
   const g = { seed: seed | 0, start: seed | 0, mode, colours: colours || CFG.colours,
               pours: CFG.pours.start, undos: CFG.undos, deckSize: mode === 'survive' ? CFG.deck : null,
               board: {}, tray: [], next: null, score: 0, turn: 0, clearsThisTurn: 0, history: [] };
   for (const k of CELLS) g.board[k] = [];
+  if (L) {
+    Object.assign(g, { level, colours: L.colours, deckSize: L.deck, bands: L.bands,
+                       pourRule: L.pours === undefined ? CFG.pours : L.pours });
+    if (g.pourRule) g.pours = g.pourRule.start;
+    for (const k in L.stones || {}) g.board[k] = L.stones[k].slice();
+  }
   for (let i = 0; i < CFG.traySize; i++) g.tray.push(newStack(g));
   g.next = newStack(g);
   if (g.deckSize) g.deckLeft = g.deckSize - CFG.traySize - 1;   // stacks still to come, after the tray and next
@@ -275,16 +301,22 @@ function newGame(seed, mode, colours) {
 // A deck: the game is won once every stack in it has been placed.
 function isWon(g) { return !!g.deckSize && g.turn >= g.deckSize; }
 const MODE_NAMES = { standard: 'Standard', free: 'Free', survive: 'Survive' };
-function gameName(g) { return MODE_NAMES[g.mode] + (g.colours !== CFG.colours ? ' · ' + g.colours + ' colours' : ''); }
-function poursLeft(g) { return g.mode !== 'free' ? g.pours : Infinity; }
-function undosLeft(g) {   // a game saved before the limit starts with the full set
-  return g.mode !== 'free' ? (g.undos === undefined ? CFG.undos : g.undos) : Infinity;
+function gameName(g) {
+  if (g.level) return 'Level ' + g.level + ' · ' + LEVELS[g.level - 1].name;
+  return MODE_NAMES[g.mode] + (g.colours !== CFG.colours ? ' · ' + g.colours + ' colours' : '');
 }
-function addPours(g, n) { if (g.mode !== 'free') g.pours = Math.min(CFG.pours.max, g.pours + n); }
+// The game's pour budget, or null when pours (and undos) are unlimited.
+function pourRule(g) { return g.pourRule !== undefined ? g.pourRule : g.mode === 'free' ? null : CFG.pours; }
+function poursLeft(g) { return pourRule(g) ? g.pours : Infinity; }
+function undosLeft(g) {   // a game saved before the limit starts with the full set
+  return pourRule(g) ? (g.undos === undefined ? CFG.undos : g.undos) : Infinity;
+}
+function addPours(g, why) { const P = pourRule(g); if (P) g.pours = Math.min(P.max, g.pours + P[why]); }
 // What pouring a's top run onto b would do, or null if it isn't allowed.
 function pourResult(board, a, b) {
   const A = board[a], B = board[b];
   if (a === b || !A || !B || !A.length || !neighbours(a).includes(b)) return null;
+  if (topOf(A) === STONE) return null;
   if (B.length && topOf(B) !== topOf(A)) return null;
   const room = CFG.hexadek - B.length;
   if (room <= 0) return null;
@@ -297,7 +329,7 @@ function pour(g, a, b) {
   const res = pourResult(g.board, a, b);
   if (!res || poursLeft(g) < 1) return null;
   g.history.push(JSON.stringify({ board: g.board, score: g.score, clearsThisTurn: g.clearsThisTurn, pours: g.pours }));
-  if (g.mode !== 'free') g.pours--;
+  if (pourRule(g)) g.pours--;
   const A = g.board[a], B = g.board[b];
   res.colour = topOf(A); res.baseTo = B.length;
   B.push(...A.splice(A.length - res.n, res.n));
@@ -308,13 +340,16 @@ function pour(g, a, b) {
     res.mult = g.clearsThisTurn;
     res.points = CFG.hexadek * CFG.pointsPerTile * res.mult;
     g.score += res.points;
-    addPours(g, CFG.pours.perClear);
+    addPours(g, 'perClear');
+    res.broke = [];   // a clear breaks the top stone of each neighbouring stack
+    for (const k of neighbours(b))
+      if (g.board[k] && topOf(g.board[k]) === STONE) { g.board[k].pop(); res.broke.push(k); }
   }
   return res;
 }
 function undo(g) {
   if (!g.history.length || undosLeft(g) < 1) return false;
-  if (g.mode !== 'free') g.undos = undosLeft(g) - 1;
+  if (pourRule(g)) g.undos = undosLeft(g) - 1;
   const s = JSON.parse(g.history.pop());
   g.board = s.board; g.score = s.score; g.clearsThisTurn = s.clearsThisTurn;
   if ('pours' in s) g.pours = s.pours;
@@ -329,7 +364,7 @@ function place(g, slot, cell) {
     if (g.deckSize) g.deckLeft--;
   } else g.next = null;
   g.turn++; g.history = []; g.clearsThisTurn = 0;
-  addPours(g, CFG.pours.perPlace);
+  addPours(g, 'perPlace');
   return true;
 }
 // 'ok': an empty cell; 'full': none, but some pours make one; 'over': no way to make one
@@ -409,7 +444,8 @@ function start() {
   let firstVisit = false;
   try { firstVisit = !saved && !localStorage.getItem('hexadek.seen'); localStorage.setItem('hexadek.seen', '1'); } catch (e) {}
   // a best score for each mode and colour count; the old single best was from Free games
-  const bestKey = gm => BEST + '.' + gm.mode + (gm.colours !== CFG.colours ? '.' + gm.colours + 'c' : '');
+  const bestKey = gm => BEST + '.' + (gm.level ? 'level' + gm.level :
+                                      gm.mode + (gm.colours !== CFG.colours ? '.' + gm.colours + 'c' : ''));
   function readBest(gm) {
     try {
       return Number(localStorage.getItem(bestKey(gm)) || (gm.mode === 'free' && gm.colours === CFG.colours ?
@@ -500,9 +536,12 @@ function start() {
     }
     return null;
   }
-  // Where a dragged piece goes, from the point its base floats at. The highlight and the
-  // drop both use these, so what lights up is always what happens.
+  // Where a dragged piece goes. The highlight and the drop both use these, so what lights
+  // up is always what happens. With a mouse the piece's base is the aim; on touch it floats
+  // well above the finger to stay visible, and the aim is the fingertip (the ghost shows where).
   function liftPoint(p) { return ui.touch ? { x: p.x, y: p.y - S * 1.6 } : { x: p.x, y: p.y + S * 0.3 }; }
+  // A fingertip covers the cell it means, and its contact point lands a little below it.
+  const aim = p => ui.touch ? { x: p.x, y: p.y - S * 0.3 } : p;
   function dropTarget(lp, reach = 1.2) {
     let bestK = null, bestD = S * reach;
     for (const c of CELLS) {
@@ -522,7 +561,7 @@ function start() {
   }
   function dragTarget() {
     if (!ui.drag || !ui.pos) return null;
-    const lp = liftPoint(ui.pos);
+    const lp = ui.touch ? aim(ui.pos) : liftPoint(ui.pos);
     return ui.drag.kind === 'tray' ? dropTarget(lp) : pourTarget(ui.drag.from, lp);
   }
   // What a tap at p means, given what's picked: with a tray stack picked, the empty cell
@@ -532,7 +571,7 @@ function start() {
     else if (ui.sel) { const k = pourTarget(ui.sel, p, 0.85); if (k) return k; }
     return null;
   }
-  const tapTarget = p => tapAction(p) || cellAt(p);
+  const tapTarget = p => tapAction(aim(p)) || cellAt(aim(p));
 
   // ---- actions ----
   function doPour(a, b) {
@@ -547,7 +586,10 @@ function start() {
     if (res.clears) {
       if (!still()) anims.push({ type: 'clear', cell: b, colour: res.colour, keep: res.baseTo, pour: pa, t0: now,
                    wait: pa.dur + stagger * (res.n - 1), dur: 340 });
-      setFlash('Hexadek! +' + res.points + (res.mult > 1 ? ' (×' + res.mult + ')' : ''));
+      if (!still()) for (const k of res.broke)
+        anims.push({ type: 'break', cell: k, at: g.board[k].length, t0: now, wait: pa.dur + stagger * (res.n - 1), dur: 340 });
+      setFlash('Hexadek! +' + res.points + (res.mult > 1 ? ' (×' + res.mult + ')' : '') +
+               (res.broke.length ? ' · ' + (res.broke.length > 1 ? res.broke.length + ' stones' : 'a stone') + ' broken' : ''));
     }
     ui.sel = null;
     after();
@@ -567,9 +609,9 @@ function start() {
     finishAnims();
     if (undo(g)) { ui.sel = null; flash = null; after(); }
   }
-  function startGame(seed, mode, colours) {
+  function startGame(seed, mode, colours, level) {
     finishAnims();
-    g = newGame(seed, mode, colours);
+    g = newGame(seed, mode, colours, level);
     ui.sel = ui.trayPick = null;
     flash = null;
     after();
@@ -578,7 +620,7 @@ function start() {
     if (tut) { g = realG || g; tut = realG = null; coach(); }
     const busy = (g.turn > 0 || g.history.length) && state !== 'over' && state !== 'won';
     if (again) {
-      const go = () => startGame(g.start, g.mode, g.colours);
+      const go = () => startGame(g.start, g.mode, g.colours, g.level);
       if (busy) ask('Restart this game from the beginning, with the same stacks?', 'Restart', go); else go();
       return;
     }
@@ -595,6 +637,11 @@ function start() {
   $('newstandard').onclick = chosen('standard');
   $('newfree').onclick = chosen('free');
   $('newsurvive').onclick = chosen('survive');
+  $('newlevelnum').innerHTML = LEVELS.map((L, i) => '<option value="' + (i + 1) + '">' + (i + 1) + ' · ' + L.name + '</option>').join('');
+  $('newlevel').onclick = () => {   // each level has a fixed deck: the same every time
+    const n = Number($('newlevelnum').value);
+    $('newgame').close(); startGame(1000 + n, 'level', null, n);
+  };
   $('newcancel').onclick = () => $('newgame').close();
   // Our own yes/no box: browsers' confirm() is blocked inside some page viewers, and then
   // answers "no" without showing anything. Plain buttons close it: no form, since a viewer
@@ -696,10 +743,11 @@ function start() {
     $('best').textContent = best;
     $('turn').textContent = g.turn;
     $('mode').textContent = gameName(g);
-    $('poursstat').style.display = g.mode !== 'free' ? '' : 'none';
-    $('pours').textContent = g.pours + ' / ' + CFG.pours.max;
+    const P = pourRule(g);
+    $('poursstat').style.display = P ? '' : 'none';
+    if (P) $('pours').textContent = g.pours + ' / ' + P.max;
     $('undo').disabled = !g.history.length || !!tut || undosLeft(g) < 1;
-    $('undo').textContent = g.mode !== 'free' && !tut ? 'Undo (' + undosLeft(g) + ')' : 'Undo';
+    $('undo').textContent = P && !tut ? 'Undo (' + undosLeft(g) + ')' : 'Undo';
     $('restart').disabled = !!tut || g.start === undefined;
     $('overrestart').style.display = g.start === undefined ? 'none' : '';
     const st = $('status');
@@ -707,12 +755,12 @@ function start() {
     let text;
     if (flash) text = flash.text;
     else if (state === 'full') text = 'Board full: pour to make room.';
-    else if (poursLeft(g) < 1 && state !== 'over') text = 'No pours left: place a stack for ' + CFG.pours.perPlace + ' more.';
+    else if (poursLeft(g) < 1 && state !== 'over') text = 'No pours left: place a stack for ' + P.perPlace + ' more.';
     else if (ui.trayPick !== null) text = 'Tap an empty cell to place it.';
     else if (ui.sel) text = 'Tap a glowing neighbour to pour.';
     else if (g.turn === 0 && !g.history.length) text = 'Drag a tray stack onto the board to start.';
     else if (g.deckSize && g.turn === 0 && !g.history.length) text = 'Place all ' + g.deckSize + ' stacks in the deck to win.';
-    else if (g.mode !== 'free') text = 'Pour, then place a stack (+' + CFG.pours.perPlace + ' pours).';
+    else if (P) text = 'Pour, then place a stack (+' + P.perPlace + ' pours).';
     else text = 'Pour as you like, then place a stack.';
     $('msg').textContent = text;
     $('giveup').style.display = state === 'full' ? 'inline-block' : 'none';
@@ -745,7 +793,7 @@ function start() {
     // slide: a press on a target for the picked stack. Moving then adjusts the target
     // (shown as you go) instead of starting a drag.
     ui.press = slot !== null ? { kind: 'tray', slot, start: p }
-                             : { kind: 'board', cell: cellAt(p), start: p, slide: !!tapAction(p) };
+                             : { kind: 'board', cell: cellAt(p), start: p, slide: !!tapAction(aim(p)) };
     if (ui.touch && slot === null) ui.hover = tapTarget(p);
     dirty = true;
   });
@@ -756,7 +804,7 @@ function start() {
     if (e.pointerType === 'mouse' || (pr && pr.kind === 'board' && !ui.drag)) ui.hover = tapTarget(p);
     if (pr && !ui.drag && !pr.slide && dist(p, pr.start) > (ui.touch ? 12 : 8)) {
       if (pr.kind === 'tray') { if (g.tray[pr.slot]) ui.drag = { kind: 'tray', slot: pr.slot }; }
-      else if (pr.cell && g.board[pr.cell].length) ui.drag = { kind: 'pour', from: pr.cell };
+      else if (pr.cell && g.board[pr.cell].length && topOf(g.board[pr.cell]) !== STONE) ui.drag = { kind: 'pour', from: pr.cell };
       if (ui.drag) { ui.sel = null; ui.trayPick = null; hud(); }
     }
     dirty = true;
@@ -787,7 +835,7 @@ function start() {
     if (!c) { ui.sel = ui.trayPick = null; return; }
     if (ui.sel && pourResult(g.board, ui.sel, c)) { doPour(ui.sel, c); return; }
     if (ui.trayPick !== null && !g.board[c].length) { doPlace(ui.trayPick, c); return; }
-    ui.sel = g.board[c].length && ui.sel !== c ? c : null;
+    ui.sel = g.board[c].length && topOf(g.board[c]) !== STONE && ui.sel !== c ? c : null;
     ui.trayPick = null;
   }
 
@@ -871,8 +919,16 @@ function start() {
     ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.fill();
     ctx.lineWidth = Math.max(1, r * 0.14); ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.stroke();
   }
+  function crack(x, y, s) {   // the mark on a stone
+    ctx.beginPath();
+    ctx.moveTo(x - s * 0.45, y - s * 0.2); ctx.lineTo(x - s * 0.12, y + s * 0.02);
+    ctx.lineTo(x + s * 0.05, y - s * 0.22); ctx.lineTo(x + s * 0.42, y + s * 0.18);
+    ctx.moveTo(x - s * 0.12, y + s * 0.02); ctx.lineTo(x - s * 0.05, y + s * 0.4);
+    ctx.lineWidth = Math.max(1.5, s * 0.07); ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.stroke();
+    ctx.lineCap = 'butt';
+  }
   function tile(x, y, s, c) {
-    const col = COLOURS[c][0];
+    const col = c === STONE ? STONE_COLOUR : COLOURS[c][0];
     hexPath(x, y + s * TILE * 0.6, s * 0.9); ctx.fillStyle = shade(col, -0.4); ctx.fill();
     hexPath(x, y, s * 0.9); ctx.fillStyle = col; ctx.fill();
     ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.stroke();
@@ -882,6 +938,7 @@ function start() {
     for (let i = 0; i < count; i++) tile(x, y - i * h, s, st[i]);
     if (!count) return;
     const ty = y - (count - 1) * h, c = st[count - 1];
+    if (c === STONE) { crack(x, ty, s); return; }
     let n = 0;
     for (let i = count - 1; i >= 0 && st[i] === c; i--) n++;
     symbol(COLOURS[c][1], x, ty - s * 0.12, s * 0.3);
@@ -995,6 +1052,11 @@ function start() {
           for (let i = 0; i < CFG.hexadek; i++) tile(x, y - i * h * grow, S * grow, a.colour);
           ctx.globalAlpha = 1;
         }
+      } else if (a.type === 'break') {   // a stone shatters: grows and fades where it was
+        const [x, y] = cellXY(a.cell), t = Math.max(0, (now - a.t0 - a.wait) / a.dur);
+        ctx.globalAlpha = 1 - t;
+        tile(x, y - a.at * h - t * S * 0.3, S * (1 + 0.3 * t), STONE);
+        ctx.globalAlpha = 1;
       } else if (a.type === 'pour') {
         const [x0, y0] = cellXY(a.a), [x1, y1] = cellXY(a.b);
         for (let k = 0; k < a.n; k++) {

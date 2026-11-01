@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -104,3 +104,42 @@ for (let i = 0; i < CFG.deck; i++) {
 assert(R.isWon(sg)); assert(sg.tray.every(t => t === null)); assert(!place(sg, 0, '0,0'));
 assert(!R.isWon(newGame(12, 'standard')));
 console.log('colour and deck tests passed');
+
+// Levels: fixed settings per level, the same deck on restart
+const {LEVELS, STONE} = R;
+LEVELS.forEach((L, i) => {
+  const lg = newGame(1000 + i + 1, 'level', null, i + 1);
+  assert.equal(lg.deckSize, L.deck); assert.equal(lg.colours, L.colours);
+  assert.deepEqual(lg.tray, newGame(1000 + i + 1, 'level', null, i + 1).tray, 'level ' + (i + 1) + ' deck is fixed');
+  for (let j = 0; j < 300; j++) {
+    const st = R.newStack(lg); let bands = 1;
+    for (let k = 1; k < st.length; k++) if (st[k] !== st[k - 1]) bands++;
+    assert(bands >= L.bands[0] && bands <= L.bands[1], 'level ' + (i + 1) + ' bands');
+    assert(st.every(c => c < L.colours));
+  }
+  assert(R.gameName(lg).startsWith('Level ' + (i + 1)));
+});
+const l1 = newGame(1001, 'level', null, 1); assert.equal(R.poursLeft(l1), Infinity); assert.equal(R.undosLeft(l1), Infinity);
+const l3 = newGame(1003, 'level', null, 3), P3 = LEVELS[2].pours;
+assert.equal(R.poursLeft(l3), P3.start);
+place(l3, 0, '0,0'); assert.equal(l3.pours, Math.min(P3.max, P3.start + P3.perPlace));
+for (let i = 0; i < 5; i++) place(l3, 0, CELLS[i + 1]); assert.equal(l3.pours, P3.max, 'tight budget caps at its own max');
+const l2 = newGame(1002, 'level', null, 2); assert.equal(R.pourRule(l2), CFG.pours);
+console.log('level tests passed');
+
+// Stones: can't be poured or poured onto; a neighbouring clear breaks the top one
+const l4 = newGame(1004, 'level', null, 4);
+for (const k in LEVELS[3].stones) assert.deepEqual(l4.board[k], LEVELS[3].stones[k]);
+const sb = newGame(9, 'free'); for (const k of CELLS) sb.board[k] = [];
+sb.board['0,0'] = [STONE, STONE]; sb.board['1,0'] = [2, STONE]; sb.board['-1,0'] = [1];
+assert.equal(pourResult(sb.board, '0,0', '0,1'), null, 'a stone cannot be poured');
+assert.equal(pourResult(sb.board, '-1,0', '0,0'), null, 'nothing pours onto a stone');
+sb.board['0,1'] = Array(11).fill(3); sb.board['1,1'] = [3];   // 0,1 neighbours both stones
+const cr = pour(sb, '1,1', '0,1'); assert(cr.clears);
+assert.deepEqual(sb.board['0,0'], [STONE], 'one clear breaks one stone');
+assert.deepEqual(sb.board['1,0'], [2], 'a broken stone uncovers what was under it');
+assert.deepEqual(cr.broke.sort(), ['0,0', '1,0']);
+assert(undo(sb)); assert.deepEqual(sb.board['0,0'], [STONE, STONE], 'undo puts stones back');
+const stones = {}; for (const k of CELLS) stones[k] = [STONE];
+assert.equal(roomState(stones, Infinity), "over", "a board of stones is stuck");
+console.log('stone tests passed');
