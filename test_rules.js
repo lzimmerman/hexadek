@@ -86,9 +86,10 @@ for (let i = 0; i < CFG.undos + 3; i++) { pour(fg, '0,0', '1,0'); assert(undo(fg
 const legacy = newGame(6); delete legacy.undos; assert.equal(R.undosLeft(legacy), CFG.undos);
 console.log('undo limit tests passed');
 
-// colours: 4 to 7, and every colour has its own symbol
-assert(R.COLOURS.length >= 7); assert.equal(new Set(R.COLOURS.map(c => c[1])).size, R.COLOURS.length);
-for (const n of [4, 5, 6, 7]) {
+// colours: New game offers 3, 5, 7 or 9 (levels use 4 and 6 too), and every colour has its own symbol
+assert(R.COLOURS.length >= 9); assert(R.COLOURS.length <= R.STONE, 'colour indices (0 to length - 1) stay clear of the stone');
+assert.equal(new Set(R.COLOURS.map(c => c[1])).size, R.COLOURS.length);
+for (const n of [3, 4, 5, 6, 7, 9]) {
   const cg = newGame(3, 'standard', n); assert.equal(cg.colours, n); const seen = new Set();
   for (let i = 0; i < 500; i++) R.newStack(cg).forEach(c => seen.add(c));
   assert.equal(seen.size, n, n + ' colours used');
