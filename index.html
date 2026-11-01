@@ -71,11 +71,12 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 button:disabled { opacity: .45; cursor: default; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* always one line tall, so a new message never moves the board; messages are kept short to fit */
-#status { margin: 2px 16px 6px; padding: 5px 10px; color: var(--ink); height: calc(1.35em + 12px); box-sizing: border-box;
+#status { margin: 2px 16px 6px; padding: 6px 12px; color: var(--ink); height: calc(1.35em + 16px); box-sizing: border-box;
   display: flex; gap: 10px; align-items: center; overflow: hidden; font-weight: 500;
   background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; }
 #msg { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media (max-width: 420px) { #status { font-size: 14px; padding: 5px 8px; } }
+@media (max-width: 420px) { #status { font-size: 14px; padding: 6px 10px; } }
+#status.tight #msg { font-size: 12.5px; }   /* a message that wouldn't fit steps down rather than touching the edge */
 #status.flash { color: var(--good); font-weight: 700; border-left-color: var(--good); }
 #giveup { display: none; flex: none; padding: 0 10px; min-height: 0; font-size: 14px; }
 #wrap { position: relative; flex: 1; min-height: 0; }
@@ -899,8 +900,10 @@ function start() {
     else if (g.deckSize && g.turn === 0 && !g.history.length) text = 'Place all ' + g.deckSize + ' stacks in the deck to win.';
     else if (g.turn === 0 && !g.history.length) text = 'Drag a tray stack onto the board to start.';
     else if (P) text = 'Pour, then place a stack (+' + P.perPlace + ' pours).';
-    else text = 'Pour as you like, then place a stack.';
+    else text = 'Pour freely, then place a stack.';
     $('msg').textContent = text;
+    st.classList.remove('tight');
+    if ($('msg').scrollWidth > $('msg').clientWidth) st.classList.add('tight');
     $('giveup').style.display = state === 'full' ? 'inline-block' : 'none';
     $('over').classList.toggle('show', state === 'over' || state === 'won');
     $('overtitle').textContent = state === 'won' ? 'Deck complete!' : 'No room left';
