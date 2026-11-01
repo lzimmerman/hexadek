@@ -824,6 +824,13 @@ function start() {
     return null;
   }
   function cellAt(p) {
+    // near the middle of a stack's own cell, that stack: a tall stack in front, drawn over the
+    // cell's lower part, mustn't steal presses meant for the one behind it (play test, level 57)
+    for (const c of CELLS) {
+      if (!g.board[c].length) continue;
+      const [x, y] = cellXY(c);
+      if (Math.hypot(p.x - x, p.y - y) < S * 0.65) return c;
+    }
     const k = stackAt(p);
     if (k) return k;
     let bestK = null, bestD = S * 0.95;
@@ -1301,7 +1308,7 @@ function start() {
     // slide: a press on a target for the picked stack. Moving then adjusts the target
     // (shown as you go) instead of starting a drag.
     ui.press = slot !== null ? { kind: 'tray', slot, start: p }
-                             : { kind: 'board', cell: cellAt(p), start: p, slide: !!tapAction(aim(p)), t0: performance.now() };
+                             : { kind: 'board', cell: cellAt(aim(p)), start: p, slide: !!tapAction(aim(p)), t0: performance.now() };
     // touch: show the target only once the finger stays or slides, so a quick tap doesn't flash a preview
     const pr = ui.press;
     if (ui.touch && slot === null) setTimeout(() => { if (ui.press === pr && !ui.drag) { ui.hover = tapTarget(ui.pos); dirty = true; } }, HOLD_MS);
