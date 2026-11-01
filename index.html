@@ -81,17 +81,21 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #giveup { display: none; flex: none; padding: 0 10px; min-height: 0; font-size: 14px; }
 #wrap { position: relative; flex: 1; min-height: 0; }
 #c { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
-#over { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
-#over.show { display: flex; }
+#over, #intro { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
+#over.show, #intro.show { display: flex; }
+#introlevel { color: var(--accent); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+#introfacts { color: var(--muted); font-size: 13px; margin: -6px 0 10px; }
 .card { background: var(--panel); color: var(--ink); padding: 20px 24px; border-radius: 14px; text-align: center; max-width: 340px; margin: 16px;
   border: 1px solid var(--cell-edge); box-shadow: 0 12px 40px rgba(0,0,0,.35); }
 .card h2 { margin: 0 0 6px; font-size: 22px; }
 .card .buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .card p { margin: 0 0 14px; }
 #overstarbig { font-size: 40px; letter-spacing: 6px; color: var(--gold); line-height: 1.15; text-shadow: 0 1px 0 rgba(0,0,0,.25); }
-#overgoals { list-style: none; padding: 10px 12px; margin: 6px 0 12px; text-align: left; color: var(--muted); font-size: 14px;
+#overgoals, #introgoals { list-style: none; padding: 10px 12px; margin: 6px 0 12px; text-align: left; color: var(--muted); font-size: 14px;
   background: var(--bg); border-radius: 10px; }
-#overgoals li { margin: 2px 0; }
+#overgoals li, #introgoals li { margin: 2px 0; }
+#introgoals li { display: flex; gap: 8px; }
+#introgoals b { color: var(--gold); flex: none; width: 3.2em; }
 #overgoals li.met { color: var(--ink); font-weight: 500; }
 #overgoals li.met::first-letter { color: var(--good); }
 dialog { border: 1px solid var(--cell-edge); border-radius: 14px; background: var(--panel); color: var(--ink); padding: 18px 22px;
@@ -134,6 +138,12 @@ dialog li { margin-bottom: 6px; }
   #msg { white-space: normal; }   /* the board is beside it, so a two-line message moves nothing */
   #coach { grid-area: 5 / 1; overflow: auto; }
   #bar { grid-area: 7 / 1; flex-wrap: wrap; padding-top: 4px; }
+  #deck { order: -1; flex-basis: 100%; }   /* its own line: the column is too narrow to share */
+  h1 { font-size: 17px; } .chip { font-size: 12px; padding: 2px 8px; } header { gap: 6px 8px; }
+  #status { flex: none; min-height: calc(2.8em + 14px); }   /* room for two lines, so the grid can't squeeze it */
+  .card { max-height: calc(100% - 16px); overflow: auto; box-sizing: border-box; margin: 8px; padding: 12px 18px; }
+  .card h2 { font-size: 19px; margin-bottom: 4px; } .card p { margin-bottom: 8px; }
+  #introgoals, #overgoals { margin: 4px 0 8px; padding: 6px 10px; }
   #wrap { grid-area: 1 / 2 / -1 / 3; }
   button { min-height: 38px; padding: 5px 11px; font-size: 14px; }
   #buttons, header, #bar { gap: 6px 8px; } #stats { gap: 2px 14px; }
@@ -164,6 +174,14 @@ dialog li { margin-bottom: 6px; }
 </div>
 <div id="wrap">
   <canvas id="c" aria-label="Hexadek board"></canvas>
+  <div id="intro" role="dialog" aria-labelledby="introtitle"><div class="card">
+    <div id="introlevel"></div>
+    <h2 id="introtitle"></h2>
+    <p id="introabout"></p>
+    <p id="introfacts"></p>
+    <ul id="introgoals"></ul>
+    <div class="buttons"><button id="introgo" class="primary">Start</button></div>
+  </div></div>
   <div id="over"><div class="card">
     <h2 id="overtitle">No room left</h2>
     <div id="overstars"><div id="overstarbig"></div><ul id="overgoals"></ul></div>
@@ -312,13 +330,18 @@ const STONE_COLOUR = '#6b7280';
 // score is 2; the score plus the hexadeks (or, with stones, every stone broken) is 3.
 // The targets are first guesses, to tune by playing.
 const LEVELS = [
-  { name: 'First deck', deck: 25, colours: 4, bands: [1, 2], pours: null, stars: { score: 480, hexadeks: 6 } },
-  { name: 'Five colours', deck: 30, colours: 5, bands: [1, 3], stars: { score: 600, hexadeks: 7 } },
+  { name: 'First deck', deck: 25, colours: 4, bands: [1, 2], pours: null, stars: { score: 480, hexadeks: 6 },
+    about: 'A gentle start: only four colours, and you can pour as much as you like.' },
+  { name: 'Five colours', deck: 30, colours: 5, bands: [1, 3], stars: { score: 600, hexadeks: 7 },
+    about: 'A fifth colour joins in, and pours now come from a budget. Place stacks to earn more.' },
   { name: 'Tight budget', deck: 30, colours: 5, bands: [1, 3], pours: { start: 2, perPlace: 2, perClear: 1, max: 6 },
-    stars: { score: 480, hexadeks: 6 } },
+    stars: { score: 480, hexadeks: 6 },
+    about: 'Fewer pours to go around. Every one counts, so look before you pour.' },
   { name: 'Stones', deck: 35, colours: 5, bands: [1, 3], stars: { score: 720, stones: true },
-    stones: { '0,0': [STONE, STONE], '-2,1': [STONE], '2,-1': [STONE], '1,1': [STONE] } },
-  { name: 'Long haul', deck: 40, colours: 6, bands: [2, 3], stars: { score: 720, hexadeks: 9 } },
+    stones: { '0,0': [STONE, STONE], '-2,1': [STONE], '2,-1': [STONE], '1,1': [STONE] },
+    about: 'Grey stones block part of the board. A hexadek next to a stone breaks it. The centre takes two.' },
+  { name: 'Long haul', deck: 40, colours: 6, bands: [2, 3], stars: { score: 720, hexadeks: 9 },
+    about: 'Six colours, taller mixed stacks and the longest deck. Keep room to manoeuvre.' },
 ];
 
 // ---- rules: plain data, no drawing ----
@@ -717,13 +740,31 @@ function start() {
     finishAnims();
     if (undo(g)) { ui.sel = null; flash = null; after(); }
   }
-  function startGame(seed, mode, colours, level) {
+  function startGame(seed, mode, colours, level, intro) {
     finishAnims();
     g = newGame(seed, mode, colours, level);
     ui.sel = ui.trayPick = null;
     flash = null;
     after();
+    $('intro').classList.remove('show');
+    if (intro) showIntro();
   }
+  function showIntro() {   // a card describing the level: what's new in it and the star goals
+    const L = LEVELS[g.level - 1], T = L.stars, P = pourRule(g);
+    $('introlevel').textContent = 'Level ' + g.level + ' of ' + LEVELS.length;
+    $('introtitle').textContent = L.name;
+    $('introabout').textContent = L.about;
+    $('introfacts').textContent = L.deck + ' stacks · ' + L.colours + ' colours · ' +
+      (P ? 'pours: start ' + P.start + ', up to ' + P.max : 'unlimited pours');
+    const goals = [['★', 'Place all ' + L.deck + ' stacks'], ['★★', 'Score ' + T.score],
+                   ['★★★', 'Score ' + T.score + (T.stones ? ' and break every stone' : ' and make ' + T.hexadeks + ' hexadeks')]];
+    $('introgoals').innerHTML = goals.map(([s, t]) => '<li><b>' + s + '</b>' + t + '</li>').join('');
+    $('intro').classList.add('show');
+    $('introgo').focus();
+  }
+  const hideIntro = () => $('intro').classList.remove('show');
+  $('introgo').onclick = hideIntro;
+  $('intro').addEventListener('click', e => { if (e.target === $('intro')) hideIntro(); });   // a tap beside the card
   function doNew(again) {   // again: the same game from the start, with the same stacks and mode
     if (tut) { g = realG || g; tut = realG = null; coach(); }
     const busy = (g.turn > 0 || g.history.length) && state !== 'over' && state !== 'won';
@@ -753,7 +794,7 @@ function start() {
       '</td><td>' + (L.stars.stones ? 'every stone' : L.stars.hexadeks + ' hexadeks') + '</td></tr>').join('');
   $('newlevel').onclick = () => {   // each level has a fixed deck: the same every time
     const n = Number($('newlevelnum').value);
-    $('newgame').close(); startGame(1000 + n, 'level', null, n);
+    $('newgame').close(); startGame(1000 + n, 'level', null, n, true);
   };
   $('newcancel').onclick = () => $('newgame').close();
   // Our own yes/no box: browsers' confirm() is blocked inside some page viewers, and then
@@ -998,6 +1039,7 @@ function start() {
   }
 
   document.addEventListener('keydown', e => {
+    if ($('intro').classList.contains('show') && (e.key === 'Escape' || e.key === 'Enter')) { e.preventDefault(); hideIntro(); return; }
     if (e.key === 'Escape') { ui.sel = ui.trayPick = null; ui.drag = ui.press = null; hud(); dirty = true; }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); doUndo(); }
   });
@@ -1005,7 +1047,7 @@ function start() {
   $('overundo').onclick = doUndo;
   $('new').onclick = () => doNew(false);
   $('overnew').onclick = () => doNew(false);
-  $('overnext').onclick = () => startGame(1000 + g.level + 1, 'level', null, g.level + 1);
+  $('overnext').onclick = () => startGame(1000 + g.level + 1, 'level', null, g.level + 1, true);
   $('restart').onclick = () => doNew(true);
   $('overrestart').onclick = () => doNew(true);
   $('giveup').onclick = () => { state = 'over'; hud(); };
