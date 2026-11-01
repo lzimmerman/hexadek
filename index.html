@@ -54,7 +54,7 @@ h1 span { color: var(--accent); }
   /* a faint line above and below: the numbers sit in a band between the title and the buttons */
   border-top: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
   border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); }
-#buttons { padding-top: 8px; }
+#buttons { padding-top: 10px; }
 .stat { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; font-weight: 600;
   text-transform: uppercase; letter-spacing: .06em; }
 .stat b { color: var(--ink); font-size: 18px; letter-spacing: 0; margin-left: 4px; }
@@ -120,8 +120,13 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
   background: var(--panel); color: var(--ink); min-height: 40px; }
 .hint { color: var(--muted); font-size: 13px; }
 .choices { display: grid; gap: 8px; margin: 4px 0 12px; }
-.choices button { text-align: left; padding: 10px 12px; }
+.choices button, .modebox { text-align: left; padding: 10px 12px; }
+/* a mode with its own buttons inside: framed like the mode buttons */
+.modebox { border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--cell-edge)); border-radius: 8px; }
+.modebox .row { margin-top: 8px; gap: 8px; }
+.modebox label { white-space: nowrap; margin-right: 8px; }
 .choices b { font-size: 16px; }
+.modebox > b { display: block; }
 .choices span { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
 .fig { display: flex; align-items: center; gap: 12px; margin: 4px 0 8px; }
 .fig canvas { width: 72px; height: 96px; flex: none; }
@@ -234,7 +239,7 @@ dialog li { margin-bottom: 6px; }
       running out of room. The bar below the board shows how far through the deck you are.</li>
     <li><b>Free</b> game: pours and undos are unlimited.</li>
     <li><b>Levels</b>: a fixed deck each, with its own rules. See <i>Levels and stars</i> below.</li>
-    <li>Choose the mode under New game, and the number of colours: 3, 5, 7 or 9. Fewer is easier.</li>
+    <li>Choose the mode under New game. Custom also sets the number of colours: 3, 5, 7 or 9. Fewer is easier.</li>
   </ul>
   <h3>Placing</h3>
   <ul>
@@ -246,10 +251,10 @@ dialog li { margin-bottom: 6px; }
     <p>12 tiles of one colour clear: 120 points. A second clear in the same turn scores ×2, a third ×3.</p></div>
   <h3>The end</h3>
   <p>Each turn adds a stack, so the board fills up. The game ends when there's no empty cell and no pour can make one.</p>
-  <h3>Levels and stars</h3>
-  <p>Levels are the main game: 72 of them in 6 chapters, each bringing something new. Each level is a fixed
+  <h3>Journey: levels and stars</h3>
+  <p>Journey is the main game: 72 levels in 6 chapters, each bringing something new. Each level is a fixed
     deck of stacks, the same every time you play it. Place every stack to finish it, and the next level opens.
-    Under New game, Continue goes to your next level, and Choose a level shows them all with your stars. The first
+    Under New game, Journey › Continue goes to your next level, and All levels shows them all with your stars. The first
     level of each chapter is always open.</p>
   <p>Finishing earns stars, from one to three:</p>
   <ul>
@@ -298,23 +303,30 @@ dialog li { margin-bottom: 6px; }
 <dialog id="newgame">
   <h2>New game</h2>
   <p id="newwarn"></p>
-  <h3 class="first">Levels</h3>
-  <div class="row"><button type="button" id="newcontinue" class="primary">Continue: Level 1</button>
-    <button type="button" id="newchoose">Choose a level</button></div>
-  <p class="hint">72 levels in 6 chapters, each a fixed deck with up to 3 stars.</p>
-  <h3>Other games</h3>
-  <label class="row" for="newcolours">Colours
-    <select id="newcolours"><option>3</option><option>5</option><option>7</option><option>9</option></select>
-    <span class="hint">fewer is easier; 5 is usual</span></label>
+  <div class="choices">
+    <div class="modebox"><b>Journey</b><span>72 levels in 6 chapters, each bringing something new. A fixed deck per
+      level, with up to 3 stars.</span>
+      <div class="row"><button type="button" id="newcontinue" class="primary">Continue: Level 1</button>
+        <button type="button" id="newchoose">All levels</button></div></div>
+  </div>
+  <h3>Other modes</h3>
   <div class="choices">
     <button type="button" id="newstandard"><b>Standard</b><span></span></button>
     <button type="button" id="newsurvive"><b>Survive</b><span></span></button>
     <button type="button" id="newfree"><b>Free</b><span>Pours and undos are unlimited.</span></button>
+    <div class="modebox"><b>Custom</b><span>Any of the modes above, with your choice of colours. Fewer is easier; 5 is
+      usual.</span>
+      <div class="row"><label class="row" for="newcolours">Colours
+          <select id="newcolours"><option>3</option><option>5</option><option>7</option><option>9</option></select></label>
+        <label class="row" for="newcustommode">Mode
+          <select id="newcustommode"><option value="standard">Standard</option><option value="survive">Survive</option>
+            <option value="free">Free</option></select></label></div>
+      <div class="row"><button type="button" id="newcustom">Play custom game</button></div></div>
   </div>
   <div class="row"><span class="spacer"></span><button type="button" id="newcancel">Cancel</button></div>
 </dialog>
 <dialog id="levels">
-  <h2>Levels</h2>
+  <h2>Journey</h2>
   <p class="hint">Finish a level to open the next. The first level of each chapter is always open, if you'd like to
     jump in at the deep end.</p>
   <div id="levelgrid"></div>
@@ -857,10 +869,12 @@ function start() {
     $('newwarn').textContent = busy ? 'The game you are playing will be lost.' : '';
     $('newwarn').style.display = busy ? '' : 'none';
     $('newcolours').value = String(Math.min(9, g.colours % 2 ? g.colours : g.colours + 1));   // older games had 4 or 6
+    if (!g.level && !tut) $('newcustommode').value = g.mode;
     $('newcontinue').textContent = 'Continue: Level ' + continueLevel();
     $('newgame').showModal();
   }
-  const chosen = mode => () => { $('newgame').close(); startGame(Date.now(), mode, Number($('newcolours').value)); };
+  const chosen = mode => () => { $('newgame').close(); startGame(Date.now(), mode); };   // the usual 5 colours
+  $('newcustom').onclick = () => { $('newgame').close(); startGame(Date.now(), $('newcustommode').value, Number($('newcolours').value)); };
   const P = CFG.pours;
   $('newstandard').querySelector('span').textContent = 'Pours are limited. Start with ' + P.start + ', get ' + P.perPlace +
     ' more for each stack you place and ' + P.perClear + ' for each hexadek, up to ' + P.max + ' saved.';
