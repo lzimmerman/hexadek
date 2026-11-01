@@ -129,6 +129,7 @@ dialog li { margin-bottom: 6px; }
     grid-template-rows: auto auto auto auto auto 1fr auto; padding-left: env(safe-area-inset-left); }
   header { grid-area: 1 / 1; padding-top: 8px; } #stats { grid-area: 2 / 1; } #buttons { grid-area: 3 / 1; }
   #status { grid-area: 4 / 1; height: auto; min-height: calc(1.35em + 12px); }
+  #status { padding: 7px 12px; line-height: 1.4; gap: 12px; }
   #msg { white-space: normal; }   /* the board is beside it, so a two-line message moves nothing */
   #coach { grid-area: 5 / 1; overflow: auto; }
   #bar { grid-area: 7 / 1; flex-wrap: wrap; padding-top: 4px; }
@@ -554,7 +555,8 @@ function start() {
   }
   let best = readBest(g);
   let state = isWon(g) ? 'won' : roomState(g.board, poursLeft(g));
-  const ui = { sel: null, trayPick: null, press: null, drag: null, hover: null, pos: null, touch: false };
+  const HOLD_MS = 150;   // a touch shorter than this is a tap: no preview while the finger is down
+  const ui = { ghostAt: null, sel: null, trayPick: null, press: null, drag: null, hover: null, pos: null, touch: false };
   let anims = [], flash = null, dirty = true;
   const lessMotion = window.matchMedia('(prefers-reduced-motion: reduce)');   // the phone's "reduce motion" setting
   const still = () => lessMotion.matches;
@@ -703,7 +705,8 @@ function start() {
     if (!tutAllows('place', slot, cell)) { ui.trayPick = null; return; }
     if (!place(g, slot, cell)) return;
     buzz(20);
-    if (!still()) anims.push({ type: 'place', cell, t0: performance.now(), dur: 180 });
+    const seen = ui.ghostAt === cell; ui.ghostAt = null;   // its preview was already showing there: no fade-in
+    if (!still() && !seen) anims.push({ type: 'place', cell, t0: performance.now(), dur: 180 });
     ui.trayPick = null; ui.sel = null;
     after();
     tutStep();
@@ -936,15 +939,18 @@ function start() {
     // slide: a press on a target for the picked stack. Moving then adjusts the target
     // (shown as you go) instead of starting a drag.
     ui.press = slot !== null ? { kind: 'tray', slot, start: p }
-                             : { kind: 'board', cell: cellAt(p), start: p, slide: !!tapAction(aim(p)) };
-    if (ui.touch && slot === null) ui.hover = tapTarget(p);
+                             : { kind: 'board', cell: cellAt(p), start: p, slide: !!tapAction(aim(p)), t0: performance.now() };
+    // touch: show the target only once the finger stays or slides, so a quick tap doesn't flash a preview
+    const pr = ui.press;
+    if (ui.touch && slot === null) setTimeout(() => { if (ui.press === pr && !ui.drag) { ui.hover = tapTarget(ui.pos); dirty = true; } }, HOLD_MS);
     dirty = true;
   });
   canvas.addEventListener('pointermove', e => {
     const p = pt(e);
     ui.pos = p;
     const pr = ui.press;
-    if (e.pointerType === 'mouse' || (pr && pr.kind === 'board' && !ui.drag)) ui.hover = tapTarget(p);
+    if (e.pointerType === 'mouse' || (pr && pr.kind === 'board' && !ui.drag &&
+        (performance.now() - pr.t0 >= HOLD_MS || dist(p, pr.start) > 12))) ui.hover = tapTarget(p);
     if (pr && !ui.drag && !pr.slide && dist(p, pr.start) > (ui.touch ? 12 : 8)) {
       if (pr.kind === 'tray') { if (g.tray[pr.slot] && tutPickOk('tray', pr.slot)) ui.drag = { kind: 'tray', slot: pr.slot }; }
       else if (!tutPickOk('board', pr.cell)) {}
@@ -957,10 +963,13 @@ function start() {
     ui.pos = pt(e);
     if (ui.drag) {
       const t = dragTarget(), d = ui.drag;
-      ui.drag = null;
+      ui.drag = null; ui.ghostAt = t;
       if (t) { if (d.kind === 'tray') doPlace(d.slot, t); else doPour(d.from, t); }
-    } else if (ui.press) tap(ui.press.kind === 'board' ? { kind: 'board', cell: tapTarget(ui.pos) } : ui.press);
-    ui.press = null;
+    } else if (ui.press) {
+      ui.ghostAt = ui.hover;
+      tap(ui.press.kind === 'board' ? { kind: 'board', cell: tapTarget(ui.pos) } : ui.press);
+    }
+    ui.press = null; ui.ghostAt = null;
     if (ui.touch) ui.hover = null;
     hud();
     dirty = true;
@@ -1154,7 +1163,8 @@ function start() {
     }
     return out;
   }
-  const ease = t => 1 - Math.pow(1 - t, 3);
+  // clamped: the frame clock can run a few ms behind an animation that a tap just started
+  const ease = t => 1 - Math.pow(1 - Math.max(0, Math.min(1, t)), 3);
   function arrived(pa, now) {
     let n = 0;
     for (let k = 0; k < pa.n; k++) if (now >= pa.t0 + k * pa.stagger + pa.dur) n++;
