@@ -395,9 +395,11 @@ const STONE_COLOUR = '#6b7280';
 // deck from a fixed seed (1000 + n), so it plays the same every time. Difficulty rises through
 // a chapter and eases a little at the start of the next, which brings in something new.
 // pours: undefined is Standard's budget, null is free pouring.
-// Stars: finishing the deck is 1; the score is 2; the top score (with stones: the score and
-// every stone broken) is 3. With M the most hexadeks the deck's tiles allow (deckMax):
-// score = (M - 1) × 120 and top = (M + 2) × 120, so ★★★ takes combos (levelTargets).
+// Stars: finishing the deck is 1; the score is 2; the top score (with stones: also every stone
+// broken) is 3. The scores come from LEVEL_TARGETS, set from the computer player's games
+// (tools/targets.js), so each level asks the same of the player whatever its deck allows.
+// Without a table entry: score = (M - 1) × 120 and top = (M + 2) × 120, with M the most
+// hexadeks the deck's tiles allow (deckMax).
 const LEVEL_COUNT = 72, CHAPTER_SIZE = 12, LEVEL_SEED = 1000;
 const POURS_TIGHT = { start: 2, perPlace: 2, perClear: 1, max: 6 };
 const POURS_TIGHTER = { start: 2, perPlace: 2, perClear: 1, max: 5 };
@@ -516,10 +518,27 @@ function newGame(seed, mode, colours, level) {
 function isWon(g) { return !!g.deckSize && g.turn >= g.deckSize; }
 const stonesLeft = board => CELLS.reduce((n, k) => n + board[k].filter(c => c === STONE).length, 0);
 // Each star's goal and whether it's met; stars count only as far as the goals in a row are met.
+// LEVEL_TARGETS:begin (written by tools/targets.js: edit there, or by hand)
+const LEVEL_TARGETS = [   // [★★ score, ★★★ score] for levels 1 to 72
+  [360, 600], [600, 840], [720, 960], [720, 840], [960, 1200], [1080, 1440],
+  [840, 1200], [840, 1200], [960, 1320], [840, 1320], [960, 1200], [1200, 1560],
+  [600, 960], [840, 1080], [720, 960], [840, 1200], [720, 1200], [1200, 1560],
+  [840, 1320], [1080, 1440], [1080, 1560], [1080, 1440], [1320, 1680], [1080, 1440],
+  [960, 1440], [960, 1320], [720, 960], [960, 1320], [960, 1440], [960, 1440],
+  [1080, 1440], [960, 1200], [1200, 1440], [1080, 1560], [1200, 1440], [1320, 1560],
+  [720, 840], [840, 1080], [720, 960], [1080, 1320], [960, 1320], [840, 1440],
+  [960, 1440], [840, 1440], [1200, 1560], [960, 1320], [1200, 1680], [1080, 1320],
+  [840, 1320], [1080, 1680], [1200, 1680], [1200, 1560], [1200, 1560], [1080, 1440],
+  [1200, 1800], [1320, 1920], [1320, 1800], [960, 1440], [960, 1560], [1200, 1560],
+  [1320, 1680], [1080, 1440], [1440, 1680], [1320, 1800], [1080, 1560], [1080, 1560],
+  [960, 1320], [1320, 1800], [960, 1440], [1200, 1680], [960, 1320], [1200, 1560],
+];
+// LEVEL_TARGETS:end
 function levelTargets(n) {
   const M = deckMax({ start: LEVEL_SEED + n, level: n }), pts = CFG.hexadek * CFG.pointsPerTile;
-  const stones = !!LEVELS[n - 1].stones;   // with stones, ★★★ also needs every stone broken, so its score is a step lower
-  return { M, score: (M - 1) * pts, top: (M + (stones ? 1 : 2)) * pts, stones };
+  const stones = !!LEVELS[n - 1].stones;
+  const [score, top] = LEVEL_TARGETS[n - 1] || [(M - 1) * pts, (M + (stones ? 1 : 2)) * pts];
+  return { M, score, top, stones };
 }
 function starGoals(g) {
   const T = levelTargets(g.level), won = isWon(g), hit = won && g.score >= T.score;

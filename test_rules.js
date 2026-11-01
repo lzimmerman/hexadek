@@ -165,7 +165,11 @@ assert.equal(R.starsFor(newGame(5, 'survive')), 0, 'only levels have stars');
 LEVELS.forEach((L, i) => {
   const T = R.levelTargets(i + 1), pts = CFG.hexadek * CFG.pointsPerTile;
   assert(T.M >= 3, 'level ' + (i + 1) + ' can make hexadeks');
-  assert.equal(T.score, (T.M - 1) * pts); assert.equal(T.top, (T.M + (L.stones ? 1 : 2)) * pts); assert.equal(T.stones, !!L.stones);
+  // targets come from the computer player (LEVEL_TARGETS): whole hexadeks, ★★★ above ★★, both within what the deck allows
+  assert(T.score >= pts && T.score % pts === 0 && T.top % pts === 0, 'level ' + (i + 1) + ' targets in hexadeks');
+  assert(T.top > T.score, 'level ' + (i + 1) + ': ★★★ asks more than ★★');
+  assert(T.score <= (T.M + 3) * pts && T.top <= (T.M + 6) * pts, 'level ' + (i + 1) + ' targets are reachable with its deck (combos add to M × 120)');
+  assert.equal(T.stones, !!L.stones);
 });
 const hx = newGame(9, 'free'); for (const k of CELLS) hx.board[k] = [];
 hx.board['0,0'] = Array(11).fill(1); hx.board['1,0'] = [1];
