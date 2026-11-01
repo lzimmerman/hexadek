@@ -4,66 +4,88 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hexadek</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Lexend: a typeface made for easy reading. Without a connection the system font stands in. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=swap">
 <style>
 :root {
-  --bg: #f3f1ec; --panel: #ffffff; --ink: #1d1f24; --muted: #62666f;
-  --cell: #dcd7cb; --cell-edge: #c2bcad; --accent: #2563eb; --good: #15803d;
+  --font: Lexend, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --bg: #f4f1ea; --panel: #ffffff; --ink: #16181d; --muted: #555a63;
+  --cell: #e2dccf; --cell-edge: #a89f8c; --plate: #cfc6b4; --accent: #1d4ed8; --on-accent: #ffffff;
+  --good: #15803d; --warn: #c2410c; --gold: #e0a100; --line: #d9d3c5;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #15171c; --panel: #1f232b; --ink: #eceef2; --muted: #a0a6b1;
-    --cell: #2b313c; --cell-edge: #3b4350; --accent: #7aa7ff; --good: #4ade80;
+    --bg: #111318; --panel: #1d2129; --ink: #f1f3f6; --muted: #aeb4bf;
+    --cell: #272d38; --cell-edge: #4a5466; --plate: #1a1e26; --accent: #82aaff; --on-accent: #0b1220;
+    --good: #4ade80; --warn: #fb923c; --gold: #fbbf24; --line: #343b48;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #15171c; --panel: #1f232b; --ink: #eceef2; --muted: #a0a6b1;
-  --cell: #2b313c; --cell-edge: #3b4350; --accent: #7aa7ff; --good: #4ade80;
+  --bg: #111318; --panel: #1d2129; --ink: #f1f3f6; --muted: #aeb4bf;
+  --cell: #272d38; --cell-edge: #4a5466; --plate: #1a1e26; --accent: #82aaff; --on-accent: #0b1220;
+  --good: #4ade80; --warn: #fb923c; --gold: #fbbf24; --line: #343b48;
 }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
-  font: 15px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  font: 15px/1.35 var(--font); }
 body { display: flex; flex-direction: column; overscroll-behavior: none; user-select: none; -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent; }
 #bar { padding: 6px 16px calc(10px + env(safe-area-inset-bottom)); }   /* clear of the phone's gesture bar */
+#decklabel { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
 #undo { min-width: 96px; }
 #deck { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
-.deckbar { flex: 1; height: 10px; border-radius: 5px; background: var(--cell); overflow: hidden; }
+.deckbar { flex: 1; height: 10px; border-radius: 5px; background: var(--cell); border: 1px solid var(--cell-edge); overflow: hidden; }
 #deckfill { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
-#decktext { color: var(--muted); font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#decktext { color: var(--ink); font-weight: 600; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 button { touch-action: manipulation; }   /* no double-tap zoom */
 @media (pointer: coarse) {   /* thumbs: bigger buttons */
   button { min-height: 48px; padding: 10px 16px; }
   #buttons, header { gap: 8px 10px; }
 }
-header { display: flex; align-items: center; gap: 10px 14px; padding: 10px 16px 4px; flex-wrap: wrap; }
+header { display: flex; align-items: center; gap: 10px 12px; padding: 10px 16px 2px; flex-wrap: wrap; }
 #buttons { padding: 4px 16px 6px; }
-h1 { font-size: 19px; margin: 0; letter-spacing: .04em; }
-.stat { font-variant-numeric: tabular-nums; color: var(--muted); }
-.stat b { color: var(--ink); }
+h1 { font-size: 20px; margin: 0; letter-spacing: .08em; font-weight: 700; }
+h1 span { color: var(--accent); }
+.chip { font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--cell);
+  border: 1px solid var(--cell-edge); white-space: nowrap; }
+#stats { display: flex; gap: 6px 18px; padding: 4px 16px 4px; flex-wrap: wrap; align-items: baseline; }
+.stat { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .06em; }
+.stat b { color: var(--ink); font-size: 18px; letter-spacing: 0; margin-left: 4px; }
+#scorestat b { font-size: 22px; }
+#poursstat.low b { color: var(--warn); }
 .spacer { flex: 1; }
-button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--cell-edge);
+button { font: inherit; font-weight: 500; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--cell-edge);
   background: var(--panel); color: var(--ink); cursor: pointer; }
-button:disabled { opacity: .4; cursor: default; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+button:disabled { opacity: .45; cursor: default; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* always one line tall, so a new message never moves the board; messages are kept short to fit */
-#status { padding: 2px 16px 6px; color: var(--muted); height: calc(1.35em + 8px); box-sizing: border-box;
+#status { padding: 2px 16px 6px; color: var(--ink); height: calc(1.35em + 8px); box-sizing: border-box;
   display: flex; gap: 10px; align-items: flex-start; overflow: hidden; }
 #msg { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#status.flash { color: var(--good); font-weight: 600; }
+#status.flash { color: var(--good); font-weight: 700; }
 #giveup { display: none; flex: none; padding: 0 10px; min-height: 0; font-size: 14px; }
 #wrap { position: relative; flex: 1; min-height: 0; }
 #c { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
-#over { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.45); }
+#over { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
 #over.show { display: flex; }
-.card { background: var(--panel); color: var(--ink); padding: 20px 24px; border-radius: 12px; text-align: center; max-width: 320px; margin: 16px; }
-.card h2 { margin: 0 0 6px; font-size: 20px; }
+.card { background: var(--panel); color: var(--ink); padding: 20px 24px; border-radius: 14px; text-align: center; max-width: 340px; margin: 16px;
+  border: 1px solid var(--cell-edge); box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+.card h2 { margin: 0 0 6px; font-size: 22px; }
+.card .buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .card p { margin: 0 0 14px; }
-#overstarbig { font-size: 34px; letter-spacing: 4px; color: #f2b705; line-height: 1.2; }
-#overgoals { list-style: none; padding: 0; margin: 4px 0 12px; text-align: left; color: var(--muted); font-size: 14px; }
-#overgoals li.met { color: var(--ink); }
-.card button { margin: 0 4px; }
-dialog { border: none; border-radius: 12px; background: var(--panel); color: var(--ink); padding: 18px 22px;
+#overstarbig { font-size: 40px; letter-spacing: 6px; color: var(--gold); line-height: 1.15; text-shadow: 0 1px 0 rgba(0,0,0,.25); }
+#overgoals { list-style: none; padding: 10px 12px; margin: 6px 0 12px; text-align: left; color: var(--muted); font-size: 14px;
+  background: var(--bg); border-radius: 10px; }
+#overgoals li { margin: 2px 0; }
+#overgoals li.met { color: var(--ink); font-weight: 500; }
+#overgoals li.met::first-letter { color: var(--good); }
+dialog { border: 1px solid var(--cell-edge); border-radius: 14px; background: var(--panel); color: var(--ink); padding: 18px 22px;
   max-width: 520px; width: calc(100% - 32px); max-height: 85vh; overflow: auto; box-sizing: border-box; }
-dialog h3 { font-size: 15px; margin: 14px 0 4px; }
+dialog h3 { font-size: 16px; margin: 16px 0 4px; padding-top: 10px; border-top: 1px solid var(--line); }
 dialog h2:focus { outline: none; }   /* focused only so the help opens at the top */
 dialog p { margin: 0 0 8px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -72,13 +94,14 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
 .hint { color: var(--muted); font-size: 13px; }
 .choices { display: grid; gap: 8px; margin: 4px 0 12px; }
 .choices button { text-align: left; padding: 10px 12px; }
+.choices b { font-size: 16px; }
 .choices span { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
 .fig { display: flex; align-items: center; gap: 12px; margin: 4px 0 8px; }
 .fig canvas { width: 72px; height: 96px; flex: none; }
 .fig canvas.wide { width: 140px; }
 .fig .arrow { font-size: 22px; color: var(--muted); }
 #levelstable { border-collapse: collapse; font-size: 13px; margin: 4px 0 8px; }
-#levelstable th, #levelstable td { text-align: left; padding: 3px 10px 3px 0; border-bottom: 1px solid var(--cell-edge); }
+#levelstable th, #levelstable td { text-align: left; padding: 3px 10px 3px 0; border-bottom: 1px solid var(--line); }
 #levelstable th { color: var(--muted); font-weight: 600; }
 #coach { display: none; margin: 2px 16px 6px; padding: 10px 12px; border-radius: 10px; background: var(--panel);
   border: 2px solid var(--accent); }
@@ -87,20 +110,22 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
 #coach p { margin: 4px 0 8px; }
 #coachstep.hint { color: var(--accent); font-weight: 600; }
 dialog::backdrop { background: rgba(0,0,0,.45); }
-dialog h2 { margin: 0 0 8px; font-size: 18px; }
+dialog h2 { margin: 0 0 8px; font-size: 20px; }
 dialog ul { padding-left: 20px; margin: 0 0 12px; }
 dialog li { margin-bottom: 6px; }
 </style>
 </head>
 <body>
 <header>
-  <h1>HEXADEK</h1>
-  <span class="stat">Score <b id="score">0</b></span>
+  <h1>HEXA<span>DEK</span></h1>
+  <span class="chip" id="mode"></span>
+</header>
+<div id="stats">
+  <span class="stat" id="scorestat">Score <b id="score">0</b></span>
+  <span class="stat" id="poursstat" title="Each pour uses one; placing a stack earns more">Pours <b id="pours">0</b></span>
   <span class="stat">Best <b id="best">0</b></span>
   <span class="stat">Turn <b id="turn">0</b></span>
-  <span class="stat" id="poursstat" title="Each pour uses one; placing a stack earns more">Pours <b id="pours">0</b></span>
-  <span class="stat"><b id="mode"></b></span>
-</header>
+</div>
 <nav class="row" id="buttons">   <!-- on the left: a page viewer may put its own controls in the top-right corner -->
   <button id="restart" title="Play this game again from the start, with the same stacks">Restart</button>
   <button id="new" title="A new game with new stacks">New game</button>
@@ -118,14 +143,17 @@ dialog li { margin-bottom: 6px; }
     <h2 id="overtitle">No room left</h2>
     <div id="overstars"><div id="overstarbig"></div><ul id="overgoals"></ul></div>
     <p id="overtext"></p>
-    <button id="overundo">Undo last pour</button>
-    <button id="overrestart">Restart</button>
-    <button id="overnew">New game</button>
+    <div class="buttons">
+      <button id="overundo">Undo last pour</button>
+      <button id="overrestart">Restart</button>
+      <button id="overnew">New game</button>
+      <button id="overnext" class="primary">Next level</button>
+    </div>
   </div></div>
 </div>
 <footer id="bar" class="row">   <!-- below the board, where a thumb reaches -->
   <button id="undo" title="Undo a pour (Ctrl/Cmd+Z)">Undo</button>
-  <div id="deck" aria-label="Deck progress"><div class="deckbar"><div id="deckfill"></div></div><span id="decktext"></span></div>
+  <div id="deck" aria-label="Deck progress"><span id="decklabel">Deck</span><div class="deckbar"><div id="deckfill"></div></div><span id="decktext"></span></div>
   <button id="haptics" aria-pressed="false" title="Vibrate on pours and hexadeks">Haptics: off</button>
 </footer>
 <dialog id="rules">
@@ -220,10 +248,11 @@ dialog li { margin-bottom: 6px; }
     <button type="button" id="newsurvive"><b>Survive</b><span></span></button>
     <button type="button" id="newfree"><b>Free</b><span>Pours and undos are unlimited.</span></button>
   </div>
+  <h3>Levels</h3>
   <label class="row" for="newlevelnum">Level
     <select id="newlevelnum"></select>
-    <button type="button" id="newlevel">Play level</button></label>
-  <p class="hint">Levels are a fixed deck each, with their own colours and pour rules. Being tuned.</p>
+    <button type="button" id="newlevel" class="primary">Play level</button></label>
+  <p class="hint">A fixed deck each, with its own colours and pour rules, and up to 3 stars. Being tuned.</p>
   <div class="row"><span class="spacer"></span><button type="button" id="newcancel">Cancel</button></div>
 </dialog>
 <dialog id="welcome">
@@ -252,7 +281,7 @@ const COLOURS = [   // colour and symbol, so colours can be told apart without c
   ['#3b82e6', 'star'], ['#9b5de5', 'diamond'], ['#14b8a6', 'hexagon'], ['#f472b6', 'heart'],
 ];
 const STONE = 9;   // a grey stone tile: it can't be poured, and breaks when a neighbouring stack clears
-const STONE_COLOUR = '#7d8590';
+const STONE_COLOUR = '#6b7280';
 // Levels: a fixed deck (same seed every time) with its own settings. pours: undefined is
 // Standard's budget, null is free pouring. stars: finishing the deck is 1; reaching the
 // score is 2; the score plus the hexadeks (or, with stones, every stone broken) is 3.
@@ -549,7 +578,7 @@ function start() {
     TY = BY + S * (1.5 * R + 1) + S * 2.1;
     SLOT = Math.min(W / 4.3, S * 2.4);
     const css = getComputedStyle(document.documentElement);
-    for (const v of ['cell', 'cell-edge', 'accent', 'ink', 'muted', 'panel']) theme[v] = css.getPropertyValue('--' + v).trim();
+    for (const v of ['cell', 'cell-edge', 'plate', 'accent', 'ink', 'muted', 'panel', 'font']) theme[v] = css.getPropertyValue('--' + v).trim();
     dirty = true;
   }
   function cellXY(k) {
@@ -803,10 +832,15 @@ function start() {
     const P = pourRule(g);
     $('poursstat').style.display = P ? '' : 'none';
     if (P) $('pours').textContent = g.pours + ' / ' + P.max;
+    $('poursstat').classList.toggle('low', !!P && g.pours <= 1);
     $('undo').disabled = !g.history.length || !!tut || undosLeft(g) < 1;
     $('undo').textContent = P && !tut ? 'Undo (' + undosLeft(g) + ')' : 'Undo';
     $('restart').disabled = !!tut || g.start === undefined;
     $('overrestart').style.display = g.start === undefined ? 'none' : '';
+    // the end card's main button: the next level after a win, otherwise a new game
+    const next = state === 'won' && g.level && g.level < LEVELS.length;
+    $('overnext').style.display = next ? '' : 'none';
+    $('overnew').classList.toggle('primary', !next);
     const st = $('status');
     st.classList.toggle('flash', !!flash);
     let text;
@@ -916,6 +950,7 @@ function start() {
   $('overundo').onclick = doUndo;
   $('new').onclick = () => doNew(false);
   $('overnew').onclick = () => doNew(false);
+  $('overnext').onclick = () => startGame(1000 + g.level + 1, 'level', null, g.level + 1);
   $('restart').onclick = () => doNew(true);
   $('overrestart').onclick = () => doNew(true);
   $('giveup').onclick = () => { state = 'over'; hud(); };
@@ -1011,22 +1046,28 @@ function start() {
     if (c === STONE) { crack(x, ty, s); return; }
     let n = 0;
     for (let i = count - 1; i >= 0 && st[i] === c; i--) n++;
-    symbol(COLOURS[c][1], x, ty - s * 0.12, s * 0.3);
-    ctx.font = '700 ' + Math.round(s * 0.28) + 'px system-ui, sans-serif';
+    symbol(COLOURS[c][1], x, ty - s * 0.2, s * 0.32);
+    // the top run's size, on a dark badge so it reads on every colour
+    const fs = Math.max(9, Math.round(s * 0.34)), bw = fs * (n > 9 ? 1.5 : 1.05), bh = fs * 1.1, by = ty + s * 0.4;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - bw / 2, by - bh / 2, bw, bh, bh / 2); else ctx.rect(x - bw / 2, by - bh / 2, bw, bh);
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fill();
+    ctx.font = '700 ' + fs + 'px ' + (theme.font || 'system-ui, sans-serif');
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.strokeText(n, x, ty + s * 0.42);
-    ctx.fillStyle = '#fff'; ctx.fillText(n, x, ty + s * 0.42);
+    ctx.fillStyle = '#fff'; ctx.fillText(n, x, by + fs * 0.04);
   }
-  function ring(x, y, s, strong) {
+  function ring(x, y, s, strong) {   // a place the picked stack can go; strong: where it will go
     hexPath(x, y, s * 0.93);
-    ctx.lineWidth = strong ? 4 : 2;
+    ctx.lineWidth = strong ? 5 : 2.5;
     ctx.strokeStyle = theme.accent;
-    ctx.setLineDash(strong ? [] : [5, 4]);
+    ctx.setLineDash(strong ? [] : [6, 4]);
+    if (strong) { ctx.shadowColor = theme.accent; ctx.shadowBlur = s * 0.35; }
     ctx.stroke();
+    ctx.shadowBlur = 0;
     ctx.setLineDash([]);
   }
   function pill(text, x, y) {
-    ctx.font = '600 ' + Math.max(12, Math.round(S * 0.3)) + 'px system-ui, sans-serif';
+    ctx.font = '600 ' + Math.max(12, Math.round(S * 0.3)) + 'px ' + theme.font;
     const w = ctx.measureText(text).width + 16, h = Math.max(22, S * 0.5);
     const px = Math.max(4, Math.min(W - w - 4, x - w / 2));
     ctx.beginPath();
@@ -1086,11 +1127,15 @@ function start() {
       if (a.type === 'pour' && !a.cleared) hidden[a.b] = (hidden[a.b] || 0) + a.n - arrived(a, now);
       if (a.type === 'place') fadeIn[a.cell] = ease(Math.min(1, (now - a.t0) / a.dur));
     }
+    for (const k of ORDER) {   // the plate under the board: the cells' larger hexes run together
+      const [x, y] = cellXY(k);
+      hexPath(x, y + S * 0.06, S * 1.12); ctx.fillStyle = theme.plate; ctx.fill();
+    }
     for (const k of ORDER) {   // the floor
       const [x, y] = cellXY(k);
       hexPath(x, y, S * 0.95);
       ctx.fillStyle = theme.cell; ctx.fill();
-      ctx.lineWidth = 1; ctx.strokeStyle = theme['cell-edge']; ctx.stroke();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = theme['cell-edge']; ctx.stroke();
       if (!g.board[k].length && hl.targets.has(k)) ring(x, y, S, k === hl.strong);
     }
     for (const k of ORDER) {
@@ -1109,7 +1154,10 @@ function start() {
       ctx.globalAlpha = 1;
       const ty = y - Math.max(0, count - 1) * h;
       if (hl.targets.has(k)) ring(x, ty, S, k === hl.strong || (hl.pill && hl.pill.cell === k));
-      if (ui.sel === k) { hexPath(x, ty, S * 0.93); ctx.lineWidth = 4; ctx.strokeStyle = theme.ink; ctx.stroke(); }
+      if (ui.sel === k) {
+        hexPath(x, ty, S * 0.95); ctx.lineWidth = 4; ctx.strokeStyle = theme.ink;
+        ctx.shadowColor = theme.accent; ctx.shadowBlur = S * 0.4; ctx.stroke(); ctx.shadowBlur = 0;
+      }
     }
     for (const a of anims) {
       if (a.type === 'clear') {
@@ -1161,7 +1209,7 @@ function start() {
       drawStack(x, y, s, st, st.length);
       ctx.globalAlpha = 1;
       if (isNext) {
-        ctx.font = Math.max(11, Math.round(S * 0.26)) + 'px system-ui, sans-serif';
+        ctx.font = '500 ' + Math.max(11, Math.round(S * 0.26)) + 'px ' + theme.font;
         ctx.fillStyle = theme.muted; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
         ctx.fillText('next', x, y + s + 6);
       }
@@ -1219,6 +1267,7 @@ function start() {
     requestAnimationFrame(frame);
   }
   new ResizeObserver(resize).observe($('wrap'));
+  if (document.fonts) document.fonts.ready.then(() => { dirty = true; });   // redraw the board's numbers in the web font
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', resize);
   resize();
   hud();
