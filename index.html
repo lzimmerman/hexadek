@@ -57,6 +57,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .card { background: var(--panel); color: var(--ink); padding: 20px 24px; border-radius: 12px; text-align: center; max-width: 320px; margin: 16px; }
 .card h2 { margin: 0 0 6px; font-size: 20px; }
 .card p { margin: 0 0 14px; }
+#overstarbig { font-size: 34px; letter-spacing: 4px; color: #f2b705; line-height: 1.2; }
+#overgoals { list-style: none; padding: 0; margin: 4px 0 12px; text-align: left; color: var(--muted); font-size: 14px; }
+#overgoals li.met { color: var(--ink); }
 .card button { margin: 0 4px; }
 dialog { border: none; border-radius: 12px; background: var(--panel); color: var(--ink); padding: 18px 22px;
   max-width: 520px; width: calc(100% - 32px); max-height: 85vh; overflow: auto; box-sizing: border-box; }
@@ -110,6 +113,7 @@ dialog li { margin-bottom: 6px; }
   <canvas id="c" aria-label="Hexadek board"></canvas>
   <div id="over"><div class="card">
     <h2 id="overtitle">No room left</h2>
+    <div id="overstars"><div id="overstarbig"></div><ul id="overgoals"></ul></div>
     <p id="overtext"></p>
     <button id="overundo">Undo last pour</button>
     <button id="overrestart">Restart</button>
@@ -142,7 +146,8 @@ dialog li { margin-bottom: 6px; }
     <li><b>Survive</b> game: pours and undos as in Standard, with a deck of 30 stacks. Place them all without
       running out of room. The bar below the board shows how far through the deck you are.</li>
     <li><b>Free</b> game: pours and undos are unlimited.</li>
-    <li><b>Levels</b>: a fixed deck each, with its own colours and pour rules. Choose one under New game.</li>
+    <li><b>Levels</b>: a fixed deck each, with its own colours and pour rules. Choose one under New game.
+      Finishing earns a star, the level's score target a second, and its extra goal a third. Your best stays.</li>
     <li>Choose the mode under New game, and the number of colours: 4 to 7. Fewer is easier.</li>
     <li><b>Stones</b> (grey) can't be poured or poured onto. A stone breaks when a neighbouring stack clears.</li>
   </ul>
@@ -225,14 +230,17 @@ const COLOURS = [   // colour and symbol, so colours can be told apart without c
 const STONE = 9;   // a grey stone tile: it can't be poured, and breaks when a neighbouring stack clears
 const STONE_COLOUR = '#7d8590';
 // Levels: a fixed deck (same seed every time) with its own settings. pours: undefined is
-// Standard's budget, null is free pouring. Stars are planned (see FEATURE_IDEAS.md), not built.
+// Standard's budget, null is free pouring. stars: finishing the deck is 1; reaching the
+// score is 2; the score plus the hexadeks (or, with stones, every stone broken) is 3.
+// The targets are first guesses, to tune by playing.
 const LEVELS = [
-  { name: 'First deck', deck: 20, colours: 4, bands: [1, 2], pours: null },
-  { name: 'Five colours', deck: 25, colours: 5, bands: [1, 3] },
-  { name: 'Tight budget', deck: 25, colours: 5, bands: [1, 3], pours: { start: 2, perPlace: 2, perClear: 1, max: 6 } },
-  { name: 'Stones', deck: 30, colours: 5, bands: [1, 3],
+  { name: 'First deck', deck: 20, colours: 4, bands: [1, 2], pours: null, stars: { score: 360, hexadeks: 5 } },
+  { name: 'Five colours', deck: 25, colours: 5, bands: [1, 3], stars: { score: 480, hexadeks: 6 } },
+  { name: 'Tight budget', deck: 25, colours: 5, bands: [1, 3], pours: { start: 2, perPlace: 2, perClear: 1, max: 6 },
+    stars: { score: 360, hexadeks: 5 } },
+  { name: 'Stones', deck: 30, colours: 5, bands: [1, 3], stars: { score: 600, stones: true },
     stones: { '0,0': [STONE, STONE], '-2,1': [STONE], '2,-1': [STONE], '1,1': [STONE] } },
-  { name: 'Long haul', deck: 40, colours: 6, bands: [2, 3] },
+  { name: 'Long haul', deck: 40, colours: 6, bands: [2, 3], stars: { score: 720, hexadeks: 9 } },
 ];
 
 // ---- rules: plain data, no drawing ----
@@ -300,6 +308,19 @@ function newGame(seed, mode, colours, level) {
 }
 // A deck: the game is won once every stack in it has been placed.
 function isWon(g) { return !!g.deckSize && g.turn >= g.deckSize; }
+const stonesLeft = board => CELLS.reduce((n, k) => n + board[k].filter(c => c === STONE).length, 0);
+// Each star's goal and whether it's met; stars count only as far as the goals in a row are met.
+function starGoals(g) {
+  const T = LEVELS[g.level - 1].stars, won = isWon(g), hit = won && g.score >= T.score;
+  return [
+    { text: 'Finish the deck', met: won },
+    { text: 'Score ' + T.score, met: hit },
+    T.stones ? { text: 'Score ' + T.score + ' and break every stone', met: hit && !stonesLeft(g.board) }
+             : { text: 'Score ' + T.score + ' and make ' + T.hexadeks + ' hexadeks (' + (g.hexadeks || 0) + ' made)',
+                 met: hit && (g.hexadeks || 0) >= T.hexadeks },
+  ];
+}
+function starsFor(g) { return g.level ? starGoals(g).filter(s => s.met).length : 0; }
 const MODE_NAMES = { standard: 'Standard', free: 'Free', survive: 'Survive' };
 function gameName(g) {
   if (g.level) return 'Level ' + g.level + ' · ' + LEVELS[g.level - 1].name;
@@ -328,7 +349,8 @@ function legalTargets(board, a) { return neighbours(a).filter(b => pourResult(bo
 function pour(g, a, b) {
   const res = pourResult(g.board, a, b);
   if (!res || poursLeft(g) < 1) return null;
-  g.history.push(JSON.stringify({ board: g.board, score: g.score, clearsThisTurn: g.clearsThisTurn, pours: g.pours }));
+  g.history.push(JSON.stringify({ board: g.board, score: g.score, clearsThisTurn: g.clearsThisTurn, pours: g.pours,
+                                 hexadeks: g.hexadeks || 0 }));
   if (pourRule(g)) g.pours--;
   const A = g.board[a], B = g.board[b];
   res.colour = topOf(A); res.baseTo = B.length;
@@ -337,6 +359,7 @@ function pour(g, a, b) {
   if (res.clears) {
     g.board[b] = [];
     g.clearsThisTurn++;
+    g.hexadeks = (g.hexadeks || 0) + 1;
     res.mult = g.clearsThisTurn;
     res.points = CFG.hexadek * CFG.pointsPerTile * res.mult;
     g.score += res.points;
@@ -353,6 +376,7 @@ function undo(g) {
   const s = JSON.parse(g.history.pop());
   g.board = s.board; g.score = s.score; g.clearsThisTurn = s.clearsThisTurn;
   if ('pours' in s) g.pours = s.pours;
+  if ('hexadeks' in s) g.hexadeks = s.hexadeks;
   return true;
 }
 function place(g, slot, cell) {
@@ -429,7 +453,7 @@ const TUTORIAL = [
 
 // ---- the page ----
 function start() {
-  const SAVE = 'hexadek.save.v1', BEST = 'hexadek.best';
+  const SAVE = 'hexadek.save.v1', BEST = 'hexadek.best', STARS = 'hexadek.stars.level';
   const OLD = 'hexdek';   // the game's first name: saves made under it still load
   const TILE = 0.12;      // tile thickness, as a share of the hex size
   const R3 = Math.sqrt(3);
@@ -479,7 +503,11 @@ function start() {
       best = g.score;
       try { localStorage.setItem(bestKey(g), String(best)); } catch (e) {}
     }
+    const st = starsFor(g);   // only the best result counts
+    if (st > readStars(g.level)) try { localStorage.setItem(STARS + g.level, String(st)); } catch (e) {}
   }
+  function readStars(n) { try { return Number(localStorage.getItem(STARS + n)) || 0; } catch (e) { return 0; } }
+  const starText = n => '★'.repeat(n) + '☆'.repeat(3 - n);
 
   const targetsFrom = a => poursLeft(g) > 0 ? legalTargets(g.board, a) : [];
 
@@ -626,6 +654,9 @@ function start() {
     }
     $('newwarn').textContent = busy ? 'Choose a mode. The game you are playing will be lost.' : 'Choose a mode.';
     $('newcolours').value = String(g.colours);
+    $('newlevelnum').innerHTML = LEVELS.map((L, i) => '<option value="' + (i + 1) + '">' + (i + 1) + ' · ' + L.name +
+      '  ' + starText(readStars(i + 1)) + '</option>').join('');
+    $('newlevelnum').value = String(g.level || 1);
     $('newgame').showModal();
   }
   const chosen = mode => () => { $('newgame').close(); startGame(Date.now(), mode, Number($('newcolours').value)); };
@@ -637,7 +668,6 @@ function start() {
   $('newstandard').onclick = chosen('standard');
   $('newfree').onclick = chosen('free');
   $('newsurvive').onclick = chosen('survive');
-  $('newlevelnum').innerHTML = LEVELS.map((L, i) => '<option value="' + (i + 1) + '">' + (i + 1) + ' · ' + L.name + '</option>').join('');
   $('newlevel').onclick = () => {   // each level has a fixed deck: the same every time
     const n = Number($('newlevelnum').value);
     $('newgame').close(); startGame(1000 + n, 'level', null, n);
@@ -758,8 +788,12 @@ function start() {
     else if (poursLeft(g) < 1 && state !== 'over') text = 'No pours left: place a stack for ' + P.perPlace + ' more.';
     else if (ui.trayPick !== null) text = 'Tap an empty cell to place it.';
     else if (ui.sel) text = 'Tap a glowing neighbour to pour.';
-    else if (g.turn === 0 && !g.history.length) text = 'Drag a tray stack onto the board to start.';
+    else if (g.level && g.turn === 0 && !g.history.length) {   // short: it has to fit a phone's status line
+      const T = LEVELS[g.level - 1].stars;
+      text = 'Place all ' + g.deckSize + '. ★★ ' + T.score + ' pts, ★★★ ' + (T.stones ? '+ all stones' : '+ ' + T.hexadeks + ' hexadeks');
+    }
     else if (g.deckSize && g.turn === 0 && !g.history.length) text = 'Place all ' + g.deckSize + ' stacks in the deck to win.';
+    else if (g.turn === 0 && !g.history.length) text = 'Drag a tray stack onto the board to start.';
     else if (P) text = 'Pour, then place a stack (+' + P.perPlace + ' pours).';
     else text = 'Pour as you like, then place a stack.';
     $('msg').textContent = text;
@@ -773,7 +807,15 @@ function start() {
       $('decktext').textContent = placed + ' / ' + g.deckSize;
       $('deck').title = (g.deckSize - placed) + ' stacks left to place';
     }
-    $('overtext').textContent = gameName(g) + ' game. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ')') + '.';
+    const goals = g.level ? starGoals(g) : null;
+    $('overstars').style.display = goals ? '' : 'none';
+    if (goals) {
+      const n = starsFor(g);
+      $('overstarbig').textContent = starText(n);
+      $('overstarbig').setAttribute('aria-label', n + ' of 3 stars');
+      $('overgoals').innerHTML = goals.map(s => '<li class="' + (s.met ? 'met' : '') + '">' + (s.met ? '✓ ' : '· ') + s.text + '</li>').join('');
+    }
+    $('overtext').textContent = gameName(g) + ' game. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ').');
     $('overundo').style.display = g.history.length && undosLeft(g) > 0 && state !== 'won' ? '' : 'none';
   }
 

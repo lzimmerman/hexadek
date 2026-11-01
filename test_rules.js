@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -143,3 +143,20 @@ assert(undo(sb)); assert.deepEqual(sb.board['0,0'], [STONE, STONE], 'undo puts s
 const stones = {}; for (const k of CELLS) stones[k] = [STONE];
 assert.equal(roomState(stones, Infinity), "over", "a board of stones is stuck");
 console.log('stone tests passed');
+
+// Stars: 1 for finishing, 2 for the score, 3 for the score plus the extra goal
+const st1 = newGame(1001, 'level', null, 1), T1 = LEVELS[0].stars;
+assert.equal(R.starsFor(st1), 0, 'no stars before the deck is done');
+st1.turn = st1.deckSize; assert.equal(R.starsFor(st1), 1);
+st1.score = T1.score; assert.equal(R.starsFor(st1), 2);
+st1.hexadeks = T1.hexadeks; assert.equal(R.starsFor(st1), 3);
+st1.score = 0; assert.equal(R.starsFor(st1), 1, 'the third star needs the second');
+const st4 = newGame(1004, 'level', null, 4); st4.turn = st4.deckSize; st4.score = LEVELS[3].stars.score;
+assert.equal(R.starsFor(st4), 2, 'stones still standing');
+for (const k of CELLS) st4.board[k] = st4.board[k].filter(c => c !== STONE);
+assert.equal(R.starsFor(st4), 3, 'every stone broken');
+assert.equal(R.starsFor(newGame(5, 'survive')), 0, 'only levels have stars');
+const hx = newGame(9, 'free'); for (const k of CELLS) hx.board[k] = [];
+hx.board['0,0'] = Array(11).fill(1); hx.board['1,0'] = [1];
+pour(hx, '1,0', '0,0'); assert.equal(hx.hexadeks, 1); undo(hx); assert.equal(hx.hexadeks, 0, 'undo takes a hexadek back');
+console.log('star tests passed');
