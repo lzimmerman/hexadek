@@ -675,6 +675,10 @@ function start() {
   const HOLD_MS = 150;   // a touch shorter than this is a tap: no preview while the finger is down
   const ui = { ghostAt: null, sel: null, trayPick: null, press: null, drag: null, hover: null, pos: null, touch: false };
   let anims = [], flash = null, dirty = true;
+  // The end of a game, shown gently: the last move plays out, the board dims (with a burst of
+  // stars after a win), and only then the card. A card that jumps in can look like an error.
+  let ending = null;   // { kind: 'won' | 'over', t0, parts }
+  const ENDING = { pause: 350, dim: 450, won: 1500, over: 950 };   // ms; t0 starts once the last move's animation ends
   const lessMotion = window.matchMedia('(prefers-reduced-motion: reduce)');   // the phone's "reduce motion" setting
   const still = () => lessMotion.matches;
   let tut = null, realG = null;   // during the tutorial, the real game waits in realG
@@ -720,7 +724,7 @@ function start() {
     TY = BY + S * (1.5 * R + 1) + S * 2.1;
     SLOT = Math.min(W / 4.3, S * 2.4);
     const css = getComputedStyle(document.documentElement);
-    for (const v of ['cell', 'cell-edge', 'plate', 'accent', 'ink', 'muted', 'panel', 'font']) theme[v] = css.getPropertyValue('--' + v).trim();
+    for (const v of ['cell', 'cell-edge', 'plate', 'accent', 'ink', 'muted', 'panel', 'font', 'bg', 'gold']) theme[v] = css.getPropertyValue('--' + v).trim();
     dirty = true;
   }
   function cellXY(k) {
@@ -834,7 +838,7 @@ function start() {
     if (undo(g)) { ui.sel = null; flash = null; after(); }
   }
   function startGame(seed, mode, colours, level, intro) {
-    finishAnims();
+    finishAnims(); ending = null;
     g = newGame(seed, mode, colours, level);
     ui.sel = ui.trayPick = null;
     flash = null;
@@ -949,7 +953,11 @@ function start() {
   showHaptics();
   $('welcomeclose').onclick = () => { $('welcome').close(); if (g.level === 1 && !g.turn) showIntro(); };
   function after() {
+    const was = state;
     state = isWon(g) ? 'won' : roomState(g.board, poursLeft(g));
+    const done = state === 'won' || state === 'over';
+    if (done && was !== state && !tut) ending = { kind: state, t0: null, parts: state === 'won' && !still() ? burst() : [] };
+    if (!done) ending = null;
     best = readBest(g);
     save();
     hud();
@@ -1046,6 +1054,8 @@ function start() {
     st.classList.toggle('flash', !!flash);
     let text;
     if (flash) text = flash.text;
+    else if (state === 'won') text = 'Deck complete!';
+    else if (state === 'over') text = 'No room left.';
     else if (state === 'full') text = 'Board full: pour to make room.';
     else if (poursLeft(g) < 1 && state !== 'over') text = 'No pours left: place a stack for ' + P.perPlace + ' more.';
     else if (ui.trayPick !== null) text = 'Tap an empty cell to place it.';
@@ -1062,7 +1072,7 @@ function start() {
     st.classList.remove('tight');
     if ($('msg').scrollWidth > $('msg').clientWidth) st.classList.add('tight');
     $('giveup').style.display = state === 'full' ? 'inline-block' : 'none';
-    $('over').classList.toggle('show', state === 'over' || state === 'won');
+    $('over').classList.toggle('show', (state === 'over' || state === 'won') && !ending);
     $('overtitle').textContent = state === 'won' ? 'Deck complete!' : 'No room left';
     $('deck').style.visibility = g.deckSize ? 'visible' : 'hidden';
     if (g.deckSize) {
@@ -1514,11 +1524,40 @@ function start() {
       ctx.globalAlpha = 1;
       pill(previewText(hl.pill.from, hl.pill.cell), x, y - (len + r.n - 1) * h);
     }
+    if (ending) drawEnding(now);
+  }
+  function burst() {   // stars for a win: each with a direction, speed, size and spin
+    const parts = [];
+    for (let i = 0; i < 18; i++) {
+      const a = Math.PI * 2 * (i / 18) + Math.random() * 0.3;
+      parts.push({ a, v: 1.6 + Math.random() * 1.6, size: 0.35 + Math.random() * 0.3, spin: (Math.random() - 0.5) * 4,
+                   delay: Math.random() * 180 });
+    }
+    return parts;
+  }
+  function drawEnding(now) {
+    if (anims.length) return;                       // the last move is still playing out
+    if (ending.t0 === null) ending.t0 = now + ENDING.pause;
+    const t = now - ending.t0, total = still() ? ENDING.dim : ENDING[ending.kind];
+    if (t < 0) return;
+    // the board dims under a wash of the page colour
+    ctx.globalAlpha = Math.min(1, t / ENDING.dim) * 0.55;
+    ctx.fillStyle = theme.bg; ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
+    for (const p of ending.parts) {                 // a win: gold stars rise out of the board and fade
+      const u = (t - p.delay) / (ENDING.won - 300);
+      if (u <= 0 || u >= 1) continue;
+      const d = S * (0.8 + 3 * p.v * (1 - Math.pow(1 - u, 2.2))), x = BX + Math.cos(p.a) * d, y = BY + Math.sin(p.a) * d * 0.8 - u * S * 1.2;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(p.spin * u); ctx.globalAlpha = u < 0.7 ? 1 : (1 - u) / 0.3;
+      ctx.fillStyle = theme.gold; ctx.font = '700 ' + Math.round(S * p.size * 2) + 'px ' + theme.font;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', 0, 0); ctx.restore();
+    }
+    if (t >= total) { ending = null; hud(); }     // now the card
   }
 
   function frame(now) {
     if (flash && now > flash.until) { flash = null; hud(); }
-    if (dirty || anims.length || tutExpect()) { dirty = false; render(now); }
+    if (dirty || anims.length || tutExpect() || ending) { dirty = false; render(now); }
     requestAnimationFrame(frame);
   }
   new ResizeObserver(resize).observe($('wrap'));
