@@ -54,6 +54,7 @@ h1 span { color: var(--accent); }
 #chapdots { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 600; color: var(--muted);
   font-variant-numeric: tabular-nums; white-space: nowrap; }
 #chapdots:empty { display: none; }
+#chapdots:not(:empty) { cursor: pointer; }
 #chapdots i { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--cell-edge); box-sizing: border-box; }
 #chapdots i.done { background: var(--gold); border-color: var(--gold); }
 #chapdots i.now { border-color: var(--accent); background: none; box-shadow: 0 0 0 1.5px var(--accent); }
@@ -289,6 +290,9 @@ dialog li { margin-bottom: 6px; }
     deck of stacks, the same every time you play it. Place every stack to finish it, and the next level opens.
     Under New game, Journey › Continue goes to your next level, and All levels shows them all with your stars. The first
     level of each chapter is always open.</p>
+  <p>While you play a level, the line under the title shows where you are in its chapter, such as
+    <i>Chapter 2 · 5 of 12</i>, with a dot for each of the chapter's levels: gold once it has stars, ringed for the
+    one you're playing. Tap it, or the level name, to see the level's card and your Journey so far.</p>
   <p>Finishing earns stars, from one to three:</p>
   <ul>
     <li>★ Finish the deck.</li>
@@ -997,6 +1001,7 @@ function start() {
   const hideIntro = () => $('intro').classList.remove('show');
   const chipIntro = () => { if (g.level && !tut && !$('over').classList.contains('show')) showIntro(); };
   $('mode').onclick = chipIntro;
+  $('chapdots').onclick = chipIntro;
   $('mode').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); chipIntro(); } });
   $('introgo').onclick = hideIntro;
   $('intro').addEventListener('click', e => { if (e.target === $('intro')) hideIntro(); });   // a tap beside the card
@@ -1218,9 +1223,9 @@ function start() {
     const key = n + ':' + stars.join();
     if (key === dotsKey) return;
     dotsKey = key;
-    $('chapdots').innerHTML = n ? '<b>' + (n - first + 1) + '/' + CHAPTER_SIZE + '</b>' +
+    $('chapdots').innerHTML = n ? '<b>Chapter ' + (LEVELS[n - 1].chapter + 1) + ' · ' + (n - first + 1) + ' of ' + CHAPTER_SIZE + '</b>' +
       stars.map((d, i) => '<i class="' + (first + i === n ? 'now' : d ? 'done' : '') + '"></i>').join('') : '';
-    $('chapdots').title = n ? 'Chapter ' + (LEVELS[n - 1].chapter + 1) + ': level ' + (n - first + 1) + ' of ' + CHAPTER_SIZE : '';
+    $('chapdots').title = n ? 'Level ' + (n - first + 1) + ' of ' + CHAPTER_SIZE + ' in chapter ' + (LEVELS[n - 1].chapter + 1) + '; gold dots: levels with stars' : '';
   }
   function hud() {
     $('score').textContent = g.score;
