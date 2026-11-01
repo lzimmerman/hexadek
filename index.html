@@ -425,6 +425,21 @@ function starGoals(g) {
              : { text: 'Score ' + T.top, met: won && g.score >= T.top },
   ];
 }
+// The most hexadeks a level's deck can make: its tiles of each colour, 12 to a hexadek.
+// Deals the whole deck on a copy of the game. The star targets follow it (see LEVELS).
+const deckMaxCache = {};
+function deckMax(g) {
+  const key = g.start + '.' + g.level;
+  if (key in deckMaxCache) return deckMaxCache[key];
+  const d = newGame(g.start, 'level', null, g.level), per = {};
+  for (let i = 0; i < d.deckSize; i++) {
+    const slot = d.tray.findIndex(t => t); if (slot < 0) break;
+    for (const c of d.tray[slot]) per[c] = (per[c] || 0) + 1;
+    const cell = CELLS.find(k => !d.board[k].length);
+    place(d, slot, cell); d.board[cell] = [];
+  }
+  return deckMaxCache[key] = Object.values(per).reduce((a, n) => a + Math.floor(n / CFG.hexadek), 0);
+}
 function starsFor(g) { return g.level ? starGoals(g).filter(s => s.met).length : 0; }
 const MODE_NAMES = { standard: 'Standard', free: 'Free', survive: 'Survive' };
 function gameName(g) {
@@ -967,7 +982,9 @@ function start() {
       $('overstarbig').setAttribute('aria-label', n + ' of 3 stars');
       $('overgoals').innerHTML = goals.map(s => '<li class="' + (s.met ? 'met' : '') + '">' + (s.met ? '✓ ' : '· ') + s.text + '</li>').join('');
     }
-    $('overtext').textContent = gameName(g) + ' game. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ').');
+    const made = g.hexadeks || 0;
+    $('overtext').textContent = gameName(g) + ' game. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ').') +
+      ' Hexadeks: ' + made + (g.level ? ' of ' + deckMax(g) + ' possible.' : '.');
     $('overundo').style.display = g.history.length && undosLeft(g) > 0 && state !== 'won' ? '' : 'none';
   }
 

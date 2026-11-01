@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -157,6 +157,12 @@ assert.equal(R.starsFor(st4), 2, 'stones still standing');
 for (const k of CELLS) st4.board[k] = st4.board[k].filter(c => c !== STONE);
 assert.equal(R.starsFor(st4), 3, 'every stone broken');
 assert.equal(R.starsFor(newGame(5, 'survive')), 0, 'only levels have stars');
+// targets follow the deck's tile supply M: ★★ = (M - 1) × 120, ★★★ = (M + 2) × 120
+LEVELS.forEach((L, i) => {
+  const M = R.deckMax(newGame(1001 + i, 'level', null, i + 1)), pts = CFG.hexadek * CFG.pointsPerTile;
+  assert.equal(L.stars.score, (M - 1) * pts, 'level ' + (i + 1) + ' ★★ for M = ' + M);
+  if (!L.stars.stones) assert.equal(L.stars.top, (M + 2) * pts, 'level ' + (i + 1) + ' ★★★ for M = ' + M);
+});
 const hx = newGame(9, 'free'); for (const k of CELLS) hx.board[k] = [];
 hx.board['0,0'] = Array(11).fill(1); hx.board['1,0'] = [1];
 pour(hx, '1,0', '0,0'); assert.equal(hx.hexadeks, 1); undo(hx); assert.equal(hx.hexadeks, 0, 'undo takes a hexadek back');
