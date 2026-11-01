@@ -134,7 +134,8 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
 .choices span { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
 .fig { display: flex; align-items: center; gap: 12px; margin: 4px 0 8px; }
 .fig canvas { width: 72px; height: 96px; flex: none; }
-.fig canvas.wide { width: 140px; }
+.fig canvas.wide { width: 140px; flex: 0 1 140px; min-width: 0; }   /* the pour pair shrinks to fit narrow phones */
+.fig .arrow { flex: none; }
 .fig .arrow { font-size: 22px; color: var(--muted); }
 #levelstable { border-collapse: collapse; font-size: 13px; margin: 4px 0 8px; }
 #levelstable th, #levelstable td { text-align: left; padding: 3px 10px 3px 0; border-bottom: 1px solid var(--line); }
@@ -242,7 +243,7 @@ dialog li { margin-bottom: 6px; }
     <li><b>Survive</b> game: pours and undos as in Standard, with a deck of 30 stacks. Place them all without
       running out of room. The bar below the board shows how far through the deck you are.</li>
     <li><b>Free</b> game: pours and undos are unlimited.</li>
-    <li><b>Levels</b>: a fixed deck each, with its own rules. See <i>Levels and stars</i> below.</li>
+    <li><b>Journey</b>: 72 levels, each a fixed deck with its own rules. See <i>Journey: levels and stars</i> below.</li>
     <li>Choose the mode under New game. Custom also sets the number of colours: 3, 5, 7, 9, 11 or 13. Fewer is easier.</li>
   </ul>
   <h3>Placing</h3>
