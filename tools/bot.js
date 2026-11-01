@@ -4,7 +4,7 @@
 //     --file index.html     the game to load (default: index.html next to this folder)
 //     --skill expert|good|casual|all   (default all)
 //     --games N             games per level and skill (default 20)
-//     --level N             only this level (default all)
+//     --level N             only this level; --levels A-B a range (default all)
 //     --random              deal a different deck for each game, with the level's settings
 //                           (for semi-randomised levels); otherwise each level's fixed deck,
 //                           and the games differ only by the player's noise
@@ -154,7 +154,8 @@ function playGame(g, skill, rnd) {
 // ---- run ----
 const games = Number(opt('games', 20));
 const skills = opt('skill', 'all') === 'all' ? Object.keys(SKILLS) : [opt('skill')];
-const levels = opt('level') ? [Number(opt('level'))] : LEVELS.map((_, i) => i + 1);
+const span = (opt('levels', opt('level') || '1-' + LEVELS.length) + '-').split('-').map(Number);   // --levels 49-72
+const levels = LEVELS.map((_, i) => i + 1).filter(n => n >= span[0] && n <= (span[1] || span[0]));
 const random = flag('random'), verbose = flag('verbose');
 const median = a => { const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
 const pct = (a, f) => (100 * a.filter(f).length / a.length).toFixed(0).padStart(3) + '%';
@@ -175,7 +176,7 @@ for (const lv of levels) {
       // a random deck gets targets from its own supply, as semi-randomised levels would
       const pts = CFG.hexadek * CFG.pointsPerTile, won = isWon(g);
       const stars = !random ? starsFor(g) : !won ? 0 : g.score < (M - 1) * pts ? 1 :
-        (LEVELS[lv - 1].stars.stones ? !CELLS.some(k => g.board[k].includes(STONE)) : g.score >= (M + 2) * pts) ? 3 : 2;
+        (LEVELS[lv - 1].stones ? !CELLS.some(k => g.board[k].includes(STONE)) : g.score >= (M + 2) * pts) ? 3 : 2;
       res.push({ won, hx: g.hexadeks || 0, M, score: g.score, stars, placed: g.turn, ms: Date.now() - t0 });
       if (flag('show')) console.log(CELLS.filter(k => g.board[k].length).map(k => k + ':' + g.board[k].join('')).join('  '));
       if (verbose) console.log(`  game ${i + 1}: ${isWon(g) ? 'won ' : 'lost'} placed ${g.turn}/${g.deckSize} hexadeks ${g.hexadeks || 0}/${M} score ${g.score} stars ${res[res.length - 1].stars} (${Date.now() - t0} ms)`);

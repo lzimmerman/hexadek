@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -120,17 +120,21 @@ LEVELS.forEach((L, i) => {
   }
   assert(R.gameName(lg).startsWith('Level ' + (i + 1)));
 });
+assert.equal(LEVELS.length, 72); assert.equal(R.CHAPTERS.length, 6);
 const l1 = newGame(1001, 'level', null, 1); assert.equal(R.poursLeft(l1), Infinity); assert.equal(R.undosLeft(l1), Infinity);
-const l3 = newGame(1003, 'level', null, 3), P3 = LEVELS[2].pours;
+const tb = LEVELS.findIndex(L => L.pours && L.pours.max === 6) + 1, l3 = newGame(1000 + tb, 'level', null, tb), P3 = LEVELS[tb - 1].pours;
 assert.equal(R.poursLeft(l3), P3.start);
 place(l3, 0, '0,0'); assert.equal(l3.pours, Math.min(P3.max, P3.start + P3.perPlace));
 for (let i = 0; i < 5; i++) place(l3, 0, CELLS[i + 1]); assert.equal(l3.pours, P3.max, 'tight budget caps at its own max');
-const l2 = newGame(1002, 'level', null, 2); assert.equal(R.pourRule(l2), CFG.pours);
+const l2 = newGame(1006, 'level', null, 6); assert.equal(R.pourRule(l2), CFG.pours);
+// every level after a chapter's first says what's new; decks never shrink within a chapter
+LEVELS.forEach((L, i) => { assert(R.levelAbout(i + 1).length > 5);
+  if (L.step) assert(L.deck >= LEVELS[i - 1].deck, 'level ' + (i + 1) + ' deck'); });
 console.log('level tests passed');
 
 // Stones: can't be poured or poured onto; a neighbouring clear breaks the top one
-const l4 = newGame(1004, 'level', null, 4);
-for (const k in LEVELS[3].stones) assert.deepEqual(l4.board[k], LEVELS[3].stones[k]);
+const sl = LEVELS.findIndex(L => L.stones) + 1, l4 = newGame(1000 + sl, 'level', null, sl);
+for (const k in LEVELS[sl - 1].stones) assert.deepEqual(l4.board[k], LEVELS[sl - 1].stones[k]);
 const sb = newGame(9, 'free'); for (const k of CELLS) sb.board[k] = [];
 sb.board['0,0'] = [STONE, STONE]; sb.board['1,0'] = [2, STONE]; sb.board['-1,0'] = [1];
 assert.equal(pourResult(sb.board, '0,0', '0,1'), null, 'a stone cannot be poured');
@@ -146,22 +150,22 @@ assert.equal(roomState(stones, Infinity), "over", "a board of stones is stuck");
 console.log('stone tests passed');
 
 // Stars: 1 for finishing, 2 for the score, 3 for the score plus the extra goal
-const st1 = newGame(1001, 'level', null, 1), T1 = LEVELS[0].stars;
+const st1 = newGame(1001, 'level', null, 1), T1 = R.levelTargets(1);
 assert.equal(R.starsFor(st1), 0, 'no stars before the deck is done');
 st1.turn = st1.deckSize; assert.equal(R.starsFor(st1), 1);
 st1.score = T1.score; assert.equal(R.starsFor(st1), 2);
 st1.score = T1.top - 1; assert.equal(R.starsFor(st1), 2, 'just short of the top score'); st1.score = T1.top; assert.equal(R.starsFor(st1), 3);
 st1.score = 0; assert.equal(R.starsFor(st1), 1, 'the third star needs the second');
-const st4 = newGame(1004, 'level', null, 4); st4.turn = st4.deckSize; st4.score = LEVELS[3].stars.score;
+const st4 = newGame(1000 + sl, 'level', null, sl); st4.turn = st4.deckSize; st4.score = R.levelTargets(sl).score;
 assert.equal(R.starsFor(st4), 2, 'stones still standing');
 for (const k of CELLS) st4.board[k] = st4.board[k].filter(c => c !== STONE);
 assert.equal(R.starsFor(st4), 3, 'every stone broken');
 assert.equal(R.starsFor(newGame(5, 'survive')), 0, 'only levels have stars');
 // targets follow the deck's tile supply M: ★★ = (M - 1) × 120, ★★★ = (M + 2) × 120
 LEVELS.forEach((L, i) => {
-  const M = R.deckMax(newGame(1001 + i, 'level', null, i + 1)), pts = CFG.hexadek * CFG.pointsPerTile;
-  assert.equal(L.stars.score, (M - 1) * pts, 'level ' + (i + 1) + ' ★★ for M = ' + M);
-  if (!L.stars.stones) assert.equal(L.stars.top, (M + 2) * pts, 'level ' + (i + 1) + ' ★★★ for M = ' + M);
+  const T = R.levelTargets(i + 1), pts = CFG.hexadek * CFG.pointsPerTile;
+  assert(T.M >= 3, 'level ' + (i + 1) + ' can make hexadeks');
+  assert.equal(T.score, (T.M - 1) * pts); assert.equal(T.top, (T.M + 2) * pts); assert.equal(T.stones, !!L.stones);
 });
 const hx = newGame(9, 'free'); for (const k of CELLS) hx.board[k] = [];
 hx.board['0,0'] = Array(11).fill(1); hx.board['1,0'] = [1];
