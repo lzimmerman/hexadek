@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hexadek themes</title>
+<!-- Every theme in ../themes.js, light and dark, drawn with the same pieces as the game:
+     header, numbers, buttons, status line, stars, and a board with tiles, a stone and target rings.
+     Open this file in a browser after editing themes.js. Contrast numbers: node tools/contrast.js -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=swap">
+<script src="../themes.js"></script>
+<style>
+  body { margin: 0; padding: 16px; background: #888; font: 15px/1.35 Lexend, system-ui, sans-serif; }
+  h1.page { margin: 0 0 12px; font-size: 18px; color: #fff; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+  .t { background: var(--bg); color: var(--ink); border-radius: 12px; padding: 12px 14px; }
+  .t h2 { font-size: 13px; margin: 0 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .hdr { display: flex; align-items: center; gap: 10px; }
+  .hdr b { font-size: 19px; letter-spacing: .08em; } .hdr b span { color: var(--accent); }
+  .chip { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--cell); border: 1px solid var(--cell-edge); }
+  .stats { display: flex; gap: 14px; margin: 6px 0; padding: 5px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); align-items: baseline; }
+  .stats i { font-style: normal; font-size: 17px; color: var(--ink); letter-spacing: 0; margin-left: 3px; }
+  .stats .w { color: var(--warn); } .stats .d { color: var(--danger); }
+  .btns { display: flex; gap: 6px; margin: 8px 0; }
+  .btns span { padding: 5px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--cell-edge);
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--cell-edge)); font-size: 13px; font-weight: 500; }
+  .btns span.p { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+  .status { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px;
+    padding: 5px 10px; font-size: 13px; font-weight: 500; margin: 4px 0; }
+  .status.g { color: var(--good); border-left-color: var(--good); font-weight: 700; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  canvas { width: 170px; height: 150px; flex: none; }
+  .card { background: var(--panel); border: 1px solid var(--cell-edge); border-radius: 10px; padding: 8px 10px; flex: 1; font-size: 12px; }
+  .card .stars { color: var(--gold); font-size: 22px; letter-spacing: 3px; text-align: center; }
+  .card .goals { background: var(--bg); border-radius: 8px; padding: 4px 8px; margin-top: 4px; color: var(--muted); }
+  .card .goals b { color: var(--gold); } .card .goals .met { color: var(--ink); } .card .goals .met::first-letter { color: var(--good); }
+  .card .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<h1 class="page">Hexadek themes (from themes.js)</h1>
+<div class="grid" id="grid"></div>
+<script>
+// tiles and stone as in index.html (COLOURS, STONE_COLOUR): themes don't change them
+const TILES = ['#e5484d', '#f2b705', '#2fa86a', '#3b82e6', '#9b5de5', '#14b8a6', '#f472b6', '#f97316', '#8b5e3c'];
+const STONE = '#6b7280';
+const grid = document.getElementById('grid');
+for (const [key, T] of Object.entries(THEMES)) for (const mode of ['light', 'dark']) {
+  const C = T[mode], el = document.createElement('div');
+  el.className = 't';
+  for (const [k, v] of Object.entries(C)) el.style.setProperty('--' + k, v);
+  const ch = CHAPTER_THEMES.indexOf(key);
+  el.innerHTML = `<h2>${T.name} · ${mode}${ch >= 0 ? ' · chapter ' + (ch + 1) : ''}</h2>
+    <div class="hdr"><b>HEXA<span>DEK</span></b><span class="chip">Level 14 · ${ch >= 0 ? T.name : 'Classic'}</span></div>
+    <div class="stats">Score <i>840</i> Pours <i class="w">2</i> <i class="d">0</i> Best <i>1200</i></div>
+    <div class="btns"><span>Restart</span><span>New game</span><span class="p">Continue</span></div>
+    <div class="status">★ place 30 · ★★ 840 pts · ★★★ 1200 pts</div>
+    <div class="status g">Hexadek! +240 (×2)</div>
+    <div class="row"><canvas></canvas><div class="card"><div class="stars">★★☆</div>
+      <div class="goals"><div class="met">✓ Finish the deck</div><div class="met">✓ Score 840</div><div>· Score 1200</div></div>
+      <div class="muted" style="margin-top:4px">Hexadeks: 7 of 8 possible.</div></div></div>`;
+  grid.appendChild(el);
+  drawBoard(el.querySelector('canvas'), C);
+}
+function hex(ctx, x, y, r) { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i + Math.PI / 6;
+  ctx.lineTo(x + r * Math.cos(a), y + r * Math.sin(a)); } ctx.closePath(); }
+function drawBoard(cv, C) {
+  const dpr = window.devicePixelRatio || 1, W = 170, H = 150; cv.width = W * dpr; cv.height = H * dpr;
+  const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
+  const S = 15, R3 = Math.sqrt(3), cells = [];
+  for (let q = -2; q <= 2; q++) for (let r = -2; r <= 2; r++) if (Math.abs(q + r) <= 2) cells.push([q, r]);
+  const xy = ([q, r]) => [W / 2 + S * R3 * (q + r / 2), H / 2 + 6 + S * 1.5 * r];
+  for (const c of cells) { const [x, y] = xy(c); hex(ctx, x, y + 1, S * 1.12); ctx.fillStyle = C.plate; ctx.fill(); }
+  // stacks: every tile colour, a stone, and a few empty cells with target rings
+  const stacks = { '-2,0': [0, 0], '-1,-1': [1, 1, 1], '0,-2': [2], '1,-2': [3, 3], '2,-2': [4], '-2,1': [5, 5], '-2,2': [6],
+                   '2,-1': [7, 7, 7], '1,1': [8], '0,0': ['S', 'S'], '-1,2': [3] };
+  const rings = ['1,-1', '0,1', '-1,1'];
+  for (const c of cells) {
+    const k = c.join(','), [x, y] = xy(c), st = stacks[k];
+    hex(ctx, x, y, S * 0.95); ctx.fillStyle = C.cell; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = C['cell-edge']; ctx.stroke();
+    if (st) st.forEach((t, i) => {
+      const col = t === 'S' ? STONE : TILES[t], yy = y - i * S * 0.22;
+      hex(ctx, x, yy + S * 0.12, S * 0.9); ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fill();
+      hex(ctx, x, yy, S * 0.9); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.stroke();
+      if (i === st.length - 1 && t !== 'S') { ctx.beginPath(); ctx.arc(x, yy - S * 0.15, S * 0.25, 0, 7); ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(x, yy + S * 0.4, S * 0.24, 0, 7); ctx.fillStyle = 'rgba(17,17,17,.85)'; ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = '600 ' + Math.round(S * 0.36) + 'px Lexend, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(st.length), x, yy + S * 0.42); }
+    });
+    if (rings.includes(k)) { hex(ctx, x, y, S * 0.9); ctx.lineWidth = k === '0,1' ? 3 : 2; ctx.setLineDash(k === '0,1' ? [] : [4, 3]);
+      ctx.strokeStyle = C.accent; if (k === '0,1') { ctx.shadowColor = C.accent; ctx.shadowBlur = 8; } ctx.stroke(); ctx.shadowBlur = 0; ctx.setLineDash([]); }
+  }
+}
+</script>
+</body>
+</html>
