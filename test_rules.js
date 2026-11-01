@@ -150,7 +150,7 @@ const st1 = newGame(1001, 'level', null, 1), T1 = LEVELS[0].stars;
 assert.equal(R.starsFor(st1), 0, 'no stars before the deck is done');
 st1.turn = st1.deckSize; assert.equal(R.starsFor(st1), 1);
 st1.score = T1.score; assert.equal(R.starsFor(st1), 2);
-st1.hexadeks = T1.hexadeks; assert.equal(R.starsFor(st1), 3);
+st1.score = T1.top - 1; assert.equal(R.starsFor(st1), 2, 'just short of the top score'); st1.score = T1.top; assert.equal(R.starsFor(st1), 3);
 st1.score = 0; assert.equal(R.starsFor(st1), 1, 'the third star needs the second');
 const st4 = newGame(1004, 'level', null, 4); st4.turn = st4.deckSize; st4.score = LEVELS[3].stars.score;
 assert.equal(R.starsFor(st4), 2, 'stones still standing');
