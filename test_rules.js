@@ -156,7 +156,7 @@ st1.turn = st1.deckSize; assert.equal(R.starsFor(st1), 1);
 st1.score = T1.score; assert.equal(R.starsFor(st1), 2);
 st1.score = T1.top - 1; assert.equal(R.starsFor(st1), 2, 'just short of the top score'); st1.score = T1.top; assert.equal(R.starsFor(st1), 3);
 st1.score = 0; assert.equal(R.starsFor(st1), 1, 'the third star needs the second');
-const st4 = newGame(1000 + sl, 'level', null, sl); st4.turn = st4.deckSize; st4.score = R.levelTargets(sl).score;
+const st4 = newGame(1000 + sl, 'level', null, sl); st4.turn = st4.deckSize; st4.score = R.levelTargets(sl).top;
 assert.equal(R.starsFor(st4), 2, 'stones still standing');
 for (const k of CELLS) st4.board[k] = st4.board[k].filter(c => c !== STONE);
 assert.equal(R.starsFor(st4), 3, 'every stone broken');
@@ -165,7 +165,7 @@ assert.equal(R.starsFor(newGame(5, 'survive')), 0, 'only levels have stars');
 LEVELS.forEach((L, i) => {
   const T = R.levelTargets(i + 1), pts = CFG.hexadek * CFG.pointsPerTile;
   assert(T.M >= 3, 'level ' + (i + 1) + ' can make hexadeks');
-  assert.equal(T.score, (T.M - 1) * pts); assert.equal(T.top, (T.M + 2) * pts); assert.equal(T.stones, !!L.stones);
+  assert.equal(T.score, (T.M - 1) * pts); assert.equal(T.top, (T.M + (L.stones ? 1 : 2)) * pts); assert.equal(T.stones, !!L.stones);
 });
 const hx = newGame(9, 'free'); for (const k of CELLS) hx.board[k] = [];
 hx.board['0,0'] = Array(11).fill(1); hx.board['1,0'] = [1];

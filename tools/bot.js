@@ -176,7 +176,7 @@ for (const lv of levels) {
       // a random deck gets targets from its own supply, as semi-randomised levels would
       const pts = CFG.hexadek * CFG.pointsPerTile, won = isWon(g);
       const stars = !random ? starsFor(g) : !won ? 0 : g.score < (M - 1) * pts ? 1 :
-        (LEVELS[lv - 1].stones ? !CELLS.some(k => g.board[k].includes(STONE)) : g.score >= (M + 2) * pts) ? 3 : 2;
+        (LEVELS[lv - 1].stones ? g.score >= (M + 1) * pts && !CELLS.some(k => g.board[k].includes(STONE)) : g.score >= (M + 2) * pts) ? 3 : 2;
       res.push({ won, hx: g.hexadeks || 0, M, score: g.score, stars, placed: g.turn, ms: Date.now() - t0 });
       if (flag('show')) console.log(CELLS.filter(k => g.board[k].length).map(k => k + ':' + g.board[k].join('')).join('  '));
       if (verbose) console.log(`  game ${i + 1}: ${isWon(g) ? 'won ' : 'lost'} placed ${g.turn}/${g.deckSize} hexadeks ${g.hexadeks || 0}/${M} score ${g.score} stars ${res[res.length - 1].stars} (${Date.now() - t0} ms)`);

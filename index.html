@@ -261,7 +261,7 @@ dialog li { margin-bottom: 6px; }
     <li>★ Finish the deck.</li>
     <li>★★ Finish, and reach the level's score target.</li>
     <li>★★★ Finish with a higher score: it takes nearly every hexadek the deck allows, plus a few double or
-      triple clears in one turn. On levels with stones, ★★★ is the ★★ score and every stone broken.</li>
+      triple clears in one turn. On levels with stones, ★★★ also needs every stone broken, with a slightly lower score.</li>
   </ul>
   <p>Each level's goals show at the start of the game, and the end screen ticks off the ones you met. Your best
     result for each level is kept, and shown in the level list. A worse game never takes stars away.</p>
@@ -353,11 +353,15 @@ const CFG = {
   pours: { start: 3, perPlace: 3, perClear: 1, max: 9 },   // Standard games; in Free games pours are free
   undos: 5,           // per Standard game; unlimited in Free games
 };
-const COLOURS = [   // colour and symbol, so colours can be told apart without colour vision
-  ['#e5484d', 'circle'], ['#f2b705', 'triangle'], ['#2fa86a', 'square'],
-  ['#3b82e6', 'star'], ['#9b5de5', 'diamond'], ['#14b8a6', 'hexagon'], ['#f472b6', 'heart'],
-  ['#f97316', 'plus'], ['#8b5e3c', 'crescent'],
-  ['#84cc16', 'leaf'], ['#1e3a8a', 'bolt'], ['#9f1239', 'drop'], ['#38bdf8', 'ring'],
+// Colour and symbol, so colours can be told apart without colour vision. Each symbol suits its
+// colour (2026-11-01): red heart, yellow star, green clover, blue water drop, purple gem,
+// teal hexagon, pink flower, orange sun, brown mountain, lime leaf, navy night moon,
+// maroon berry, sky-blue cloud.
+const COLOURS = [
+  ['#e5484d', 'heart'], ['#f2b705', 'star'], ['#2fa86a', 'clover'],
+  ['#3b82e6', 'drop'], ['#9b5de5', 'diamond'], ['#14b8a6', 'hexagon'], ['#f472b6', 'flower'],
+  ['#f97316', 'sun'], ['#8b5e3c', 'triangle'],
+  ['#84cc16', 'leaf'], ['#1e3a8a', 'crescent'], ['#9f1239', 'circle'], ['#38bdf8', 'cloud'],
 ];
 const STONE = 99;   // a grey stone tile: it can't be poured, and breaks when a neighbouring stack clears
                     // (it was 9 until there were more than 9 colours; load() converts older saves)
@@ -489,14 +493,15 @@ const stonesLeft = board => CELLS.reduce((n, k) => n + board[k].filter(c => c ==
 // Each star's goal and whether it's met; stars count only as far as the goals in a row are met.
 function levelTargets(n) {
   const M = deckMax({ start: LEVEL_SEED + n, level: n }), pts = CFG.hexadek * CFG.pointsPerTile;
-  return { M, score: (M - 1) * pts, top: (M + 2) * pts, stones: !!LEVELS[n - 1].stones };
+  const stones = !!LEVELS[n - 1].stones;   // with stones, ★★★ also needs every stone broken, so its score is a step lower
+  return { M, score: (M - 1) * pts, top: (M + (stones ? 1 : 2)) * pts, stones };
 }
 function starGoals(g) {
   const T = levelTargets(g.level), won = isWon(g), hit = won && g.score >= T.score;
   return [
     { text: 'Finish the deck', met: won },
     { text: 'Score ' + T.score, met: hit },
-    T.stones ? { text: 'Score ' + T.score + ' and break every stone', met: hit && !stonesLeft(g.board) }
+    T.stones ? { text: 'Score ' + T.top + ' and break every stone', met: won && g.score >= T.top && !stonesLeft(g.board) }
              : { text: 'Score ' + T.top, met: won && g.score >= T.top },
   ];
 }
@@ -632,7 +637,7 @@ const TUTORIAL = [
           'how many tiles of that colour are on top: the top run. Your goal is to build a stack of 12 tiles all ' +
           'of one colour, called a hexadek.' },
   { text: 'Pouring moves a top run onto a neighbouring stack with the same top colour. Tap the marked red stack ' +
-          '(red circle, 3), then tap the red stack next to it.', expect: { pour: ['-1,0', '0,0'] } },
+          '(red heart, 3), then tap the red stack next to it.', expect: { pour: ['-1,0', '0,0'] } },
   { text: 'All 3 red tiles moved across: that stack now has 5 reds on top. You can also pour onto an empty cell. ' +
           'Pour the purple tile from the marked stack onto the marked empty cell.', expect: { pour: ['1,-1', '2,-1'] } },
   { text: 'That uncovered 4 red tiles. Pour them onto the big red stack too.', expect: { pour: ['1,-1', '0,0'] } },
@@ -863,7 +868,7 @@ function start() {
     $('introfacts').textContent = L.deck + ' stacks · ' + L.colours + ' colours · ' +
       (P ? 'pours: start ' + P.start + ', up to ' + P.max : 'unlimited pours');
     const goals = [['★', 'Place all ' + L.deck + ' stacks'], ['★★', 'Score ' + T.score],
-                   ['★★★', T.stones ? 'Score ' + T.score + ' and break every stone' : 'Score ' + T.top + ' (combos help)']];
+                   ['★★★', 'Score ' + T.top + (T.stones ? ' and break every stone' : ' (combos help)')]];
     $('introgoals').innerHTML = goals.map(([s, t]) => '<li><b>' + s + '</b>' + t + '</li>').join('');
     $('intro').classList.add('show');
     $('introgo').focus({ preventScroll: true });
@@ -1071,7 +1076,7 @@ function start() {
     else if (ui.sel) text = 'Tap a glowing neighbour to pour.';
     else if (g.level && g.turn === 0 && !g.history.length) {   // short: it has to fit a phone's status line
       const T = levelTargets(g.level);
-      text = '★ place ' + g.deckSize + ' · ★★ ' + T.score + ' pts · ★★★ ' + (T.stones ? 'all stones' : T.top + ' pts');
+      text = '★ place ' + g.deckSize + ' · ★★ ' + T.score + ' pts · ★★★ ' + T.top + (T.stones ? ' + stones' : ' pts');
     }
     else if (g.deckSize && g.turn === 0 && !g.history.length) text = 'Place all ' + g.deckSize + ' stacks in the deck to win.';
     else if (g.turn === 0 && !g.history.length) text = 'Drag a tray stack onto the board to start.';
@@ -1238,7 +1243,6 @@ function start() {
   function symbol(kind, x, y, r) {
     ctx.beginPath();
     if (kind === 'circle') ctx.arc(x, y, r * 0.8, 0, Math.PI * 2);
-    else if (kind === 'square') ctx.rect(x - r * 0.7, y - r * 0.7, r * 1.4, r * 1.4);
     else if (kind === 'diamond') { ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.8, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r * 0.8, y); }
     else if (kind === 'triangle') { ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.95, y + r * 0.7); ctx.lineTo(x - r * 0.95, y + r * 0.7); }
     else if (kind === 'hexagon') for (let i = 0; i < 6; i++) {
@@ -1250,27 +1254,42 @@ function start() {
       ctx.bezierCurveTo(x - r * 1.3, y - r * 0.1, x - r * 0.55, y - r * 1.05, x, y - r * 0.4);
       ctx.bezierCurveTo(x + r * 0.55, y - r * 1.05, x + r * 1.3, y - r * 0.1, x, y + r * 0.85);
     }
-    else if (kind === 'plus') {
-      const a = r * 0.85, b = r * 0.3;
-      for (const [dx, dy] of [[-b, -a], [b, -a], [b, -b], [a, -b], [a, b], [b, b], [b, a], [-b, a], [-b, b], [-a, b], [-a, -b], [-b, -b]])
-        ctx.lineTo(x + dx, y + dy);
-    }
     else if (kind === 'leaf') {   // a lens on the diagonal
       const a = r * 0.8;
       ctx.moveTo(x - a, y + a); ctx.quadraticCurveTo(x + a, y + a, x + a, y - a); ctx.quadraticCurveTo(x - a, y - a, x - a, y + a);
-    }
-    else if (kind === 'bolt') {
-      for (const [dx, dy] of [[0.3, -1], [-0.55, 0.15], [-0.05, 0.15], [-0.3, 1], [0.55, -0.2], [0.05, -0.2]]) ctx.lineTo(x + dx * r, y + dy * r);
     }
     else if (kind === 'drop') {   // a point at the top, a round base
       const cy = y + r * 0.3, p = r * 0.62, f = Math.acos(p / (r * 1.3));
       ctx.moveTo(x, y - r); ctx.arc(x, cy, p, -Math.PI / 2 + f, Math.PI * 1.5 - f);
     }
-    else if (kind === 'ring') {   // a thick ring: the inner circle runs the other way, so it stays open
-      ctx.arc(x, y, r * 0.82, 0, Math.PI * 2); ctx.moveTo(x + r * 0.4, y); ctx.arc(x, y, r * 0.4, 0, Math.PI * 2, true);
+    else if (kind === 'clover') {   // three round leaves and a stem
+      for (const [dx, dy] of [[0, -0.42], [-0.42, 0.12], [0.42, 0.12]]) {
+        ctx.moveTo(x + dx * r + r * 0.4, y + dy * r); ctx.arc(x + dx * r, y + dy * r, r * 0.4, 0, Math.PI * 2);
+      }
+      ctx.moveTo(x - r * 0.1, y + r * 0.1); ctx.rect(x - r * 0.1, y + r * 0.1, r * 0.2, r * 0.85);
+    }
+    else if (kind === 'flower') {   // five round petals around a centre
+      for (let i = 0; i < 5; i++) {
+        const a = -Math.PI / 2 + i * Math.PI * 2 / 5, px = x + Math.cos(a) * r * 0.5, py = y + Math.sin(a) * r * 0.5;
+        ctx.moveTo(px + r * 0.36, py); ctx.arc(px, py, r * 0.36, 0, Math.PI * 2);
+      }
+    }
+    else if (kind === 'sun') {   // a disc with eight short rays
+      for (let i = 0; i < 16; i++) {
+        const a = i * Math.PI / 8, rr = i % 2 ? r * 0.62 : r * 0.98;
+        ctx.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a));
+      }
+    }
+    else if (kind === 'cloud') {   // three puffs on a flat base
+      const k = r * 1.2, cy = y + r * 0.12;
+      ctx.moveTo(x - k * 0.85, cy + k * 0.45);
+      ctx.arc(x - k * 0.45, cy + k * 0.1, k * 0.38, Math.PI * 0.75, Math.PI * 1.6);
+      ctx.arc(x + k * 0.05, cy - k * 0.2, k * 0.5, Math.PI * 1.1, Math.PI * 1.95);
+      ctx.arc(x + k * 0.5, cy + k * 0.12, k * 0.38, Math.PI * 1.45, Math.PI * 0.4);
+      ctx.lineTo(x - k * 0.85, cy + k * 0.45);
     }
     else if (kind === 'crescent') {   // the left part of a circle, with a circle the same size cut out on its right
-      const R = r * 0.9, d = r * 0.75, h = Math.sqrt(R * R - d * d / 4), f = Math.atan2(h, d / 2), cx = x - r * 0.2;
+      const R = r * 0.9, d = r * 0.75, h = Math.sqrt(R * R - d * d / 4), f = Math.atan2(h, d / 2), cx = x + r * 0.26;   // centres the visible shape, which spans cx - R to cx + d / 2
       ctx.arc(cx, y, R, f, 2 * Math.PI - f);
       ctx.arc(cx + d, y, R, Math.PI + f, Math.PI - f, true);
     }
