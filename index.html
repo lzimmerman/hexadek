@@ -503,8 +503,8 @@ function start() {
   // Where a dragged piece goes, from the point its base floats at. The highlight and the
   // drop both use these, so what lights up is always what happens.
   function liftPoint(p) { return ui.touch ? { x: p.x, y: p.y - S * 1.6 } : { x: p.x, y: p.y + S * 0.3 }; }
-  function dropTarget(lp) {
-    let bestK = null, bestD = S * 1.2;
+  function dropTarget(lp, reach = 1.2) {
+    let bestK = null, bestD = S * reach;
     for (const c of CELLS) {
       if (g.board[c].length) continue;
       const [x, y] = cellXY(c), d = Math.hypot(lp.x - x, lp.y - y);
@@ -512,8 +512,8 @@ function start() {
     }
     return bestK;
   }
-  function pourTarget(from, lp) {
-    let bestK = null, bestD = S * 1.2;
+  function pourTarget(from, lp, reach = 1.2) {
+    let bestK = null, bestD = S * reach;
     for (const c of targetsFrom(from)) {
       const [x, y] = cellXY(c), d = distToColumn(lp, x, y, Math.max(0, g.board[c].length - 1) * S * TILE);
       if (d < bestD) { bestD = d; bestK = c; }
@@ -525,6 +525,14 @@ function start() {
     const lp = liftPoint(ui.pos);
     return ui.drag.kind === 'tray' ? dropTarget(lp) : pourTarget(ui.drag.from, lp);
   }
+  // What a tap at p means, given what's picked: with a tray stack picked, the empty cell
+  // under p wins over a tall stack drawn across it; with a stack selected, a legal target wins.
+  function tapAction(p) {
+    if (ui.trayPick !== null) { const k = dropTarget(p, 0.95); if (k) return k; }
+    else if (ui.sel) { const k = pourTarget(ui.sel, p, 0.85); if (k) return k; }
+    return null;
+  }
+  const tapTarget = p => tapAction(p) || cellAt(p);
 
   // ---- actions ----
   function doPour(a, b) {
@@ -734,15 +742,19 @@ function start() {
     ui.pos = p; ui.touch = e.pointerType !== 'mouse';
     try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
     const slot = traySlotAt(p);
-    ui.press = slot !== null ? { kind: 'tray', slot, start: p } : { kind: 'board', cell: cellAt(p), start: p };
+    // slide: a press on a target for the picked stack. Moving then adjusts the target
+    // (shown as you go) instead of starting a drag.
+    ui.press = slot !== null ? { kind: 'tray', slot, start: p }
+                             : { kind: 'board', cell: cellAt(p), start: p, slide: !!tapAction(p) };
+    if (ui.touch && slot === null) ui.hover = tapTarget(p);
     dirty = true;
   });
   canvas.addEventListener('pointermove', e => {
     const p = pt(e);
     ui.pos = p;
-    if (e.pointerType === 'mouse') ui.hover = cellAt(p);
     const pr = ui.press;
-    if (pr && !ui.drag && dist(p, pr.start) > 8) {
+    if (e.pointerType === 'mouse' || (pr && pr.kind === 'board' && !ui.drag)) ui.hover = tapTarget(p);
+    if (pr && !ui.drag && !pr.slide && dist(p, pr.start) > (ui.touch ? 12 : 8)) {
       if (pr.kind === 'tray') { if (g.tray[pr.slot]) ui.drag = { kind: 'tray', slot: pr.slot }; }
       else if (pr.cell && g.board[pr.cell].length) ui.drag = { kind: 'pour', from: pr.cell };
       if (ui.drag) { ui.sel = null; ui.trayPick = null; hud(); }
@@ -755,12 +767,13 @@ function start() {
       const t = dragTarget(), d = ui.drag;
       ui.drag = null;
       if (t) { if (d.kind === 'tray') doPlace(d.slot, t); else doPour(d.from, t); }
-    } else if (ui.press) tap(ui.press);
+    } else if (ui.press) tap(ui.press.kind === 'board' ? { kind: 'board', cell: tapTarget(ui.pos) } : ui.press);
     ui.press = null;
+    if (ui.touch) ui.hover = null;
     hud();
     dirty = true;
   });
-  canvas.addEventListener('pointercancel', () => { ui.press = ui.drag = null; dirty = true; });
+  canvas.addEventListener('pointercancel', () => { ui.press = ui.drag = ui.hover = null; dirty = true; });
   canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { ui.hover = null; dirty = true; } });
 
   function tap(pr) {
@@ -915,8 +928,7 @@ function start() {
       if (t) { out.strong = t; out.pill = { cell: t, from: ui.drag.from }; }
     } else if (ui.sel) {
       targetsFrom(ui.sel).forEach(k => out.targets.add(k));
-      if (ui.hover && out.targets.has(ui.hover))
-        out.pill = { cell: ui.hover, from: ui.sel };
+      if (ui.hover && out.targets.has(ui.hover)) { out.strong = ui.hover; out.pill = { cell: ui.hover, from: ui.sel }; }
     } else if (ui.trayPick !== null) {
       empties();
       if (ui.hover && out.targets.has(ui.hover)) { out.strong = ui.hover; out.ghost = { cell: ui.hover, st: g.tray[ui.trayPick] }; }
