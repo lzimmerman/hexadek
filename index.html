@@ -239,7 +239,7 @@ dialog li { margin-bottom: 6px; }
       running out of room. The bar below the board shows how far through the deck you are.</li>
     <li><b>Free</b> game: pours and undos are unlimited.</li>
     <li><b>Levels</b>: a fixed deck each, with its own rules. See <i>Levels and stars</i> below.</li>
-    <li>Choose the mode under New game. Custom also sets the number of colours: 3, 5, 7 or 9. Fewer is easier.</li>
+    <li>Choose the mode under New game. Custom also sets the number of colours: 3, 5, 7, 9, 11 or 13. Fewer is easier.</li>
   </ul>
   <h3>Placing</h3>
   <ul>
@@ -317,7 +317,7 @@ dialog li { margin-bottom: 6px; }
     <div class="modebox"><b>Custom</b><span>Any of the modes above, with your choice of colours. Fewer is easier; 5 is
       usual.</span>
       <div class="row"><label class="row" for="newcolours">Colours
-          <select id="newcolours"><option>3</option><option>5</option><option>7</option><option>9</option></select></label>
+          <select id="newcolours"><option>3</option><option>5</option><option>7</option><option>9</option><option>11</option><option>13</option></select></label>
         <label class="row" for="newcustommode">Mode
           <select id="newcustommode"><option value="standard">Standard</option><option value="survive">Survive</option>
             <option value="free">Free</option></select></label></div>
@@ -344,7 +344,7 @@ dialog li { margin-bottom: 6px; }
 // ---- tuning: change these and reload ----
 const CFG = {
   radius: 2,          // board: a hexagon of 19 cells
-  colours: 5,         // the default; New game offers 3, 5, 7 or 9
+  colours: 5,         // the default; Custom offers 3 to 13, in steps of 2
   deck: 30,           // stacks in a Survive game's deck
   minTiles: 2, maxTiles: 6, maxBands: 3,   // tray stacks
   hexadek: 12,         // height limit; a full stack of one colour clears
@@ -357,8 +357,10 @@ const COLOURS = [   // colour and symbol, so colours can be told apart without c
   ['#e5484d', 'circle'], ['#f2b705', 'triangle'], ['#2fa86a', 'square'],
   ['#3b82e6', 'star'], ['#9b5de5', 'diamond'], ['#14b8a6', 'hexagon'], ['#f472b6', 'heart'],
   ['#f97316', 'plus'], ['#8b5e3c', 'crescent'],
+  ['#84cc16', 'leaf'], ['#1e3a8a', 'bolt'], ['#9f1239', 'drop'], ['#38bdf8', 'ring'],
 ];
-const STONE = 9;   // a grey stone tile: it can't be poured, and breaks when a neighbouring stack clears
+const STONE = 99;   // a grey stone tile: it can't be poured, and breaks when a neighbouring stack clears
+                    // (it was 9 until there were more than 9 colours; load() converts older saves)
 const STONE_COLOUR = '#6b7280';
 // Levels: 72, in 6 chapters of 12. A level's settings come from its number (levelSpec), and its
 // deck from a fixed seed (1000 + n), so it plays the same every time. Difficulty rises through
@@ -466,7 +468,7 @@ function newStack(g) {
 function newGame(seed, mode, colours, level) {
   mode = mode || 'standard';
   const L = mode === 'level' ? LEVELS[level - 1] : null;
-  const g = { seed: seed | 0, start: seed | 0, mode, colours: colours || CFG.colours,
+  const g = { seed: seed | 0, start: seed | 0, mode, colours: colours || CFG.colours, stone: STONE,
               pours: CFG.pours.start, undos: CFG.undos, deckSize: mode === 'survive' ? CFG.deck : null,
               board: {}, tray: [], next: null, score: 0, turn: 0, clearsThisTurn: 0, history: [] };
   for (const k of CELLS) g.board[k] = [];
@@ -691,7 +693,14 @@ function start() {
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(SAVE) || localStorage.getItem(OLD + '.save.v1'));
-      if (s && s.board && CELLS.every(k => Array.isArray(s.board[k])) && Array.isArray(s.tray) && 'next' in s) return s;   // next is null at the end of a deck
+      if (s && s.board && CELLS.every(k => Array.isArray(s.board[k])) && Array.isArray(s.tray) && 'next' in s) {   // next is null at the end of a deck
+        if (s.level && !s.stone) {   // saved when a stone was 9: now a colour, so convert (and drop the undo steps, which hold old boards)
+          for (const k of CELLS) s.board[k] = s.board[k].map(c => c === 9 ? STONE : c);
+          s.history = [];
+        }
+        s.stone = STONE;
+        return s;
+      }
     } catch (e) {}
     return null;
   }
@@ -872,7 +881,7 @@ function start() {
     }
     $('newwarn').textContent = busy ? 'The game you are playing will be lost.' : '';
     $('newwarn').style.display = busy ? '' : 'none';
-    $('newcolours').value = String(Math.min(9, g.colours % 2 ? g.colours : g.colours + 1));   // older games had 4 or 6
+    $('newcolours').value = String(Math.min(13, g.colours % 2 ? g.colours : g.colours + 1));   // older games had 4 or 6
     if (!g.level && !tut) $('newcustommode').value = g.mode;
     $('newcontinue').textContent = 'Continue: Level ' + continueLevel();
     $('newgame').showModal();
@@ -1245,6 +1254,20 @@ function start() {
       const a = r * 0.85, b = r * 0.3;
       for (const [dx, dy] of [[-b, -a], [b, -a], [b, -b], [a, -b], [a, b], [b, b], [b, a], [-b, a], [-b, b], [-a, b], [-a, -b], [-b, -b]])
         ctx.lineTo(x + dx, y + dy);
+    }
+    else if (kind === 'leaf') {   // a lens on the diagonal
+      const a = r * 0.8;
+      ctx.moveTo(x - a, y + a); ctx.quadraticCurveTo(x + a, y + a, x + a, y - a); ctx.quadraticCurveTo(x - a, y - a, x - a, y + a);
+    }
+    else if (kind === 'bolt') {
+      for (const [dx, dy] of [[0.3, -1], [-0.55, 0.15], [-0.05, 0.15], [-0.3, 1], [0.55, -0.2], [0.05, -0.2]]) ctx.lineTo(x + dx * r, y + dy * r);
+    }
+    else if (kind === 'drop') {   // a point at the top, a round base
+      const cy = y + r * 0.3, p = r * 0.62, f = Math.acos(p / (r * 1.3));
+      ctx.moveTo(x, y - r); ctx.arc(x, cy, p, -Math.PI / 2 + f, Math.PI * 1.5 - f);
+    }
+    else if (kind === 'ring') {   // a thick ring: the inner circle runs the other way, so it stays open
+      ctx.arc(x, y, r * 0.82, 0, Math.PI * 2); ctx.moveTo(x + r * 0.4, y); ctx.arc(x, y, r * 0.4, 0, Math.PI * 2, true);
     }
     else if (kind === 'crescent') {   // the left part of a circle, with a circle the same size cut out on its right
       const R = r * 0.9, d = r * 0.75, h = Math.sqrt(R * R - d * d / 4), f = Math.atan2(h, d / 2), cx = x - r * 0.2;
