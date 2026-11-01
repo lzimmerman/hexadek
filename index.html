@@ -945,7 +945,7 @@ function start() {
       'Games (date, game, result, score, stars, hexadeks/M, placed/deck, undos used, active play time m:ss):');
     let log = []; try { log = JSON.parse(localStorage.getItem(LOG) || '[]'); } catch (e) {}
     for (const r of log) lines.push([r.t, r.game, r.result, r.score, r.stars === null ? '' : r.stars + '★',
-      r.hexadeks + (r.M ? '/' + r.M : ''), r.placed + (r.deck ? '/' + r.deck : ''), r.undos === null ? '' : r.undos, r.time || ''].join(', '));
+      r.hexadeks + (r.M ? '/' + r.M : ''), r.placed + (r.deck ? '/' + r.deck : ''), r.undos === null ? '' : r.undos, r.time || ''].join(', ') + ';');   // ';' keeps records apart if a paste drops the line breaks
     if (!log.length) lines.push('(none yet: the log starts with this version)');
     return lines.join('\n');
   }
