@@ -13,6 +13,7 @@
 // On play-tested levels (1 to TESTED) each target stays within STEP2 / STEP3 hexadeks of the old
 // formula (elsewhere within LOOSE), so the computer player
 // evens out the outliers without reshaping levels that already play well.
+// Then caps: ★★ at most (M - 1) hexadeks, ★★★ at most (M + 1), so neither needs a perfect run plus combos.
 // Prints the table next to the old formula; --write puts it into index.html (LEVEL_TARGETS).
 
 const fs = require('fs'), path = require('path');
@@ -52,6 +53,9 @@ for (const n of levels) {
   const near = (v, old, step) => Math.min(old + step * PTS, Math.max(old - step * PTS, v));   // smooth outliers, keep the shape
   const t = n <= TESTED;
   score = near(score, oldScore, t ? STEP2 : LOOSE); top = near(top, oldTop, t ? STEP3 : LOOSE);
+  // play tests (DESIGN.md): with more colours combos get rare, so targets must not need a perfect run
+  score = Math.min(score, (M - 1) * PTS);   // ★★ never needs every hexadek
+  top = Math.min(top, (M + 1) * PTS);       // ★★★ at most every hexadek plus one combo's worth
   score = Math.max(score, PTS);              // at least one hexadek
   top = Math.max(top, score + PTS);          // ★★★ always asks for more than ★★
   rows.push({ n, M, score, top, oldScore, oldTop,
