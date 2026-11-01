@@ -293,11 +293,11 @@ const STONE_COLOUR = '#6b7280';
 // score is 2; the score plus the hexadeks (or, with stones, every stone broken) is 3.
 // The targets are first guesses, to tune by playing.
 const LEVELS = [
-  { name: 'First deck', deck: 20, colours: 4, bands: [1, 2], pours: null, stars: { score: 360, hexadeks: 5 } },
-  { name: 'Five colours', deck: 25, colours: 5, bands: [1, 3], stars: { score: 480, hexadeks: 6 } },
-  { name: 'Tight budget', deck: 25, colours: 5, bands: [1, 3], pours: { start: 2, perPlace: 2, perClear: 1, max: 6 },
-    stars: { score: 360, hexadeks: 5 } },
-  { name: 'Stones', deck: 30, colours: 5, bands: [1, 3], stars: { score: 600, stones: true },
+  { name: 'First deck', deck: 25, colours: 4, bands: [1, 2], pours: null, stars: { score: 480, hexadeks: 6 } },
+  { name: 'Five colours', deck: 30, colours: 5, bands: [1, 3], stars: { score: 600, hexadeks: 7 } },
+  { name: 'Tight budget', deck: 30, colours: 5, bands: [1, 3], pours: { start: 2, perPlace: 2, perClear: 1, max: 6 },
+    stars: { score: 480, hexadeks: 6 } },
+  { name: 'Stones', deck: 35, colours: 5, bands: [1, 3], stars: { score: 720, stones: true },
     stones: { '0,0': [STONE, STONE], '-2,1': [STONE], '2,-1': [STONE], '1,1': [STONE] } },
   { name: 'Long haul', deck: 40, colours: 6, bands: [2, 3], stars: { score: 720, hexadeks: 9 } },
 ];
