@@ -11,7 +11,7 @@
 //   panel      cards, dialogs, buttons and the status line
 //   ink        main text, and the outline of a selected stack
 //   muted      secondary text: labels, hints, "next"
-//   cell       an empty board cell
+//   cell       an empty board cell (cell, cell-edge and plate: classic in every theme, see BOARD_KEYS)
 //   cell-edge  the outline of empty cells, chips and inputs
 //   plate      the board's backing, under the cells
 //   accent     highlights: target rings, the blue in the title, primary buttons, links
@@ -98,6 +98,12 @@ const THEMES = {
 };
 
 const CHAPTER_THEMES = ['meadow', 'dunes', 'riverbed', 'autumn', 'dusk', 'nightforest'];
+
+// The board keeps the classic colours in every theme (2026-11-01): tinted cells sat close to some
+// tile colours and muted the bands in a stack. A theme can keep its own board with ownBoard: true.
+const BOARD_KEYS = ['cell', 'cell-edge', 'plate'];
+for (const T of Object.values(THEMES)) if (!T.ownBoard)
+  for (const mode of ['light', 'dark']) for (const k of BOARD_KEYS) T[mode][k] = THEMES.classic[mode][k];
 
 // CSS that sets a theme's colours, following the page's own light/dark rules: the light set,
 // the dark set when the device is in dark mode (unless the page is forced light), and the
