@@ -79,7 +79,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #status.tight #msg { font-size: 12.5px; }   /* a message that wouldn't fit steps down rather than touching the edge */
 #status.flash { color: var(--good); font-weight: 700; border-left-color: var(--good); }
 #giveup { display: none; flex: none; padding: 0 10px; min-height: 0; font-size: 14px; }
-#wrap { position: relative; flex: 1; min-height: 0; }
+#side { display: contents; }
+#wrap { position: relative; flex: 1; min-height: 0; order: 1; }
+#bar { order: 2; }
 #c { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
 #over, #intro { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
 #over.show, #intro.show { display: flex; }
@@ -130,27 +132,27 @@ dialog ul { padding-left: 20px; margin: 0 0 12px; }
 dialog li { margin-bottom: 6px; }
 /* short landscape screens (a phone on its side): controls in a column on the left, the board fills the right */
 @media (orientation: landscape) and (max-height: 520px) {
-  body { display: grid; grid-template-columns: clamp(260px, 44vw, 360px) 1fr;
-    grid-template-rows: auto auto auto auto auto 1fr auto; padding-left: env(safe-area-inset-left); }
-  header { grid-area: 1 / 1; padding-top: 8px; } #stats { grid-area: 2 / 1; } #buttons { grid-area: 3 / 1; }
-  #status { grid-area: 4 / 1; height: auto; min-height: calc(1.35em + 12px); }
-  #status { padding: 7px 12px; line-height: 1.4; gap: 12px; }
+  body { display: grid; grid-template-columns: clamp(260px, 44vw, 380px) 1fr; grid-template-rows: minmax(0, 1fr);
+    padding-left: env(safe-area-inset-left); }
+  /* the column scrolls by itself if a short viewer can't fit it all; the board always fits the height */
+  #side { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  #side > * { flex: none; }
+  header { padding-top: 8px; }
+  #status { height: auto; min-height: calc(1.35em + 14px); padding: 6px 12px; line-height: 1.35; gap: 12px; }
   #msg { white-space: normal; }   /* the board is beside it, so a two-line message moves nothing */
-  #coach { grid-area: 5 / 1; overflow: auto; }
-  #bar { grid-area: 7 / 1; flex-wrap: wrap; padding-top: 4px; }
+  #bar { margin-top: auto; flex-wrap: wrap; padding-top: 4px; }
   #deck { order: -1; flex-basis: 100%; }   /* its own line: the column is too narrow to share */
-  h1 { font-size: 17px; } .chip { font-size: 12px; padding: 2px 8px; } header { gap: 6px 8px; }
-  #status { flex: none; min-height: calc(2.8em + 14px); }   /* room for two lines, so the grid can't squeeze it */
+  h1 { font-size: 17px; } .chip { font-size: 12px; padding: 2px 8px; }
   .card { max-height: calc(100% - 16px); overflow: auto; box-sizing: border-box; margin: 8px; padding: 12px 18px; }
   .card h2 { font-size: 19px; margin-bottom: 4px; } .card p { margin-bottom: 8px; }
   #introgoals, #overgoals { margin: 4px 0 8px; padding: 6px 10px; }
-  #wrap { grid-area: 1 / 2 / -1 / 3; }
-  button { min-height: 38px; padding: 5px 11px; font-size: 14px; }
-  #buttons, header, #bar { gap: 6px 8px; } #stats { gap: 2px 14px; }
+  button { min-height: 36px; padding: 4px 10px; font-size: 14px; }
+  #buttons, header, #bar { gap: 6px; } #stats { gap: 2px 14px; padding-bottom: 4px; } #buttons { padding-top: 6px; }
 }
 </style>
 </head>
 <body>
+<div id="side">   <!-- a column beside the board on short landscape screens; invisible to layout otherwise -->
 <header>
   <h1>HEXA<span>DEK</span></h1>
   <span class="chip" id="mode"></span>
@@ -171,6 +173,12 @@ dialog li { margin-bottom: 6px; }
   <div class="step" id="coachstep"></div>
   <p id="coachtext"></p>
   <div class="row"><button id="coachnext">Next</button><button id="coachskip">Leave the tutorial</button></div>
+</div>
+<footer id="bar" class="row">   <!-- below the board, where a thumb reaches -->
+  <button id="undo" title="Undo a pour (Ctrl/Cmd+Z)">Undo</button>
+  <div id="deck" aria-label="Deck progress"><span id="decklabel">Deck</span><div class="deckbar"><div id="deckfill"></div></div><span id="decktext"></span></div>
+  <button id="haptics" aria-pressed="false" title="Vibrate on pours and hexadeks">Haptics: off</button>
+</footer>
 </div>
 <div id="wrap">
   <canvas id="c" aria-label="Hexadek board"></canvas>
@@ -194,11 +202,6 @@ dialog li { margin-bottom: 6px; }
     </div>
   </div></div>
 </div>
-<footer id="bar" class="row">   <!-- below the board, where a thumb reaches -->
-  <button id="undo" title="Undo a pour (Ctrl/Cmd+Z)">Undo</button>
-  <div id="deck" aria-label="Deck progress"><span id="decklabel">Deck</span><div class="deckbar"><div id="deckfill"></div></div><span id="decktext"></span></div>
-  <button id="haptics" aria-pressed="false" title="Vibrate on pours and hexadeks">Haptics: off</button>
-</footer>
 <dialog id="rules">
   <h2 tabindex="-1">How to play</h2>
   <p>Hexadek is a puzzle about sorting coloured tiles. Each cell of the board holds a stack of hex tiles.
@@ -760,7 +763,7 @@ function start() {
                    ['★★★', 'Score ' + T.score + (T.stones ? ' and break every stone' : ' and make ' + T.hexadeks + ' hexadeks')]];
     $('introgoals').innerHTML = goals.map(([s, t]) => '<li><b>' + s + '</b>' + t + '</li>').join('');
     $('intro').classList.add('show');
-    $('introgo').focus();
+    $('introgo').focus({ preventScroll: true });
   }
   const hideIntro = () => $('intro').classList.remove('show');
   $('introgo').onclick = hideIntro;
