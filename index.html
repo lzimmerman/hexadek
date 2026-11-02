@@ -343,7 +343,8 @@ dialog li { margin-bottom: 6px; }
     <li>A stone can't be poured, and nothing can be poured onto it.</li>
     <li>When a stack clears, each stack next to it loses its top stone, and whatever was under it is free again.
       Above, the full red stack clears and breaks the stone beside it, uncovering the yellow tile.</li>
-    <li>Some cells hold two stones, one on top of the other, and need two clears next to them.</li>
+    <li>Some cells hold two stones, one on top of the other, marked with a <b>2</b>. They need two clears next to
+      them.</li>
     <li>Breaking stones earns no points, but it frees up cells, and on a stones level it's the way to ★★★.</li>
   </ul>
   <h3>Tips</h3>
@@ -634,7 +635,7 @@ const ENDLESS_PERKS = {
   budget: { name: 'Bigger budget', text: 'Save up to 9 pours, as in Classic.' },
   short: { name: 'Shorter deck', text: '5 fewer stacks to place.' },
   lighter: { name: 'Lighter stacks', text: 'More stacks of a single colour.' },
-  stone: { name: 'Break a stone', text: 'The tallest stone is gone.' },
+  stone: { name: 'Break a stone', text: 'One stone is gone.' },   // a two-high one first, where there is one
   pours: { name: 'Extra pours', text: 'Start with 3 more pours.', old: true },   // retired: saved runs may hold them
   undos: { name: 'Extra undos', text: '3 more undos.', old: true },
 };
@@ -1766,11 +1767,13 @@ function start() {
     for (let i = 0; i < count; i++) tile(x, y - i * h, s, st[i]);
     if (!count) return;
     const ty = y - (count - 1) * h, c = st[count - 1];
-    if (c === STONE) { crack(x, ty, s); return; }
     let n = 0;
     for (let i = count - 1; i >= 0 && st[i] === c; i--) n++;
+    if (c === STONE) { crack(x, ty, s); if (n > 1) badge(x, ty, s, n); return; }   // stones two high: how many clears they need
     symbol(COLOURS[c][1], x, ty - s * 0.2, s * 0.32);
-    // the top run's size, on a dark badge so it reads on every colour
+    badge(x, ty, s, n);
+  }
+  function badge(x, ty, s, n) {   // the top run's size, on a dark badge so it reads on every colour
     const fs = Math.max(9, Math.round(s * 0.34)), bw = fs * (n > 9 ? 1.5 : 1.05), bh = fs * 1.1, by = ty + s * 0.4;
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(x - bw / 2, by - bh / 2, bw, bh, bh / 2); else ctx.rect(x - bw / 2, by - bh / 2, bw, bh);
