@@ -1,13 +1,13 @@
-// Compare the computer player with and without the hub strategy: node tools/hubcompare.js DIR [skill]
+// Compare the computer player with and without a strategy: node tools/hubcompare.js DIR [skill] [strategy]
 //
-// DIR holds output of   node tools/bot.js --json --skill S [--hub auto] --levels A-B
-// for one skill (default good) with and without --hub. Prints, per chapter and per kind of level,
+// DIR holds output of   node tools/bot.js --json --skill S [--hub auto | --leapfrog | --bank ...] --levels A-B
+// for one skill (default good) with and without the strategy (default hub; also leap, bank, leap+bank). Prints, per chapter and per kind of level,
 // how often each finishes and reaches ★★ / ★★★ (with the game's current targets), the median
 // score, and how much of the time the hub player really places in the hub; then the levels
 // where the hub helps most and least.
 
 const fs = require('fs'), path = require('path');
-const dir = process.argv[2], skill = process.argv[3] || 'good';
+const dir = process.argv[2], skill = process.argv[3] || 'good', strat = process.argv[4] || 'hub';
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 global.THEMES = {}; global.CHAPTER_THEMES = [];
 const { LEVELS, levelTargets } = eval('(() => {' + html.match(/<script>([\s\S]*)<\/script>/)[1] + '; return { LEVELS, levelTargets }; })()');
@@ -18,7 +18,7 @@ for (const f of fs.readdirSync(dir)) for (const line of fs.readFileSync(path.joi
   const r = JSON.parse(line.slice(5));
   ((runs[r.level] = runs[r.level] || {})[r.skill] = (runs[r.level][r.skill] || [])).push(...r.games);
 }
-const A = skill, B = skill + '+hub';
+const A = skill, B = skill + '+' + strat;
 const median = a => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[s.length >> 1] : 0; };
 const rate = (gs, f) => gs.length ? gs.filter(f).length / gs.length : 0;
 function sum(gs, n) {   // n: level, for its targets (gs may mix levels when n is null)
@@ -38,7 +38,7 @@ const row = (label, ns) => {
   console.log(label.padEnd(24) + ` finish ${P(a.finish)} →${P(b.finish)}   ★★ ${P(a.two)} →${P(b.two)}   ★★★ ${P(a.three)} →${P(b.three)}` +
     `   hexadeks ${P(a.hx)} →${P(b.hx)}   in hub ${P(b.hub)}`);
 };
-console.log(`${A} without → with the hub strategy (${levels.length} levels, ${runs[levels[0]][A].length} games each)\n`);
+console.log(`${A} without → with ${strat} (${levels.length} levels, ${runs[levels[0]][A].length} games each)\n`);
 const chapters = [...new Set(levels.map(n => LEVELS[n - 1].chapter))];
 for (const c of chapters) row('Chapter ' + (c + 1) + ' ' + LEVELS[c * 12].name, levels.filter(n => LEVELS[n - 1].chapter === c));
 console.log('');
@@ -53,5 +53,5 @@ const gain = n => { const a = sum(runs[n][A]), b = sum(runs[n][B]); return { n, 
 const g = levels.map(gain).sort((x, y) => y.d - x.d);
 const line = r => `  L${String(r.n).padEnd(3)} ${LEVELS[r.n - 1].colours} colours${LEVELS[r.n - 1].stones ? ', stones' : '        '}  ` +
   `finish ${P(r.a.finish)} →${P(r.b.finish)}  ★★ ${P(r.a.two)} →${P(r.b.two)}  ★★★ ${P(r.a.three)} →${P(r.b.three)}  in hub ${P(r.b.hub)}`;
-console.log('\nHub helps most:'); g.slice(0, 8).forEach(r => console.log(line(r)));
-console.log('\nHub helps least (or hurts):'); g.slice(-8).reverse().forEach(r => console.log(line(r)));
+console.log('\n' + strat + ' helps most:'); g.slice(0, 8).forEach(r => console.log(line(r)));
+console.log('\n' + strat + ' helps least (or hurts):'); g.slice(-8).reverse().forEach(r => console.log(line(r)));

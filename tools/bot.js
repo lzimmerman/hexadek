@@ -20,6 +20,11 @@
 //                           --skill (default player), then simulate runs from the pass rates.
 //                           --json prints a line per tier; --from DIR combines such lines instead of
 //                           playing; --write puts the skip lists into index.html (ENDLESS_SKIP)
+//     --leapfrog            plays the leapfrog strategy seen in play tests: a colour's top run can hop on
+//                           across stacks with the same colour on top, so it travels further than one
+//                           pour (searched as one move of up to 4 pours, each paid for as usual)
+//     --bank                plays the banking strategy seen in play tests: single-colour stacks kept side
+//                           by side around the edge, corners most, as savings for later hexadeks
 //     --hub auto|point|line plays the hub strategy seen in play tests: keep a hub free (the centre, or a
 //                           line through it with more colours), place each new stack there, and pour
 //                           its colours out to home areas around it, one area per colour.
@@ -63,11 +68,29 @@ const W = {        // how the player values a board
   pour: 25, pourCap: 4,        // pours left in a budget game, up to pourCap
   stone: 90,                   // each stone still standing
   over: -1e6,                  // no room left
+  // --bank only
+  bank: 4, bankCorner: 3,      // a single-colour stack at the edge next to another of its colour, per tile; corners extra
   // --hub only
   zone: 6, zoneOff: 3,         // a top run at its colour's home area / elsewhere, per tile
   hubFull: 8, hubPlace: 40,    // tiles left in the hub, per tile; placing the new stack in the hub
 };
 const ON = new Set(CELLS), NB = {}; for (const k of CELLS) NB[k] = neighbours(k).filter(n => ON.has(n));   // on the board only
+
+// ---- the leapfrog and banking strategies (--leapfrog, --bank) ----
+const LEAP = flag('leapfrog'), BANK = flag('bank'), LEAP_HOPS = 3;   // hops after the first pour
+const ring = k => { const [q, r] = k.split(',').map(Number); return Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r)); };
+const EDGE = new Set(CELLS.filter(k => ring(k) === 2)), CORNER = new Set(CELLS.filter(k => NB[k].length === 3));
+const pure = st => st.length && topOf(st) !== STONE && st.every(c => c === st[0]);
+function bankValue(board) {   // savings: single-colour stacks side by side around the edge
+  let v = 0;
+  for (const k of EDGE) {
+    const st = board[k]; if (!pure(st)) continue;
+    for (const n of NB[k]) if (n > k && EDGE.has(n) && pure(board[n]) && board[n][0] === st[0])
+      v += (W.bank + (CORNER.has(k) || CORNER.has(n) ? W.bankCorner : 0)) * (st.length + board[n].length);
+  }
+  return v;
+}
+const tag = () => (HUB_MODE ? '+hub' : '') + (LEAP ? '+leap' : '') + (BANK ? '+bank' : '');
 
 // ---- the hub strategy (--hub) ----
 const HUB_MODE = opt('hub', null), R3 = Math.sqrt(3);
@@ -133,6 +156,7 @@ function judge(board, pours, budget) {
   v += W.empty * empty + W.emptyFew * Math.min(empty, 3);
   if (budget) v += W.pour * Math.min(pours, W.pourCap);
   if (HUB.size) v += hubValue(board);
+  if (BANK) v += bankValue(board);
   return v;
 }
 
@@ -148,8 +172,23 @@ function plan(g, skill, rnd) {
   const seen = new Set([boardKey(start.board)]);
   let frontier = [start]; const all = [start];
   const noise = () => (rnd() - 0.5) * skill.noise;
+  // leapfrog: the run that just landed on b hops on to stacks topped with its colour, as part of the same move
+  const leap = (n, from, at, hops) => {
+    const col = topOf(n.board[at]);
+    if (!hops || poursLeft(n) < 1 || col === STONE) return;
+    for (const c of NB[at]) {
+      if (c === from || !n.board[c].length || topOf(n.board[c]) !== col || !pourResult(n.board, at, c)) continue;
+      const s = sim(n); pour(s, at, c);
+      const key = boardKey(s.board); if (seen.has(key)) continue; seen.add(key);
+      s.seq = n.seq.concat([[at, c]]); s.history = null;
+      s.v = s.score + judge(s.board, s.pours, budget) + noise();
+      next.push(s); all.push(s);
+      leap(s, at, c, hops - 1);
+    }
+  };
+  let next;
   for (let d = 0; d < skill.depth; d++) {
-    const next = [];
+    next = [];
     for (const n of frontier) {
       if (poursLeft(n) < 1) continue;
       for (const a of CELLS) {
@@ -164,6 +203,7 @@ function plan(g, skill, rnd) {
           s.seq = n.seq.concat([[a, b]]); s.history = null;
           s.v = s.score + judge(s.board, s.pours, budget) + noise();
           next.push(s); all.push(s);
+          if (LEAP) leap(s, a, b, LEAP_HOPS);
         }
       }
     }
@@ -294,9 +334,9 @@ for (const lv of levels) {
       if (flag('show')) console.log(CELLS.filter(k => g.board[k].length).map(k => k + ':' + g.board[k].join('')).join('  '));
       if (verbose) console.log(`  game ${i + 1}: ${isWon(g) ? 'won ' : 'lost'} placed ${g.turn}/${g.deckSize} hexadeks ${g.hexadeks || 0}/${M} score ${g.score} stars ${res[res.length - 1].stars} (${Date.now() - t0} ms)`);
     }
-    if (flag('json')) console.log('JSON ' + JSON.stringify({ level: lv, skill: sk + (HUB_MODE ? '+hub' : ''), games: res }));
+    if (flag('json')) console.log('JSON ' + JSON.stringify({ level: lv, skill: sk + tag(), games: res }));
     const sc = res.map(r => r.score);
-    console.log(`${(lv + ' ' + LEVELS[lv - 1].name).padEnd(17)} ${(sk + (HUB_MODE ? '+hub' : '')).padEnd(7)} ${pct(res, r => r.won)}    ` +
+    console.log(`${(lv + ' ' + LEVELS[lv - 1].name).padEnd(17)} ${(sk + tag()).padEnd(7)} ${pct(res, r => r.won)}    ` +
       `${median(res.map(r => r.hx))}/${median(res.map(r => r.M))}`.padEnd(18) +
       `${median(sc)} [${Math.min(...sc)}–${Math.max(...sc)}]`.padEnd(22) +
       `${pct(res, r => r.stars >= 1)} ${pct(res, r => r.stars >= 2)} ${pct(res, r => r.stars >= 3)}`);
