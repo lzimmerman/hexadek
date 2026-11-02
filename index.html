@@ -598,10 +598,10 @@ function newGame(seed, mode, colours, level, deck, spec) {
 // Stages 1 to ENDLESS_RAMP use tiers 1 to 8 in turn, rising from about chapter 2 to chapter 6. After
 // that each stage draws one of the top tiers, which change the rule (stones, colours, mixed stacks,
 // pours) rather than piling on: play tests put the wall at about level 70, so the top sits just
-// below it. Decks come from a fixed pool per tier (seed ENDLESS_SEED + 1000 × tier + i), and decks
+// below it. Decks come from a fixed pool of 500 per tier (seed ENDLESS_SEED + 1000 × tier + i), and decks
 // the expert computer player couldn't finish are skipped (ENDLESS_SKIP, from tools/bot.js
 // --endless), so every stage dealt can be won.
-const ENDLESS_SEED = 200000, ENDLESS_POOL = 60, ENDLESS_RAMP = 8;
+const ENDLESS_SEED = 200000, ENDLESS_POOL = 500, ENDLESS_RAMP = 8;
 const ENDLESS_TIERS = [   // like a level's settings; deck lengths stay short so a loss late in a stage costs less
   { colours: 5, deck: 30, bands: [1, 3] },
   { colours: 5, deck: 30, bands: [1, 3], pours: POURS_TIGHT },
@@ -618,7 +618,7 @@ const ENDLESS_TIERS = [   // like a level's settings; deck lengths stay short so
   { colours: 7, deck: 36, bands: [1, 3], pours: POURS_TIGHTER, stones: STONE_LAYOUTS[3], bandOdds: [1, 2, 2], top: 'Crowded' },
 ];
 // ENDLESS_SKIP:begin (written by tools/bot.js --endless --write)
-const ENDLESS_SKIP = { 6: [36, 57], 8: [20, 37, 51], 11: [2, 10, 17, 50, 58] };   // tier: pool indices whose deck the expert couldn't finish
+const ENDLESS_SKIP = { 4: [316, 337, 364, 375], 6: [36, 57, 337], 8: [20, 37, 51, 68, 113, 210, 233, 263, 270, 278, 315, 345, 348, 385, 436, 437, 454, 474, 489], 10: [161, 445], 11: [2, 10, 17, 50, 58, 70, 71, 83, 90, 111, 133, 167, 185, 206, 229, 235, 257, 259, 360, 430, 437, 488] };   // tier: pool indices whose deck the expert couldn't finish
 // ENDLESS_SKIP:end
 // A reward, chosen after each stage, for the next one only.
 const ENDLESS_PERKS = {
