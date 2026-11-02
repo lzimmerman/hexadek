@@ -3,12 +3,16 @@
 //   node tools/bot.js [options]
 //     --file index.html     the game to load (default: index.html next to this folder)
 //     --skill expert|good|casual|all   (default all)
+//     --skill custom --beam B --depth D --noise N   a player of your own making
 //     --games N             games per level and skill (default 20)
 //     --level N             only this level; --levels A-B a range (default all)
 //     --random              deal a different deck for each game, with the level's settings
 //                           (for semi-randomised levels); otherwise each level's fixed deck,
 //                           and the games differ only by the player's noise
 //     --colours C --deck D  override the level's settings, to try variations
+//     --pours S,P,C,M       ...and its pour budget: start, per stack placed, per hexadek, most held
+//     --stones N --bands A,B   ...its stones (the layout with N stone cells, 0 for none) and colours per stack
+//     --bandodds X,Y,Z      ...or the odds of 1, 2 and 3 colours per stack
 //     --verbose             one line per game
 //     --json                also a JSON line per level and skill, with every game (for tools/targets.js)
 //     --hub auto|point|line plays the hub strategy seen in play tests: keep a hub free (the centre, or a
@@ -29,15 +33,19 @@ const flag = name => args.includes('--' + name);
 const file = opt('file', path.join(__dirname, '..', 'index.html'));
 const html = fs.readFileSync(file, 'utf8');
 eval(html.match(/<script>([\s\S]*)<\/script>/)[1] +
-  ';global.R={CFG,CELLS,neighbours,runLen,topOf,newGame,pourResult,pour,place,roomState,poursLeft,isWon,LEVELS,STONE,starsFor,deckMax}');
+  ';global.R={CFG,CELLS,neighbours,runLen,topOf,newGame,pourResult,pour,place,roomState,poursLeft,isWon,LEVELS,STONE,starsFor,deckMax,STONE_LAYOUTS}');
 const { CFG, CELLS, neighbours, runLen, topOf, newGame, pourResult, pour, place, roomState, poursLeft, isWon, LEVELS, STONE,
-        starsFor, deckMax } = R;
+        starsFor, deckMax, STONE_LAYOUTS } = R;
 
 const SKILLS = {   // beam: boards kept per depth; depth: pours searched per turn; noise: randomness in judging
+  // player: matched to the play tests through level 60 (2026-11-01): it finishes about as often as a
+  // person does under tight pour budgets, where the others overrate people (they plan pours further ahead)
+  player: { beam: 2, depth: 3, noise: 50 },
   expert: { beam: 10, depth: 6, noise: 4 },
   good:   { beam: 5, depth: 4, noise: 25 },
   casual: { beam: 2, depth: 2, noise: 70 },
 };
+if (opt('skill') === 'custom') SKILLS.custom = { beam: Number(opt('beam', 3)), depth: Number(opt('depth', 3)), noise: Number(opt('noise', 40)) };
 const W = {        // how the player values a board
   empty: 70, emptyFew: 120,    // each empty cell; extra for each of the first 3 (room to place)
   pure: 0.6,                   // a stack of one colour, times its height squared: only these can clear
@@ -209,6 +217,10 @@ console.log('level             skill   finish  hexadeks/M (med)  score med [minâ
 for (const lv of levels) {
   const L0 = LEVELS[lv - 1];
   LEVELS[lv - 1] = { ...L0, colours: Number(opt('colours', L0.colours)), deck: Number(opt('deck', L0.deck)) };
+  if (opt('stones')) LEVELS[lv - 1].stones = Number(opt('stones')) ? STONE_LAYOUTS[Number(opt('stones'))] : null;
+  if (opt('bands')) LEVELS[lv - 1].bands = opt('bands').split(',').map(Number);
+  if (opt('bandodds')) LEVELS[lv - 1].bandOdds = opt('bandodds').split(',').map(Number);   // odds of 1, 2, 3 bands
+  if (opt('pours')) { const [start, perPlace, perClear, max] = opt('pours').split(',').map(Number); LEVELS[lv - 1].pours = { start, perPlace, perClear, max }; }
   for (const sk of skills) {
     const res = [];
     for (let i = 0; i < games; i++) {

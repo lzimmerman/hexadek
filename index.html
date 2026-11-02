@@ -459,8 +459,19 @@ function levelSpec(n) {
   if (c === 5) Object.assign(L, { colours: i < 6 ? 6 : 7, deck: 38 + i, bands: i < 8 ? [1, 3] : [2, 3],
                                   pours: i < 4 ? undefined : i < 9 ? POURS_TIGHT : POURS_TIGHTER,
                                   stones: i % 2 ? STONE_LAYOUTS[2 + (i >> 2)] : null });
-  return L;
+  return Object.assign(L, LEVEL_TWEAKS[n]);
 }
+// Hand-tuned levels. Play tests (2026-11-01) showed stacks that are all mixed (2-3 colours) under a
+// tight pour budget were far harder for people than for the computer player: level 60 took 25 tries.
+// These levels deal mostly mixed stacks with an occasional single colour (odds of 1, 2, 3 colours),
+// tuned with tools/bot.js --skill player to about level 58's difficulty, which took 3 tries.
+const LEVEL_TWEAKS = {
+  60: { bandOdds: [1, 4, 4] },
+  69: { bandOdds: [1, 4, 4] },
+  70: { bandOdds: [1, 2, 2] },
+  71: { bandOdds: [1, 8, 8] },
+  72: { bandOdds: [1, 5, 5] },
+};
 const LEVELS = Array.from({ length: LEVEL_COUNT }, (_, i) => levelSpec(i + 1));
 // What a level brings: its chapter's description at the start, otherwise what changed.
 function levelAbout(n) {
@@ -505,9 +516,18 @@ function rand(g) {   // mulberry32; the seed lives in the game so a saved game c
   t ^= t + Math.imul(t ^ t >>> 7, t | 61);
   return ((t ^ t >>> 14) >>> 0) / 4294967296;
 }
+// A number of colour bands from odds for 1, 2, 3... bands (e.g. [1, 3, 3]: mostly mixed, sometimes
+// one colour), at most one per tile. One random draw, like the even choice, so other levels' decks stay put.
+function pickBands(odds, n, r) {
+  const w = odds.slice(0, n), total = w.reduce((a, b) => a + b, 0);
+  let x = r * total;
+  for (let i = 0; i < w.length; i++) { x -= w[i]; if (x < 0) return i + 1; }
+  return w.length;
+}
 function newStack(g) {
   const n = CFG.minTiles + Math.floor(rand(g) * (CFG.maxTiles - CFG.minTiles + 1));
-  const bands = g.bands ? g.bands[0] + Math.floor(rand(g) * (Math.min(g.bands[1], n) - g.bands[0] + 1))
+  const bands = g.bandOdds ? pickBands(g.bandOdds, n, rand(g))
+              : g.bands ? g.bands[0] + Math.floor(rand(g) * (Math.min(g.bands[1], n) - g.bands[0] + 1))
                         : 1 + Math.floor(rand(g) * Math.min(CFG.maxBands, n));
   const cuts = new Set();
   while (cuts.size < bands - 1) cuts.add(1 + Math.floor(rand(g) * (n - 1)));
@@ -531,7 +551,7 @@ function newGame(seed, mode, colours, level) {
               board: {}, tray: [], next: null, score: 0, turn: 0, clearsThisTurn: 0, history: [] };
   for (const k of CELLS) g.board[k] = [];
   if (L) {
-    Object.assign(g, { level, levels: LEVEL_COUNT, colours: L.colours, deckSize: L.deck, bands: L.bands,
+    Object.assign(g, { level, levels: LEVEL_COUNT, colours: L.colours, deckSize: L.deck, bands: L.bands, bandOdds: L.bandOdds,
                        pourRule: L.pours === undefined ? CFG.pours : L.pours });
     if (g.pourRule) g.pours = g.pourRule.start;
     for (const k in L.stones || {}) g.board[k] = L.stones[k].slice();
@@ -556,9 +576,9 @@ const LEVEL_TARGETS = [   // [★★ score, ★★★ score] for levels 1 to 72
   [720, 840], [840, 1080], [720, 960], [840, 1080], [840, 1080], [840, 1320],
   [960, 1200], [840, 1080], [1200, 1440], [960, 1200], [1200, 1560], [960, 1200],
   [840, 1200], [1080, 1320], [1200, 1440], [1080, 1320], [1200, 1440], [1080, 1320],
-  [1200, 1440], [1320, 1680], [1320, 1560], [960, 1440], [960, 1560], [1200, 1560],
+  [1200, 1440], [1320, 1680], [1320, 1560], [960, 1440], [960, 1560], [1200, 1800],
   [1320, 1560], [1080, 1440], [1200, 1440], [1320, 1560], [1080, 1320], [1080, 1560],
-  [960, 1320], [1320, 1680], [960, 1440], [1200, 1680], [960, 1320], [1200, 1560],
+  [960, 1320], [1320, 1680], [1080, 1440], [1200, 1800], [960, 1440], [1200, 1680],
 ];
 // LEVEL_TARGETS:end
 function levelTargets(n) {

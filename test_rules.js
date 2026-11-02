@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -115,11 +115,17 @@ LEVELS.forEach((L, i) => {
   for (let j = 0; j < 300; j++) {
     const st = R.newStack(lg); let bands = 1;
     for (let k = 1; k < st.length; k++) if (st[k] !== st[k - 1]) bands++;
-    assert(bands >= L.bands[0] && bands <= L.bands[1], 'level ' + (i + 1) + ' bands');
+    const [lo, hi] = L.bandOdds ? [1, L.bandOdds.length] : L.bands;   // odds: any count with a chance
+    assert(bands >= lo && bands <= hi, 'level ' + (i + 1) + ' bands');
     assert(st.every(c => c < L.colours));
   }
   assert(R.gameName(lg).startsWith('Level ' + (i + 1)));
 });
+// band odds: mostly mixed, sometimes one colour, never more bands than tiles
+{ const counts = [0, 0, 0, 0];
+  for (let j = 0; j < 9000; j++) counts[R.pickBands([1, 4, 4], 6, j / 9000)]++;
+  assert.deepEqual(counts, [0, 1000, 4000, 4000]);
+  assert.equal(R.pickBands([1, 4, 4], 2, 0.99), 2); }
 assert.equal(LEVELS.length, 72); assert.equal(R.CHAPTERS.length, 6);
 const l1 = newGame(1001, 'level', null, 1); assert.equal(R.poursLeft(l1), Infinity); assert.equal(R.undosLeft(l1), Infinity);
 const tb = LEVELS.findIndex(L => L.pours && L.pours.max === 6) + 1, l3 = newGame(1000 + tb, 'level', null, tb), P3 = LEVELS[tb - 1].pours;
