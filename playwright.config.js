@@ -11,7 +11,8 @@ module.exports = defineConfig({
   fullyParallel: true,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
-  use: { baseURL: live || 'http://127.0.0.1:8123/' },
+  // Service workers are blocked, as they'd answer requests before the tests' own routes; tests/app.spec.js allows them.
+  use: { baseURL: live || 'http://127.0.0.1:8123/', serviceWorkers: 'block' },
   webServer: live ? undefined : {
     command: 'python3 -m http.server 8123 --bind 127.0.0.1',
     url: 'http://127.0.0.1:8123/index.html',

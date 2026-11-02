@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hexadek</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111318" media="(prefers-color-scheme: dark)">
 <!-- Lexend: a typeface made for easy reading, bundled in fonts/. Without it the system font stands in. -->
 <link rel="stylesheet" href="fonts/lexend.css">
 <style>
@@ -335,6 +340,9 @@ dialog li { margin-bottom: 6px; }
     <li>Haptics, also below the board, makes the phone vibrate on pours and hexadeks. It's off to start with.</li>
     <li><b>Restart</b> plays the same game again from the start, with the same stacks, to try another plan.
       <b>New game</b> deals new stacks.</li>
+    <li><b>As an app:</b> on Android, open the browser menu and choose <i>Install app</i> or <i>Add to Home
+      screen</i>; on an iPhone, tap Share, then <i>Add to Home Screen</i>. It opens full screen and plays offline.
+      Your progress stays with the browser you install it from.</li>
   </ul>
   <div class="row"><button type="button" id="tutor">Play the tutorial</button><span class="spacer"></span><button type="button" id="rulesclose">Close</button></div>
   <div class="extra">   <!-- for testing: below the buttons, out of the way -->
@@ -1927,6 +1935,9 @@ function start() {
 }
 
 if (typeof document !== 'undefined') start();
+// Offline play and Install app, where the browser allows a service worker (not from a file, or in some embeds).
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && /^https?:$/.test(location.protocol))
+  navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
 </html>

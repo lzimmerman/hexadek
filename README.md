@@ -15,10 +15,14 @@ of one colour, to clear it and score. Several hexadeks in one turn make a combo.
 
 ## Playing
 
-Open `index.html` in a browser; `themes.js` and `fonts/` need to sit beside it. There's no
-build step, no server and no network use: the game is plain HTML, CSS and JavaScript, and keeps
-progress in the browser's local storage on the device. How to play (in the game) explains the
-rules.
+Play at **https://lzimmerman.github.io/hexadek/**. On a phone it installs as an app (Android:
+browser menu › Install app; iPhone: Share › Add to Home Screen) and then plays offline.
+
+To run it locally, open `index.html` in a browser; `themes.js` and `fonts/` need to sit beside it.
+There's no build step, no server and no network use: the game is plain HTML, CSS and JavaScript,
+and keeps progress in the browser's local storage on the device. The app files are
+`manifest.webmanifest`, `icons/` and `sw.js`, the offline cache (it works only when served over
+the web). How to play (in the game) explains the rules.
 
 ## Development
 
