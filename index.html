@@ -262,13 +262,14 @@ dialog li { margin-bottom: 6px; }
     <li>Its whole top run moves: onto a stack with the same top colour, or onto an empty cell.</li>
     <li>Only neighbours: the six cells touching it.</li>
     <li>A stack holds at most 12 tiles. If the whole run doesn't fit, only what fits moves.</li>
-    <li><b>Standard</b> game: each pour uses one. You start with 3, get 3 more for each stack you place and 1 for
-      each hexadek, and can save up to 9. Undo gives the pour back, and you have 5 undos per game.</li>
-    <li><b>Survive</b> game: pours and undos as in Standard, with a deck of 30 stacks. Place them all without
-      running out of room. The bar below the board shows how far through the deck you are.</li>
-    <li><b>Free</b> game: pours and undos are unlimited.</li>
     <li><b>Journey</b>: 72 levels, each a fixed deck with its own rules. See <i>Journey: levels and stars</i> below.</li>
-    <li>Choose the mode under New game. Custom also sets the number of colours: 3, 5, 7, 9, 11 or 13. Fewer is easier.</li>
+    <li><b>Endless</b>: play until the board fills, for a best score. Each pour uses one: you start with 3, get 3 more
+      for each stack you place and 1 for each hexadek, and can save up to 9. Undo gives the pour back, and you have 5
+      undos per game.</li>
+    <li><b>Custom</b>: choose the colours (3 to 13; fewer is easier), limited or free pours (free pours come with
+      unlimited undos), and the length: endless, or a deck of 30 or 50 stacks to place without running out of room.
+      The bar below the board shows how far through a deck you are.</li>
+    <li>Choose under New game.</li>
   </ul>
   <h3>Placing</h3>
   <ul>
@@ -322,7 +323,7 @@ dialog li { margin-bottom: 6px; }
     <li>Use an empty cell to park a top run and uncover the colour underneath.</li>
     <li>Try not to bury a colour under a different one.</li>
     <li>Keep two or three cells empty when you can, and check the next stack before you place.</li>
-    <li>In a Standard game, spend pours where they finish or set up a hexadek, and save the rest for a crowded board.</li>
+    <li>When pours are limited, spend them where they finish or set up a hexadek, and save the rest for a crowded board.</li>
     <li>Undo is free until you place, so experiment.</li>
   </ul>
   <h3>Controls</h3>
@@ -359,16 +360,16 @@ dialog li { margin-bottom: 6px; }
   </div>
   <h3>Other modes</h3>
   <div class="choices">
-    <button type="button" id="newstandard"><b>Standard</b><span></span></button>
-    <button type="button" id="newsurvive"><b>Survive</b><span></span></button>
-    <button type="button" id="newfree"><b>Free</b><span>Pours and undos are unlimited.</span></button>
-    <div class="modebox"><b>Custom</b><span>Any of the modes above, with your choice of colours. Fewer is easier; 5 is
-      usual.</span>
+    <button type="button" id="newendless"><b>Endless</b><span></span></button>
+    <div class="modebox"><b>Custom</b><span>Your own rules. Fewer colours is easier; 5 is usual. Free pours come
+      with unlimited undos. Each mix keeps its own best score.</span>
       <div class="row"><label class="row" for="newcolours">Colours
           <select id="newcolours"><option>3</option><option>5</option><option>7</option><option>9</option><option>11</option><option>13</option></select></label>
-        <label class="row" for="newcustommode">Mode
-          <select id="newcustommode"><option value="standard">Standard</option><option value="survive">Survive</option>
-            <option value="free">Free</option></select></label></div>
+        <label class="row" for="newpours">Pours
+          <select id="newpours"><option value="limited">Limited</option><option value="free">Free</option></select></label>
+        <label class="row" for="newlength">Length
+          <select id="newlength"><option value="0">Endless</option><option value="30">Deck of 30</option>
+            <option value="50">Deck of 50</option></select></label></div>
       <div class="row"><button type="button" id="newcustom">Play custom game</button></div></div>
   </div>
   <div class="row"><span class="spacer"></span><button type="button" id="newcancel">Cancel</button></div>
@@ -542,11 +543,13 @@ function newStack(g) {
   }
   return st;
 }
-function newGame(seed, mode, colours, level) {
+// mode: 'standard' (Endless: limited pours), 'free' (unlimited pours and undos), 'survive' (limited pours and a
+// deck) or 'level'. deck: a deck size for a custom game; Survive's default is CFG.deck.
+function newGame(seed, mode, colours, level, deck) {
   mode = mode || 'standard';
   const L = mode === 'level' ? LEVELS[level - 1] : null;
   const g = { seed: seed | 0, start: seed | 0, mode, colours: colours || CFG.colours, stone: STONE,
-              pours: CFG.pours.start, undos: CFG.undos, deckSize: mode === 'survive' ? CFG.deck : null,
+              pours: CFG.pours.start, undos: CFG.undos, deckSize: mode === 'survive' ? deck || CFG.deck : mode === 'free' ? deck || null : null,
               board: {}, tray: [], next: null, score: 0, turn: 0, clearsThisTurn: 0, history: [] };
   for (const k of CELLS) g.board[k] = [];
   if (L) {
@@ -611,11 +614,15 @@ function deckMax(g) {
   return deckMaxCache[key] = Object.values(per).reduce((a, n) => a + Math.floor(n / CFG.hexadek), 0);
 }
 function starsFor(g) { return g.level ? starGoals(g).filter(s => s.met).length : 0; }
-const MODE_NAMES = { standard: 'Standard', free: 'Free', survive: 'Survive' };
+// Endless, or a custom game named by what differs: "Deck of 30 · free pours · 7 colours".
 function gameName(g) {
   if (g.level) return 'Level ' + g.level + ' · ' + LEVELS[g.level - 1].name;
-  return MODE_NAMES[g.mode] + (g.colours !== CFG.colours ? ' · ' + g.colours + ' colours' : '');
+  return [g.deckSize ? 'Deck of ' + g.deckSize : 'Endless', g.mode === 'free' ? 'free pours' : null,
+          g.colours !== CFG.colours ? g.colours + ' colours' : null].filter(Boolean).join(' · ');
 }
+// The custom settings a game was started with (levels have none).
+const customOf = g => ({ colours: g.colours, free: g.mode === 'free', deck: g.deckSize || 0 });
+const customMode = c => c.free ? 'free' : c.deck ? 'survive' : 'standard';
 // The game's pour budget, or null when pours (and undos) are unlimited.
 function pourRule(g) { return g.pourRule !== undefined ? g.pourRule : g.mode === 'free' ? null : CFG.pours; }
 function poursLeft(g) { return pourRule(g) ? g.pours : Infinity; }
@@ -731,7 +738,7 @@ const TUTORIAL = [
   { text: 'All 3 red tiles moved across: that stack now has 5 reds on top. You can also pour onto an empty cell. ' +
           'Pour the purple tile from the marked stack onto the marked empty cell.', expect: { pour: ['1,-1', '2,-1'] } },
   { text: 'That uncovered 4 red tiles. Pour them onto the big red stack too.', expect: { pour: ['1,-1', '0,0'] } },
-  { text: 'This practice game is a Free game, where pours are free. In a Standard game each pour uses one, and ' +
+  { text: 'Pours are free in this practice game. In other games each pour uses one, and ' +
           'you earn 3 for each stack you place. To end your turn, place a new stack from the tray below. ' +
           'Drag the marked red stack onto the marked cell, or tap it and then tap the cell.', expect: { place: [0, '1,0'] } },
   { text: 'The big stack has 9 reds, and the new one has 3. Pour the new one onto it to make 12 of one colour.',
@@ -771,8 +778,9 @@ function start() {
   let firstVisit = false;
   try { firstVisit = !saved && !localStorage.getItem('hexadek.seen'); localStorage.setItem('hexadek.seen', '1'); } catch (e) {}
   // a best score for each mode and colour count; the old single best was from Free games
-  const bestKey = gm => BEST + '.' + (gm.level ? 'lv' + gm.level :
-                                      gm.mode + (gm.colours !== CFG.colours ? '.' + gm.colours + 'c' : ''));
+  const bestKey = gm => BEST + '.' + (gm.level ? 'lv' + gm.level : gm.mode +
+    (gm.deckSize && gm.deckSize !== (gm.mode === 'survive' ? CFG.deck : 0) ? '.d' + gm.deckSize : '') +
+    (gm.colours !== CFG.colours ? '.' + gm.colours + 'c' : ''));
   function readBest(gm) {
     try {
       return Number(localStorage.getItem(bestKey(gm)) || (gm.mode === 'free' && gm.colours === CFG.colours ?
@@ -1005,11 +1013,11 @@ function start() {
     if (!log.length) lines.push('(none yet: the log starts with this version)');
     return lines.join('\n');
   }
-  function startGame(seed, mode, colours, level, intro) {
+  function startGame(seed, mode, colours, level, intro, deck) {
     logGame('left');   // a game in progress that's replaced (Restart, New game, another level)
     lastInput = Date.now();   // the clock starts with the game, so the first move's thinking counts
     finishAnims(); ending = null;
-    g = newGame(seed, mode, colours, level);
+    g = newGame(seed, mode, colours, level, deck);
     ui.sel = ui.trayPick = null;
     flash = null;
     after();
@@ -1044,27 +1052,25 @@ function start() {
     if (tut) { g = realG || g; tut = realG = null; coach(); }
     const busy = (g.turn > 0 || g.history.length) && state !== 'over' && state !== 'won';
     if (again) {
-      const go = () => startGame(g.start, g.mode, g.colours, g.level);
+      const go = () => startGame(g.start, g.mode, g.colours, g.level, false, g.level ? null : g.deckSize);
       if (busy) ask('Restart this game from the beginning, with the same stacks?', 'Restart', go); else go();
       return;
     }
     $('newwarn').textContent = busy ? 'The game you are playing will be lost.' : '';
     $('newwarn').style.display = busy ? '' : 'none';
     $('newcolours').value = String(Math.min(13, g.colours % 2 ? g.colours : g.colours + 1));   // older games had 4 or 6
-    if (!g.level && !tut) $('newcustommode').value = g.mode;
+    if (!g.level && !tut) { const c = customOf(g); $('newpours').value = c.free ? 'free' : 'limited'; $('newlength').value = String(c.deck); }
     $('newcontinue').textContent = 'Continue: Level ' + continueLevel();
     $('newgame').showModal();
   }
-  const chosen = mode => () => { $('newgame').close(); startGame(Date.now(), mode); };   // the usual 5 colours
-  $('newcustom').onclick = () => { $('newgame').close(); startGame(Date.now(), $('newcustommode').value, Number($('newcolours').value)); };
+  $('newendless').onclick = () => { $('newgame').close(); startGame(Date.now(), 'standard'); };   // the usual 5 colours
+  $('newcustom').onclick = () => {
+    const c = { colours: Number($('newcolours').value), free: $('newpours').value === 'free', deck: Number($('newlength').value) };
+    $('newgame').close(); startGame(Date.now(), customMode(c), c.colours, null, false, c.deck || null);
+  };
   const P = CFG.pours;
-  $('newstandard').querySelector('span').textContent = 'Pours are limited. Start with ' + P.start + ', get ' + P.perPlace +
-    ' more for each stack you place and ' + P.perClear + ' for each hexadek, up to ' + P.max + ' saved.';
-  $('newsurvive').querySelector('span').textContent = 'Place all ' + CFG.deck +
-    ' stacks of a deck without running out of room. Pours and undos as in Standard.';
-  $('newstandard').onclick = chosen('standard');
-  $('newfree').onclick = chosen('free');
-  $('newsurvive').onclick = chosen('survive');
+  $('newendless').querySelector('span').textContent = 'Play until the board fills, for a best score. Start with ' + P.start +
+    ' pours, get ' + P.perPlace + ' more for each stack you place and ' + P.perClear + ' for each hexadek, up to ' + P.max + ' saved.';
   $('levelstable').replaceChildren(el('tr', null, el('th', null, 'Chapter'), el('th', null, 'Levels'), el('th', null, 'Brings')),
     ...CHAPTERS.map((C, c) => el('tr', null, el('td', null, (c + 1) + ' · ' + C.name),
       el('td', null, (c * CHAPTER_SIZE + 1) + '–' + (c + 1) * CHAPTER_SIZE), el('td', null, C.about))));
@@ -1328,7 +1334,7 @@ function start() {
       $('overgoals').replaceChildren(...goals.map(s => el('li', { class: s.met ? 'met' : '' }, (s.met ? '✓ ' : '· ') + s.text)));
     }
     const made = g.hexadeks || 0;
-    $('overtext').textContent = gameName(g) + ' game. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ').') +
+    $('overtext').textContent = gameName(g) + '. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ').') +
       ' Hexadeks: ' + made + (g.level ? ' of ' + deckMax(g) + ' possible.' : '.');
     $('overundo').style.display = g.history.length && undosLeft(g) > 0 && state !== 'won' ? '' : 'none';
   }

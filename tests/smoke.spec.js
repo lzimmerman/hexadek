@@ -77,6 +77,30 @@ test('dialogs: How to play, play data, New game and All levels', async ({ page }
   expect(errors).toEqual([]);
 });
 
+test('New game: Endless, and a Custom game that Restart keeps', async ({ page }) => {
+  const errors = await openGame(page);
+  await page.locator('#new').click();
+  await page.locator('#newendless').click();
+  await expect(page.locator('#mode')).toHaveText('Endless');
+  await expect(page.locator('#deckbar')).toBeHidden();
+  await page.locator('#new').click();
+  await page.locator('#newcolours').selectOption('3');
+  await page.locator('#newpours').selectOption('free');
+  await page.locator('#newlength').selectOption('50');
+  await page.locator('#newcustom').click();
+  await expect(page.locator('#mode')).toHaveText('Deck of 50 · free pours · 3 colours');
+  await expect(page.locator('#decktext')).toHaveText('0 / 50');
+  const first = await game(page, () => JSON.stringify(window.__t.g.tray));
+  await page.locator('#restart').click();
+  expect(await game(page, () => ({ deck: window.__t.g.deckSize, tray: JSON.stringify(window.__t.g.tray) })))
+    .toEqual({ deck: 50, tray: first });
+  await page.locator('#new').click();   // the dialog remembers the custom settings
+  await expect(page.locator('#newpours')).toHaveValue('free');
+  await expect(page.locator('#newlength')).toHaveValue('50');
+  await expect(page.locator('#newcolours')).toHaveValue('3');
+  expect(errors).toEqual([]);
+});
+
 test('keeps the game after a reload', async ({ page, hasTouch }) => {
   await openGame(page);
   await tap(page, hasTouch, await slotPoint(page, 0));
