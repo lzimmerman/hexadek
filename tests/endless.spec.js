@@ -22,11 +22,17 @@ test('Endless: stages, rewards and the best run', async ({ page, hasTouch }) => 
   await expect(page.locator('#overtitle')).toHaveText('Stage 1 cleared!');
   await expect(page.locator('#overperks button')).toHaveCount(2);
   await expect(page.locator('#overnext')).toBeHidden();
-  const perk = await page.locator('#overperks button').first().getAttribute('data-perk');
-  const name = await page.locator('#overperks button').first().locator('b').textContent();
-  await page.locator('#overperks button').first().click();
+  await expect(page.locator('#overstage')).toBeDisabled();   // a reward first
+  const perk = await page.locator('#overperks button').last().getAttribute('data-perk');
+  const name = await page.locator('#overperks button').last().locator('b').textContent();
+  await page.locator('#overperks button').first().click();   // a change of mind is fine
+  await page.locator('#overperks button').last().click();
+  await expect(page.locator('#overperks button').last()).toHaveAttribute('aria-checked', 'true');
+  await expect(page.locator('#overperks button').first()).toHaveAttribute('aria-checked', 'false');
+  await expect(page.locator('#mode')).toHaveText('Endless · Stage 1');   // picking doesn't start the stage
+  await page.locator('#overstage').click();
   await expect(page.locator('#mode')).toHaveText('Endless · Stage 2');
-  await expect(page.locator('#msg')).toContainText('Stage 2: place ' + (perk === 'short' ? 25 : 30) + ' stacks · ' + name);
+  await expect(page.locator('#msg')).toContainText('Stage 2: place ' + (perk === 'short' ? 25 : 30) + ' stacks · ' + name.replace(/^✓ /, ''));
   expect(await game(page, () => [window.__t.g.score, window.__t.g.endless.perk])).toEqual([600, perk]);
   // a full board with nothing to pour: the run is over, and its stage count is the best
   const full = {}; ['0,0', '1,0', '-1,0', '0,1', '0,-1', '1,-1', '-1,1', '2,0', '-2,0', '0,2', '0,-2', '2,-2', '-2,2', '2,-1', '-2,1', '1,1', '-1,-1', '1,-2', '-1,2']
