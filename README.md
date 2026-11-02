@@ -51,3 +51,10 @@ Tools, in `tools/`:
   as a courtesy: the dedication asks for nothing.
 - Game design, code, tile symbols and colour themes were made for this project with
   [Claude Code](https://claude.com/claude-code).
+
+## Licence
+
+The game's code is under the [MIT License](LICENSE), copyright (c) 2026 lzimmerman. This covers
+everything in the repository except `fonts/`: the Lexend font files keep their own SIL Open
+Font License ([`fonts/OFL.txt`](fonts/OFL.txt)), as noted under Credits.
+
