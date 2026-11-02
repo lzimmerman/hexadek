@@ -289,8 +289,8 @@ dialog li { margin-bottom: 6px; }
     <li>A stack holds at most 12 tiles. If the whole run doesn't fit, only what fits moves.</li>
     <li><b>Journey</b>: 72 levels, each a fixed deck with its own rules. See <i>Journey: levels and stars</i> below.</li>
     <li><b>Endless</b>: one stage after another, each a deck on a fresh board, rising to about the difficulty of
-      the last chapter. After each stage, pick one of two rewards for the next: extra pours, extra undos, a stone
-      gone or a shorter deck. Losing a stage ends the run; your best is the most stages cleared. Every deck has been
+      the last chapter. After each stage, pick one of two rewards for the next: a bigger pour budget, a shorter
+      deck, lighter stacks (more of a single colour) or a stone gone. Losing a stage ends the run; your best is the most stages cleared. Every deck has been
       checked: it can be finished.</li>
     <li><b>Classic</b>: play until the board fills, for a best score. Each pour uses one: you start with 3, get 3 more
       for each stack you place and 1 for each hexadek, and can save up to 9. Undo gives the pour back, and you have 5
@@ -625,12 +625,18 @@ const ENDLESS_TIERS = [   // like a level's settings; deck lengths stay short so
 // ENDLESS_SKIP:begin (written by tools/bot.js --endless --write)
 const ENDLESS_SKIP = { 4: [316, 337, 364, 375], 6: [36, 57, 337], 8: [20, 37, 51, 68, 113, 210, 233, 263, 270, 278, 315, 345, 348, 385, 436, 437, 454, 474, 489], 10: [161, 445], 11: [2, 10, 17, 50, 58, 70, 71, 83, 90, 111, 133, 167, 185, 206, 229, 235, 257, 259, 360, 430, 437, 488] };   // tier: pool indices whose deck the expert couldn't finish
 // ENDLESS_SKIP:end
-// A reward, chosen after each stage, for the next one only.
+// A reward, chosen after each stage, for the next one only. Measured with the player bot on the top
+// tiers (2026-11-02; clears 81% with no reward): Bigger budget 85%, Shorter deck 88%, Lighter stacks
+// 90%, Stone gone 86% (about 82% → 92% where it's offered). They replaced Extra pours (+3 to start:
+// 82%) and Extra undos (the play test used 0–2 of 5), which were worth almost nothing. Candidates
+// that were too strong: one colour fewer (94%), mostly single-colour stacks (99%).
 const ENDLESS_PERKS = {
-  pours: { name: 'Extra pours', text: 'Start with 3 more pours.' },
-  undos: { name: 'Extra undos', text: '3 more undos.' },
-  stone: { name: 'Break a stone', text: 'The tallest stone is gone.' },
+  budget: { name: 'Bigger budget', text: 'Save up to 9 pours, as in Classic.' },
   short: { name: 'Shorter deck', text: '5 fewer stacks to place.' },
+  lighter: { name: 'Lighter stacks', text: 'More stacks of a single colour.' },
+  stone: { name: 'Break a stone', text: 'The tallest stone is gone.' },
+  pours: { name: 'Extra pours', text: 'Start with 3 more pours.', old: true },   // retired: saved runs may hold them
+  undos: { name: 'Extra undos', text: '3 more undos.', old: true },
 };
 const endlessRng = (run, stage, salt) => { const g = { seed: (run ^ (stage * 7919 + salt * 104729)) | 0 }; rand(g); return () => rand(g); };
 function endlessTier(run, stage) {
@@ -646,25 +652,39 @@ function endlessDeckSeed(run, stage, tier) {
 // The two rewards offered after a stage, for the one that follows: only those that would help there.
 function endlessOffer(run, stage) {
   const T = ENDLESS_TIERS[endlessTier(run, stage + 1)], r = endlessRng(run, stage, 3);
-  const ids = Object.keys(ENDLESS_PERKS).filter(id => id !== 'stone' || T.stones).filter(id => id !== 'pours' || T.pours !== null);
+  const tight = T.pours && T.pours.max < CFG.pours.max;
+  const ids = Object.keys(ENDLESS_PERKS).filter(id => !ENDLESS_PERKS[id].old && (id !== 'stone' || T.stones) && (id !== 'budget' || tight));
   const a = ids.splice(Math.floor(r() * ids.length), 1)[0];
   return [a, ids[Math.floor(r() * ids.length)]];
 }
-// Stage `stage` of the run `run`, with a reward, carrying on from the run's score so far.
-function endlessGame(run, stage, perk, total) {
-  const tier = endlessTier(run, stage), T = ENDLESS_TIERS[tier], L = Object.assign({}, T);
+// A tier's settings with a reward applied. 'colour' and 'simple' are candidates measured with the
+// computer player (tools/bot.js --endless --perk), not offered in the game.
+function endlessSpec(tier, perk) {
+  const T = ENDLESS_TIERS[tier], L = Object.assign({}, T);
   if (perk === 'short') L.deck -= 5;
   if (perk === 'stone' && T.stones) {
     const tall = Object.keys(T.stones).sort((a, b) => T.stones[b].length - T.stones[a].length)[0];
     L.stones = Object.assign({}, T.stones); delete L.stones[tall];
   }
-  const g = newGame(endlessDeckSeed(run, stage, tier), 'endless', null, null, null, L);
-  g.endless = { run: run | 0, stage, tier, perk: perk || null };
-  g.score = total || 0;
+  if (perk === 'colour') L.colours -= 1;                 // one colour fewer
+  if (perk === 'simple') L.bandOdds = [2, 2, 1];         // more single-colour stacks
+  if (perk === 'budget') L.pours = CFG.pours;            // Classic's roomier budget (up to 9 saved)
+  if (perk === 'lighter') { const o = T.bandOdds || [1, 1, 1]; L.bandOdds = [o[0] * 1.4, o[1], o[2]]; }   // 40% more single-colour stacks
+  return L;
+}
+function endlessStart(g, perk) {   // the rewards that change the game's counters rather than its deck
   if (perk === 'pours' && g.pourRule) g.pours = Math.min(g.pourRule.max, g.pours + 3);
   if (perk === 'undos') g.undos += 3;
   g.undoStart = g.undos;
   return g;
+}
+// Stage `stage` of the run `run`, with a reward, carrying on from the run's score so far.
+function endlessGame(run, stage, perk, total) {
+  const tier = endlessTier(run, stage);
+  const g = newGame(endlessDeckSeed(run, stage, tier), 'endless', null, null, null, endlessSpec(tier, perk));
+  g.endless = { run: run | 0, stage, tier, perk: perk || null };
+  g.score = total || 0;
+  return endlessStart(g, perk);
 }
 // A deck: the game is won once every stack in it has been placed.
 function isWon(g) { return !!g.deckSize && g.turn >= g.deckSize; }
@@ -1084,7 +1104,8 @@ function start() {
     if (tut || !g || g.logged || (!g.turn && result === 'left')) return;
     g.logged = true;
     const T = g.level ? levelTargets(g.level) : null;
-    const rec = { t: stamp(), game: gameName(g), level: g.level || null, result,
+    const perk = g.endless && ENDLESS_PERKS[g.endless.perk];   // Endless: the reward this stage was played with
+    const rec = { t: stamp(), game: gameName(g) + (perk ? ' · ' + perk.name : ''), level: g.level || null, result,
       score: g.score, stars: g.level ? starsFor(g) : null, hexadeks: g.hexadeks || 0, M: T ? T.M : null,
       placed: g.turn, deck: g.deckSize || null, colours: g.colours, undos: pourRule(g) ? (g.undoStart || CFG.undos) - undosLeft(g) : null,
       time: g.ms ? mmss(g.ms) : null };

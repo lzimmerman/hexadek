@@ -207,10 +207,14 @@ for (let run = 1; run < 40; run++) for (let s = 1; s < 30; s++) {
 assert.deepEqual(R.endlessGame(5, 3).tray, R.endlessGame(5, 3).tray, 'a run deals the same decks again');
 const e1 = R.endlessGame(5, 1, null, 0); assert.equal(e1.deckSize, ET[0].deck); assert.equal(R.gameName(e1), 'Endless · Stage 1');
 assert(!e1.level && R.starsFor(e1) === 0);
-const e3 = R.endlessGame(5, 3, 'pours', 2400), t3 = ET[2];
-assert.equal(e3.score, 2400, 'the run total carries on'); assert.equal(e3.pours, Math.min(t3.pours.max, t3.pours.start + 3));
+const e3 = R.endlessGame(5, 3, 'budget', 2400), t3 = ET[2];
+assert.equal(e3.score, 2400, 'the run total carries on'); assert.equal(e3.pourRule, CFG.pours, 'Classic\'s budget');
 assert.equal(R.endlessGame(5, 3, 'short', 0).deckSize, t3.deck - 5);
-assert.equal(R.endlessGame(5, 3, 'undos', 0).undos, CFG.undos + 3);
+assert.deepEqual(R.endlessGame(5, 3, 'lighter', 0).bandOdds, [1.4, 1, 1], 'more single-colour stacks');
+assert.equal(R.endlessGame(5, 3, 'undos', 0).undos, CFG.undos + 3, 'a retired reward in a saved run still works');
+for (let run = 1; run < 40; run++) for (let st = 1; st < 30; st++)
+  assert(R.endlessOffer(run, st).every(id => !EP[id].old), 'retired rewards aren\'t offered');
+assert(!R.endlessOffer(1, 0).includes('budget'), 'no bigger budget for a stage that already has the roomy one');
 const stoneCells = g => CELLS.filter(k => g.board[k].includes(STONE)).length;
 assert.equal(stoneCells(R.endlessGame(5, 3, 'stone', 0)), stoneCells(R.endlessGame(5, 3, null, 0)) - 1, 'a stone gone');
 assert.deepEqual(ET[2].stones, R.STONE_LAYOUTS[2], 'the reward leaves the tier itself alone');
