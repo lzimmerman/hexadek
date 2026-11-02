@@ -104,16 +104,16 @@ for (let i = 0; i < CFG.deck; i++) {
 }
 assert(R.isWon(sg)); assert(sg.tray.every(t => t === null)); assert(!place(sg, 0, '0,0'));
 assert(!R.isWon(newGame(12, 'standard')));
-// custom games: any deck length, with limited or free pours; names say what differs from Endless
+// custom games: any deck length, with limited or free pours; names say what differs from Classic
 const fd = newGame(12, 'free', 5, null, 50); assert.equal(fd.deckSize, 50); assert.equal(R.poursLeft(fd), Infinity);
 for (let i = 0; i < 50; i++) { assert(place(fd, fd.tray.findIndex(t => t), '0,0')); fd.board['0,0'] = []; }
 assert(R.isWon(fd));
 assert.equal(newGame(1, 'survive', 5, null, 50).deckSize, 50); assert.equal(newGame(1, 'free').deckSize, null);
-assert.equal(newGame(1, 'standard', 5, null, 30).deckSize, null, 'Endless has no deck');
-assert.equal(R.gameName(newGame(1, 'standard')), 'Endless');
+assert.equal(newGame(1, 'standard', 5, null, 30).deckSize, null, 'Classic has no deck');
+assert.equal(R.gameName(newGame(1, 'standard')), 'Classic');
 assert.equal(R.gameName(newGame(1, 'survive')), 'Deck of 30');
 assert.equal(R.gameName(newGame(1, 'free', 7, null, 50)), 'Deck of 50 · free pours · 7 colours');
-assert.equal(R.gameName(newGame(1, 'free', 3)), 'Endless · free pours · 3 colours');
+assert.equal(R.gameName(newGame(1, 'free', 3)), 'Classic · free pours · 3 colours');
 console.log('colour and deck tests passed');
 
 // Levels: fixed settings per level, the same deck on restart

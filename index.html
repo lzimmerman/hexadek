@@ -268,12 +268,12 @@ dialog li { margin-bottom: 6px; }
     <li>Only neighbours: the six cells touching it.</li>
     <li>A stack holds at most 12 tiles. If the whole run doesn't fit, only what fits moves.</li>
     <li><b>Journey</b>: 72 levels, each a fixed deck with its own rules. See <i>Journey: levels and stars</i> below.</li>
-    <li><b>Endless</b>: play until the board fills, for a best score. Each pour uses one: you start with 3, get 3 more
+    <li><b>Classic</b>: play until the board fills, for a best score. Each pour uses one: you start with 3, get 3 more
       for each stack you place and 1 for each hexadek, and can save up to 9. Undo gives the pour back, and you have 5
       undos per game.</li>
     <li><b>Custom</b>: choose the colours (3 to 13; fewer is easier), limited or free pours (free pours come with
-      unlimited undos), and the length: endless, or a deck of 30 or 50 stacks to place without running out of room.
-      The bar below the board shows how far through a deck you are.</li>
+      unlimited undos), and the length: until the board is full, or a deck of 30 or 50 stacks to place without
+      running out of room. The bar below the board shows how far through a deck you are.</li>
     <li>Choose under New game.</li>
   </ul>
   <h3>Placing</h3>
@@ -368,7 +368,7 @@ dialog li { margin-bottom: 6px; }
   </div>
   <h3>Other modes</h3>
   <div class="choices">
-    <button type="button" id="newendless"><b>Endless</b><span></span></button>
+    <button type="button" id="newclassic"><b>Classic</b><span></span></button>
     <div class="modebox"><b>Custom</b><span>Your own rules. Fewer colours is easier; 5 is usual. Free pours come
       with unlimited undos. Each mix keeps its own best score.</span>
       <div class="row"><label class="row" for="newcolours">Colours
@@ -376,7 +376,7 @@ dialog li { margin-bottom: 6px; }
         <label class="row" for="newpours">Pours
           <select id="newpours"><option value="limited">Limited</option><option value="free">Free</option></select></label>
         <label class="row" for="newlength">Length
-          <select id="newlength"><option value="0">Endless</option><option value="30">Deck of 30</option>
+          <select id="newlength"><option value="0">Until full</option><option value="30">Deck of 30</option>
             <option value="50">Deck of 50</option></select></label></div>
       <div class="row"><button type="button" id="newcustom">Play custom game</button></div></div>
   </div>
@@ -551,7 +551,7 @@ function newStack(g) {
   }
   return st;
 }
-// mode: 'standard' (Endless: limited pours), 'free' (unlimited pours and undos), 'survive' (limited pours and a
+// mode: 'standard' (Classic: limited pours), 'free' (unlimited pours and undos), 'survive' (limited pours and a
 // deck) or 'level'. deck: a deck size for a custom game; Survive's default is CFG.deck.
 function newGame(seed, mode, colours, level, deck) {
   mode = mode || 'standard';
@@ -622,10 +622,10 @@ function deckMax(g) {
   return deckMaxCache[key] = Object.values(per).reduce((a, n) => a + Math.floor(n / CFG.hexadek), 0);
 }
 function starsFor(g) { return g.level ? starGoals(g).filter(s => s.met).length : 0; }
-// Endless, or a custom game named by what differs: "Deck of 30 · free pours · 7 colours".
+// Classic, or a custom game named by what differs: "Deck of 30 · free pours · 7 colours".
 function gameName(g) {
   if (g.level) return 'Level ' + g.level + ' · ' + LEVELS[g.level - 1].name;
-  return [g.deckSize ? 'Deck of ' + g.deckSize : 'Endless', g.mode === 'free' ? 'free pours' : null,
+  return [g.deckSize ? 'Deck of ' + g.deckSize : 'Classic', g.mode === 'free' ? 'free pours' : null,
           g.colours !== CFG.colours ? g.colours + ' colours' : null].filter(Boolean).join(' · ');
 }
 // The custom settings a game was started with (levels have none).
@@ -1071,13 +1071,13 @@ function start() {
     $('newcontinue').textContent = 'Continue: Level ' + continueLevel();
     $('newgame').showModal();
   }
-  $('newendless').onclick = () => { $('newgame').close(); startGame(Date.now(), 'standard'); };   // the usual 5 colours
+  $('newclassic').onclick = () => { $('newgame').close(); startGame(Date.now(), 'standard'); };   // the usual 5 colours
   $('newcustom').onclick = () => {
     const c = { colours: Number($('newcolours').value), free: $('newpours').value === 'free', deck: Number($('newlength').value) };
     $('newgame').close(); startGame(Date.now(), customMode(c), c.colours, null, false, c.deck || null);
   };
   const P = CFG.pours;
-  $('newendless').querySelector('span').textContent = 'Play until the board fills, for a best score. Start with ' + P.start +
+  $('newclassic').querySelector('span').textContent = 'Play until the board fills, for a best score. Start with ' + P.start +
     ' pours, get ' + P.perPlace + ' more for each stack you place and ' + P.perClear + ' for each hexadek, up to ' + P.max + ' saved.';
   $('levelstable').replaceChildren(el('tr', null, el('th', null, 'Chapter'), el('th', null, 'Levels'), el('th', null, 'Brings')),
     ...CHAPTERS.map((C, c) => el('tr', null, el('td', null, (c + 1) + ' · ' + C.name),

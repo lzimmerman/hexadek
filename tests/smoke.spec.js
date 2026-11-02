@@ -77,11 +77,11 @@ test('dialogs: How to play, play data, New game and All levels', async ({ page }
   expect(errors).toEqual([]);
 });
 
-test('New game: Endless, and a Custom game that Restart keeps', async ({ page }) => {
+test('New game: Classic, and a Custom game that Restart keeps', async ({ page }) => {
   const errors = await openGame(page);
   await page.locator('#new').click();
-  await page.locator('#newendless').click();
-  await expect(page.locator('#mode')).toHaveText('Endless');
+  await page.locator('#newclassic').click();
+  await expect(page.locator('#mode')).toHaveText('Classic');
   await expect(page.locator('#deckbar')).toBeHidden();
   await page.locator('#new').click();
   await page.locator('#newcolours').selectOption('3');
