@@ -1,0 +1,33 @@
+# On every push and pull request: the rules tests, then the browser tests in Chromium, Firefox and
+# WebKit (Safari's engine). A failure shows as a red cross on the commit; its screenshots and traces
+# are attached to the run for a week.
+name: Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Rules tests
+        run: node test_rules.js index.html
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Browser tests
+        run: npx playwright test --grep-invert @screens
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 7

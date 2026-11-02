@@ -21,11 +21,23 @@ rules.
 
 ## Development
 
-Tests (Node 11 or later):
+Rules tests (Node 11 or later):
 
 ```sh
 node test_rules.js index.html
 ```
+
+Browser tests with [Playwright](https://playwright.dev), in Chromium (as an Android phone), WebKit
+(Safari's engine, as an iPhone) and Firefox. They need Node 18 or later (`.nvmrc` asks for 24):
+
+```sh
+npm install && npx playwright install    # once
+npm run test:browsers    # loading, a level to its end card, pours, peek, dialogs, reload, random play
+npm run test:live        # the same, against the live site
+npm run test:screens     # screenshots of the main screens, side by side in screens/index.html
+```
+
+GitHub Actions runs the rules and browser tests on every push.
 
 Tools, in `tools/`:
 
@@ -34,7 +46,7 @@ Tools, in `tools/`:
 | `bot.js` | Computer players that play the real rules, for tuning levels (`--skill player` is matched to play tests) |
 | `targets.js` | Sets each level's star targets from the computer players' scores |
 | `hubcompare.js` | Compares the computer player with and without the "hub" strategy |
-| `monkey.js` | Random taps, drags and buttons on the real page in headless Chrome, checking the game stays sound |
+| `monkey.js` | Random taps, drags and buttons on the real page in headless Chrome, checking the game stays sound (the browser tests run it in all three engines) |
 | `contrast.js` | Contrast checks for the colour themes |
 | `themes.html` | A preview of every colour theme, light and dark |
 

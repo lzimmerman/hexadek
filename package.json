@@ -1,0 +1,15 @@
+{
+  "name": "hexadek",
+  "private": true,
+  "description": "Hexadek, a hex stacking puzzle. Browser tests (Playwright); the game itself needs no build.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node test_rules.js index.html",
+    "test:browsers": "playwright test",
+    "test:screens": "playwright test --grep @screens && node tests/screens-page.js",
+    "test:live": "BASE_URL=https://lzimmerman.github.io/hexadek/ playwright test --grep-invert @screens"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1"
+  }
+}
