@@ -18,6 +18,16 @@ test('manifest and icons load', async ({ page, request, baseURL }) => {
   }
 });
 
+test('link previews point at a real image', async ({ page, request }) => {
+  await page.goto('./');
+  const og = async p => page.locator(`meta[property="og:${p}"]`).getAttribute('content');
+  expect(await og('title')).toContain('Hexadek');
+  const img = new URL(await og('image')).pathname.replace(/^\/hexadek\//, '');   // the local copy of the same file
+  const res = await request.get(img);
+  expect(res.ok()).toBe(true);
+  expect(res.headers()['content-type']).toContain('image/png');
+});
+
 test('plays offline once opened', async ({ page, context, browserName }) => {
   test.skip(browserName !== 'chromium', 'service workers are only testable in Chromium');
   await page.goto('./');
