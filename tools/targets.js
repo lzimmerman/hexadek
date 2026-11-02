@@ -24,6 +24,10 @@ const STEP2 = Number(arg('step2', 1)), STEP3 = Number(arg('step3', 2));   // mos
 const TESTED = Number(arg('tested', 24)), LOOSE = Number(arg('loose', 3));   // ...on play-tested levels; others may move LOOSE
 const EXTRA = Number(arg('extra', 1));   // ★★★: hexadeks above the expert's score (play tests reach more than it does)
 const PTS = 120;
+// Targets set by hand from play tests, kept when the table is rewritten.
+// L68 (2026-11-02): ★★ 1320 was above its neighbours with the same 13 possible hexadeks (L66, L69:
+// 1080); a play test made 10 of 13. Lowered to 1200.
+const PLAYTESTED = { 68: { score: 1200 } };
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const { LEVELS } = eval('(() => {' + html.match(/<script>([\s\S]*)<\/script>/)[1] + '; return { LEVELS }; })()');   // for which levels have stones
 
@@ -58,6 +62,7 @@ for (const n of levels) {
   top = Math.min(top, (M + 1) * PTS);       // ★★★ at most every hexadek plus one combo's worth
   score = Math.max(score, PTS);              // at least one hexadek
   top = Math.max(top, score + PTS);          // ★★★ always asks for more than ★★
+  if (PLAYTESTED[n]) ({ score = score, top = top } = PLAYTESTED[n]);   // set from play tests: kept
   rows.push({ n, M, score, top, oldScore, oldTop,
     goodRate: G.filter(g => g.won && g.score >= score).length / G.length,
     expertTop: E.filter(g => g.won && g.score >= top && !g.stonesLeft).length / E.length });
