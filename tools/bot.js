@@ -15,6 +15,11 @@
 //     --bandodds X,Y,Z      ...or the odds of 1, 2 and 3 colours per stack
 //     --verbose             one line per game
 //     --json                also a JSON line per level and skill, with every game (for tools/targets.js)
+//     --endless             Endless: play every deck in each tier's pool (tools: --tiers A-B, --pool N),
+//                           with the expert (decks it can't finish are skipped by the game) and with
+//                           --skill (default player), then simulate runs from the pass rates.
+//                           --json prints a line per tier; --from DIR combines such lines instead of
+//                           playing; --write puts the skip lists into index.html (ENDLESS_SKIP)
 //     --hub auto|point|line plays the hub strategy seen in play tests: keep a hub free (the centre, or a
 //                           line through it with more colours), place each new stack there, and pour
 //                           its colours out to home areas around it, one area per colour.
@@ -33,9 +38,10 @@ const flag = name => args.includes('--' + name);
 const file = opt('file', path.join(__dirname, '..', 'index.html'));
 const html = fs.readFileSync(file, 'utf8');
 eval(html.match(/<script>([\s\S]*)<\/script>/)[1] +
-  ';global.R={CFG,CELLS,neighbours,runLen,topOf,newGame,pourResult,pour,place,roomState,poursLeft,isWon,LEVELS,STONE,starsFor,deckMax,STONE_LAYOUTS}');
+  ';global.R={CFG,CELLS,neighbours,runLen,topOf,newGame,pourResult,pour,place,roomState,poursLeft,isWon,LEVELS,STONE,starsFor,deckMax,STONE_LAYOUTS,' +
+  'ENDLESS_TIERS,ENDLESS_SEED,ENDLESS_POOL,ENDLESS_RAMP,endlessTier}');
 const { CFG, CELLS, neighbours, runLen, topOf, newGame, pourResult, pour, place, roomState, poursLeft, isWon, LEVELS, STONE,
-        starsFor, deckMax, STONE_LAYOUTS } = R;
+        starsFor, deckMax, STONE_LAYOUTS, ENDLESS_TIERS, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_RAMP, endlessTier } = R;
 
 const SKILLS = {   // beam: boards kept per depth; depth: pours searched per turn; noise: randomness in judging
   // player: matched to the play tests through level 60 (2026-11-01): it finishes about as often as a
@@ -201,6 +207,56 @@ function playGame(g, skill, rnd) {
     if (!place(g, p.slot, p.cell)) break;
   }
   return g;
+}
+
+// ---- Endless ----
+if (flag('endless')) {
+  const sk = opt('skill', 'player'), pool = Number(opt('pool', ENDLESS_POOL));
+  const tspan = (opt('tiers', '1-' + ENDLESS_TIERS.length) + '-').split('-').map(Number);
+  const tiers = {};   // tier (0-based): { skip: [indices], pass: share the player clears, n }
+  if (opt('from')) {
+    for (const f of fs.readdirSync(opt('from'))) for (const line of fs.readFileSync(path.join(opt('from'), f), 'utf8').split('\n'))
+      if (line.startsWith('ENDLESS ')) { const r = JSON.parse(line.slice(8)); tiers[r.tier] = r; }
+  } else {
+    for (let t = tspan[0] - 1; t < (tspan[1] || tspan[0]); t++) {
+      const skip = [], wins = []; const t0 = Date.now();
+      for (let i = 0; i < pool; i++) {
+        const seed = ENDLESS_SEED + 1000 * t + i;
+        const e = playGame(newGame(seed, 'endless', null, null, null, ENDLESS_TIERS[t]), SKILLS.expert, mulberry(i * 31 + t));
+        if (!isWon(e)) { skip.push(i); continue; }
+        wins.push(isWon(playGame(newGame(seed, 'endless', null, null, null, ENDLESS_TIERS[t]), SKILLS[sk], mulberry(i * 7919 + t))));
+      }
+      tiers[t] = { tier: t, skip, pass: wins.filter(Boolean).length / Math.max(1, wins.length), n: wins.length, s: (Date.now() - t0) / 1000 };
+      if (flag('json')) console.log('ENDLESS ' + JSON.stringify(tiers[t]));
+    }
+  }
+  console.log(`Endless tiers: expert skips, and how often ${sk} clears the rest`);
+  for (const t of Object.keys(tiers).map(Number).sort((a, b) => a - b)) {
+    const T = ENDLESS_TIERS[t], r = tiers[t];
+    console.log(`  tier ${String(t + 1).padStart(2)} ${(T.top || 'stage ' + (t + 1)).padEnd(8)} ${T.colours} colours, deck ${T.deck}` +
+      `${T.stones ? ', ' + Object.keys(T.stones).length + ' stones' : ''}${T.pours ? ', pours max ' + T.pours.max : ''}${T.bandOdds ? ', mixed' : ''}`.padEnd(46) +
+      `skip ${String(r.skip.length).padStart(2)}/${pool}   clears ${(100 * r.pass).toFixed(0).padStart(3)}%`);
+  }
+  if (Object.keys(tiers).length === ENDLESS_TIERS.length) {   // runs: each stage cleared with its tier's rate
+    const rnd = mulberry(12345), cleared = [];
+    for (let run = 0; run < 20000; run++) {
+      let s = 1; while (s < 500 && rnd() < tiers[endlessTier(run * 977 + 13, s)].pass) s++;
+      cleared.push(s - 1);
+    }
+    cleared.sort((a, b) => a - b);
+    const q = f => cleared[Math.floor(f * (cleared.length - 1))];
+    console.log(`Runs (no rewards): stages cleared, median ${q(0.5)}, a good run (top quarter) ${q(0.75)}+, top tenth ${q(0.9)}+;` +
+      ` ${(100 * cleared.filter(c => c >= ENDLESS_RAMP).length / cleared.length).toFixed(0)}% get past the ramp (stage ${ENDLESS_RAMP})`);
+  }
+  if (flag('write')) {
+    const file = path.join(__dirname, '..', 'index.html'), re = /(\/\/ ENDLESS_SKIP:begin[^\n]*\n)[\s\S]*?(\n\/\/ ENDLESS_SKIP:end)/;
+    const skip = {}; for (const t in tiers) if (tiers[t].skip.length) skip[t] = tiers[t].skip;
+    const body = 'const ENDLESS_SKIP = { ' + Object.keys(skip).map(t => t + ': [' + skip[t].join(', ') + ']').join(', ') + ' }' +
+      ';   // tier: pool indices whose deck the expert couldn\'t finish';
+    fs.writeFileSync(file, html.replace(re, (m, a, b) => a + body + b));
+    console.log('Wrote ENDLESS_SKIP into index.html.');
+  }
+  process.exit(0);
 }
 
 // ---- run ----

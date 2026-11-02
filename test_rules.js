@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -190,3 +190,31 @@ const hx = newGame(9, 'free'); for (const k of CELLS) hx.board[k] = [];
 hx.board['0,0'] = Array(11).fill(1); hx.board['1,0'] = [1];
 pour(hx, '1,0', '0,0'); assert.equal(hx.hexadeks, 1); undo(hx); assert.equal(hx.hexadeks, 0, 'undo takes a hexadek back');
 console.log('star tests passed');
+
+// Endless: tiers ramp then draw from the top; decks come from the checked pool; rewards apply to one stage
+const { ENDLESS_TIERS: ET, ENDLESS_RAMP: ER, ENDLESS_SKIP: ES, ENDLESS_PERKS: EP } = R;
+for (let s = 1; s <= ER; s++) assert.equal(R.endlessTier(77, s), s - 1, 'the ramp is in order');
+const tops = new Set();
+for (let s = ER + 1; s < ER + 200; s++) { const t = R.endlessTier(77, s); assert(t >= ER && t < ET.length); tops.add(t); }
+assert.equal(tops.size, ET.length - ER, 'every top tier comes up');
+for (let run = 1; run < 40; run++) for (let s = 1; s < 30; s++) {
+  const t = R.endlessTier(run, s), i = R.endlessDeckSeed(run, s, t) - R.ENDLESS_SEED - 1000 * t;
+  assert(i >= 0 && i < R.ENDLESS_POOL && !(ES[t] || []).includes(i), 'a checked deck');
+  const offer = R.endlessOffer(run, s), next = ET[R.endlessTier(run, s + 1)];
+  assert.equal(new Set(offer).size, 2, 'two different rewards');
+  assert(offer.every(id => EP[id] && (id !== 'stone' || next.stones)), 'only rewards that help next stage');
+}
+assert.deepEqual(R.endlessGame(5, 3).tray, R.endlessGame(5, 3).tray, 'a run deals the same decks again');
+const e1 = R.endlessGame(5, 1, null, 0); assert.equal(e1.deckSize, ET[0].deck); assert.equal(R.gameName(e1), 'Endless · Stage 1');
+assert(!e1.level && R.starsFor(e1) === 0);
+const e3 = R.endlessGame(5, 3, 'pours', 2400), t3 = ET[2];
+assert.equal(e3.score, 2400, 'the run total carries on'); assert.equal(e3.pours, Math.min(t3.pours.max, t3.pours.start + 3));
+assert.equal(R.endlessGame(5, 3, 'short', 0).deckSize, t3.deck - 5);
+assert.equal(R.endlessGame(5, 3, 'undos', 0).undos, CFG.undos + 3);
+const stoneCells = g => CELLS.filter(k => g.board[k].includes(STONE)).length;
+assert.equal(stoneCells(R.endlessGame(5, 3, 'stone', 0)), stoneCells(R.endlessGame(5, 3, null, 0)) - 1, 'a stone gone');
+assert.deepEqual(ET[2].stones, R.STONE_LAYOUTS[2], 'the reward leaves the tier itself alone');
+const ew = R.endlessGame(9, 1, null, 0);
+for (let i = 0; i < ew.deckSize; i++) { assert(place(ew, ew.tray.findIndex(t => t), '0,0')); ew.board['0,0'] = []; }
+assert(R.isWon(ew));
+console.log('endless tests passed');

@@ -8,6 +8,8 @@ of one colour, to clear it and score. Several hexadeks in one turn make a combo.
 
 - **Journey:** 72 levels in 6 chapters, each bringing something new (pour budgets, stones,
   more colours, longer decks), with one to three stars per level.
+- **Endless:** stage after stage on fresh boards, rising to about the last chapter's difficulty,
+  with a reward to pick between stages; every deck is checked to be winnable.
 - **Classic:** play until the board fills, for a best score; and **Custom**: 3 to 13 colours,
   limited or free pours, and a length: fill the board, or a deck of 30 or 50 stacks.
 - A tutorial, colour themes by chapter, light and dark modes, haptics, and a hold-to-peek

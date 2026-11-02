@@ -163,6 +163,9 @@ button.quiet { color: var(--danger); font-size: 13px; padding: 6px 10px; }
 .modebox label { white-space: nowrap; margin-right: 8px; }
 .choices b { font-size: 16px; }
 .modebox > b { display: block; }
+#overperks { display: grid; gap: 8px; flex-basis: 100%; }   /* a row of its own, above Restart and New game */
+#overperks button { text-align: left; }
+#overperks span { display: block; font-weight: 400; font-size: 13px; opacity: 0.85; }
 .choices span { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
 .fig { display: flex; align-items: center; gap: 12px; margin: 4px 0 8px; }
 .fig canvas { width: 72px; height: 96px; flex: none; }
@@ -254,6 +257,7 @@ dialog li { margin-bottom: 6px; }
     <p id="overtext"></p>
     <div class="buttons">
       <button id="overnext" class="primary">Next level</button>   <!-- first: what most players want after a level -->
+      <div id="overperks"></div>   <!-- Endless: the two rewards for the next stage -->
       <button id="overundo">Undo last pour</button>
       <button id="overrestart">Restart</button>
       <button id="overnew">New game</button>
@@ -279,6 +283,10 @@ dialog li { margin-bottom: 6px; }
     <li>Only neighbours: the six cells touching it.</li>
     <li>A stack holds at most 12 tiles. If the whole run doesn't fit, only what fits moves.</li>
     <li><b>Journey</b>: 72 levels, each a fixed deck with its own rules. See <i>Journey: levels and stars</i> below.</li>
+    <li><b>Endless</b>: one stage after another, each a deck on a fresh board, rising to about the difficulty of
+      the last chapter. After each stage, pick one of two rewards for the next: extra pours, extra undos, a stone
+      gone or a shorter deck. Losing a stage ends the run; your best is the most stages cleared. Every deck has been
+      checked: it can be finished.</li>
     <li><b>Classic</b>: play until the board fills, for a best score. Each pour uses one: you start with 3, get 3 more
       for each stack you place and 1 for each hexadek, and can save up to 9. Undo gives the pour back, and you have 5
       undos per game.</li>
@@ -379,6 +387,8 @@ dialog li { margin-bottom: 6px; }
   </div>
   <h3>Other modes</h3>
   <div class="choices">
+    <button type="button" id="newendless"><b>Endless</b><span>Stage after stage on fresh boards, harder as you go,
+      with a reward to pick after each. One lost stage ends the run. <i id="endlessbest"></i></span></button>
     <button type="button" id="newclassic"><b>Classic</b><span></span></button>
     <div class="modebox"><b>Custom</b><span>Your own rules. Fewer colours is easier; 5 is usual. Free pours come
       with unlimited undos. Each mix keeps its own best score.</span>
@@ -563,16 +573,18 @@ function newStack(g) {
   return st;
 }
 // mode: 'standard' (Classic: limited pours), 'free' (unlimited pours and undos), 'survive' (limited pours and a
-// deck) or 'level'. deck: a deck size for a custom game; Survive's default is CFG.deck.
-function newGame(seed, mode, colours, level, deck) {
+// deck), 'level' or 'endless'. deck: a deck size for a custom game; Survive's default is CFG.deck.
+// spec: settings like a level's, for an Endless stage (endlessGame).
+function newGame(seed, mode, colours, level, deck, spec) {
   mode = mode || 'standard';
-  const L = mode === 'level' ? LEVELS[level - 1] : null;
+  const L = spec || (mode === 'level' ? LEVELS[level - 1] : null);
   const g = { seed: seed | 0, start: seed | 0, mode, colours: colours || CFG.colours, stone: STONE,
               pours: CFG.pours.start, undos: CFG.undos, deckSize: mode === 'survive' ? deck || CFG.deck : mode === 'free' ? deck || null : null,
               board: {}, tray: [], next: null, score: 0, turn: 0, clearsThisTurn: 0, history: [] };
   for (const k of CELLS) g.board[k] = [];
   if (L) {
-    Object.assign(g, { level, levels: LEVEL_COUNT, colours: L.colours, deckSize: L.deck, bands: L.bands, bandOdds: L.bandOdds,
+    if (mode === 'level') Object.assign(g, { level, levels: LEVEL_COUNT });
+    Object.assign(g, { colours: L.colours, deckSize: L.deck, bands: L.bands, bandOdds: L.bandOdds,
                        pourRule: L.pours === undefined ? CFG.pours : L.pours });
     if (g.pourRule) g.pours = g.pourRule.start;
     for (const k in L.stones || {}) g.board[k] = L.stones[k].slice();
@@ -580,6 +592,73 @@ function newGame(seed, mode, colours, level, deck) {
   for (let i = 0; i < CFG.traySize; i++) g.tray.push(newStack(g));
   g.next = newStack(g);
   if (g.deckSize) g.deckLeft = g.deckSize - CFG.traySize - 1;   // stacks still to come, after the tray and next
+  return g;
+}
+// ---- Endless: stage after stage, each a deck on a fresh board, until one is lost ----
+// Stages 1 to ENDLESS_RAMP use tiers 1 to 8 in turn, rising from about chapter 2 to chapter 6. After
+// that each stage draws one of the top tiers, which change the rule (stones, colours, mixed stacks,
+// pours) rather than piling on: play tests put the wall at about level 70, so the top sits just
+// below it. Decks come from a fixed pool per tier (seed ENDLESS_SEED + 1000 × tier + i), and decks
+// the expert computer player couldn't finish are skipped (ENDLESS_SKIP, from tools/bot.js
+// --endless), so every stage dealt can be won.
+const ENDLESS_SEED = 200000, ENDLESS_POOL = 60, ENDLESS_RAMP = 8;
+const ENDLESS_TIERS = [   // like a level's settings; deck lengths stay short so a loss late in a stage costs less
+  { colours: 5, deck: 30, bands: [1, 3] },
+  { colours: 5, deck: 30, bands: [1, 3], pours: POURS_TIGHT },
+  { colours: 6, deck: 31, bands: [1, 3], pours: POURS_TIGHT, stones: STONE_LAYOUTS[2] },
+  { colours: 6, deck: 32, bands: [1, 3], pours: POURS_TIGHT, bandOdds: [1, 2, 2] },
+  { colours: 6, deck: 33, bands: [1, 3], pours: POURS_TIGHT, stones: STONE_LAYOUTS[3], bandOdds: [1, 2, 2] },
+  { colours: 7, deck: 33, bands: [1, 3], pours: POURS_TIGHT },
+  { colours: 7, deck: 34, bands: [1, 3], pours: POURS_TIGHT, stones: STONE_LAYOUTS[2], bandOdds: [1, 2, 2] },
+  { colours: 7, deck: 35, bands: [1, 3], pours: POURS_TIGHTER, bandOdds: [1, 3, 3] },
+  // the top: one of these for every stage after the ramp
+  { colours: 7, deck: 36, bands: [1, 3], pours: POURS_TIGHT, stones: STONE_LAYOUTS[3], bandOdds: [1, 2, 2], top: 'Stones' },
+  { colours: 7, deck: 36, bands: [1, 3], pours: POURS_TIGHTER, bandOdds: [1, 3, 3], top: 'Budget' },
+  { colours: 7, deck: 36, bands: [1, 3], pours: POURS_TIGHT, bandOdds: [1, 4, 4], top: 'Mixed' },
+  { colours: 7, deck: 36, bands: [1, 3], pours: POURS_TIGHTER, stones: STONE_LAYOUTS[3], bandOdds: [1, 2, 2], top: 'Crowded' },
+];
+// ENDLESS_SKIP:begin (written by tools/bot.js --endless --write)
+const ENDLESS_SKIP = { 6: [36, 57], 8: [20, 37, 51], 11: [2, 10, 17, 50, 58] };   // tier: pool indices whose deck the expert couldn't finish
+// ENDLESS_SKIP:end
+// A reward, chosen after each stage, for the next one only.
+const ENDLESS_PERKS = {
+  pours: { name: 'Extra pours', text: 'Start with 3 more pours.' },
+  undos: { name: 'Extra undos', text: '3 more undos.' },
+  stone: { name: 'Break a stone', text: 'The tallest stone is gone.' },
+  short: { name: 'Shorter deck', text: '5 fewer stacks to place.' },
+};
+const endlessRng = (run, stage, salt) => { const g = { seed: (run ^ (stage * 7919 + salt * 104729)) | 0 }; rand(g); return () => rand(g); };
+function endlessTier(run, stage) {
+  if (stage <= ENDLESS_RAMP) return stage - 1;
+  const tops = ENDLESS_TIERS.length - ENDLESS_RAMP;
+  return ENDLESS_RAMP + Math.floor(endlessRng(run, stage, 1)() * tops);
+}
+function endlessDeckSeed(run, stage, tier) {
+  const skip = ENDLESS_SKIP[tier] || [], ok = [];
+  for (let i = 0; i < ENDLESS_POOL; i++) if (!skip.includes(i)) ok.push(i);
+  return ENDLESS_SEED + 1000 * tier + ok[Math.floor(endlessRng(run, stage, 2)() * ok.length)];
+}
+// The two rewards offered after a stage, for the one that follows: only those that would help there.
+function endlessOffer(run, stage) {
+  const T = ENDLESS_TIERS[endlessTier(run, stage + 1)], r = endlessRng(run, stage, 3);
+  const ids = Object.keys(ENDLESS_PERKS).filter(id => id !== 'stone' || T.stones).filter(id => id !== 'pours' || T.pours !== null);
+  const a = ids.splice(Math.floor(r() * ids.length), 1)[0];
+  return [a, ids[Math.floor(r() * ids.length)]];
+}
+// Stage `stage` of the run `run`, with a reward, carrying on from the run's score so far.
+function endlessGame(run, stage, perk, total) {
+  const tier = endlessTier(run, stage), T = ENDLESS_TIERS[tier], L = Object.assign({}, T);
+  if (perk === 'short') L.deck -= 5;
+  if (perk === 'stone' && T.stones) {
+    const tall = Object.keys(T.stones).sort((a, b) => T.stones[b].length - T.stones[a].length)[0];
+    L.stones = Object.assign({}, T.stones); delete L.stones[tall];
+  }
+  const g = newGame(endlessDeckSeed(run, stage, tier), 'endless', null, null, null, L);
+  g.endless = { run: run | 0, stage, tier, perk: perk || null };
+  g.score = total || 0;
+  if (perk === 'pours' && g.pourRule) g.pours = Math.min(g.pourRule.max, g.pours + 3);
+  if (perk === 'undos') g.undos += 3;
+  g.undoStart = g.undos;
   return g;
 }
 // A deck: the game is won once every stack in it has been placed.
@@ -636,6 +715,7 @@ function starsFor(g) { return g.level ? starGoals(g).filter(s => s.met).length :
 // Classic, or a custom game named by what differs: "Deck of 30 · free pours · 7 colours".
 function gameName(g) {
   if (g.level) return 'Level ' + g.level + ' · ' + LEVELS[g.level - 1].name;
+  if (g.endless) return 'Endless · Stage ' + g.endless.stage;
   return [g.deckSize ? 'Deck of ' + g.deckSize : 'Classic', g.mode === 'free' ? 'free pours' : null,
           g.colours !== CFG.colours ? g.colours + ' colours' : null].filter(Boolean).join(' · ');
 }
@@ -797,7 +877,7 @@ function start() {
   let firstVisit = false;
   try { firstVisit = !saved && !localStorage.getItem('hexadek.seen'); localStorage.setItem('hexadek.seen', '1'); } catch (e) {}
   // a best score for each mode and colour count; the old single best was from Free games
-  const bestKey = gm => BEST + '.' + (gm.level ? 'lv' + gm.level : gm.mode +
+  const bestKey = gm => BEST + '.' + (gm.level ? 'lv' + gm.level : gm.endless ? 'endless' : gm.mode +
     (gm.deckSize && gm.deckSize !== (gm.mode === 'survive' ? CFG.deck : 0) ? '.d' + gm.deckSize : '') +
     (gm.colours !== CFG.colours ? '.' + gm.colours + 'c' : ''));
   function readBest(gm) {
@@ -845,9 +925,13 @@ function start() {
       best = g.score;
       try { localStorage.setItem(bestKey(g), String(best)); } catch (e) {}
     }
+    if (g.endless && endlessCleared(g) > readEndlessStages())   // Endless: the most stages cleared in a run
+      try { localStorage.setItem(BEST + '.endless.stages', String(endlessCleared(g))); } catch (e) {}
     const st = starsFor(g);   // only the best result counts
     if (st > readStars(g.level)) try { localStorage.setItem(STARS + g.level, String(st)); } catch (e) {}
   }
+  const endlessCleared = gm => gm.endless.stage - (isWon(gm) ? 0 : 1);
+  function readEndlessStages() { try { return Number(localStorage.getItem(BEST + '.endless.stages')) || 0; } catch (e) { return 0; } }
   function readStars(n) { try { return Number(localStorage.getItem(STARS + n)) || 0; } catch (e) { return 0; } }
   const starText = n => '★'.repeat(n) + '☆'.repeat(3 - n);
 
@@ -997,7 +1081,7 @@ function start() {
     const T = g.level ? levelTargets(g.level) : null;
     const rec = { t: stamp(), game: gameName(g), level: g.level || null, result,
       score: g.score, stars: g.level ? starsFor(g) : null, hexadeks: g.hexadeks || 0, M: T ? T.M : null,
-      placed: g.turn, deck: g.deckSize || null, colours: g.colours, undos: pourRule(g) ? 5 - undosLeft(g) : null,
+      placed: g.turn, deck: g.deckSize || null, colours: g.colours, undos: pourRule(g) ? (g.undoStart || CFG.undos) - undosLeft(g) : null,
       time: g.ms ? mmss(g.ms) : null };
     try {
       const log = JSON.parse(localStorage.getItem(LOG) || '[]'); log.push(rec);
@@ -1033,16 +1117,21 @@ function start() {
     return lines.join('\n');
   }
   function startGame(seed, mode, colours, level, intro, deck) {
+    beginGame(newGame(seed, mode, colours, level, deck));
+    if (intro) showIntro();
+  }
+  function beginGame(ng) {
     logGame('left');   // a game in progress that's replaced (Restart, New game, another level)
     lastInput = Date.now();   // the clock starts with the game, so the first move's thinking counts
     finishAnims(); ending = null;
-    g = newGame(seed, mode, colours, level, deck);
+    g = ng;
     ui.sel = ui.trayPick = null;
     flash = null;
     after();
     $('intro').classList.remove('show');
-    if (intro) showIntro();
   }
+  const startEndless = run => beginGame(endlessGame(run, 1, null, 0));
+  const nextStage = perk => beginGame(endlessGame(g.endless.run, g.endless.stage + 1, perk, g.score));
   function showIntro() {   // a card describing the level: what's new in it and the star goals
     const L = LEVELS[g.level - 1], T = levelTargets(g.level), P = pourRule(g);
     $('introlevel').textContent = 'Level ' + g.level + ' of ' + LEVELS.length + ' · Chapter ' + (L.chapter + 1) + ' (' + (L.step + 1) + '/' + CHAPTER_SIZE + ')';
@@ -1069,19 +1158,25 @@ function start() {
   $('intro').addEventListener('click', e => { if (e.target === $('intro')) hideIntro(); });   // a tap beside the card
   function doNew(again) {   // again: the same game from the start, with the same stacks and mode
     if (tut) { g = realG || g; tut = realG = null; coach(); }
-    const busy = (g.turn > 0 || g.history.length) && state !== 'over' && state !== 'won';
+    const busy = g.endless ? state !== 'over' && (g.endless.stage > 1 || g.turn > 0) :
+      (g.turn > 0 || g.history.length) && state !== 'over' && state !== 'won';
     if (again) {
-      const go = () => startGame(g.start, g.mode, g.colours, g.level, false, g.level ? null : g.deckSize);
-      if (busy) ask('Restart this game from the beginning, with the same stacks?', 'Restart', go); else go();
+      const go = g.endless ? () => startEndless(g.endless.run) :
+        () => startGame(g.start, g.mode, g.colours, g.level, false, g.level ? null : g.deckSize);
+      if (busy) ask(g.endless ? 'Restart this run from stage 1, with the same decks?' :
+        'Restart this game from the beginning, with the same stacks?', 'Restart', go); else go();
       return;
     }
     $('newwarn').textContent = busy ? 'The game you are playing will be lost.' : '';
     $('newwarn').style.display = busy ? '' : 'none';
     $('newcolours').value = String(Math.min(13, g.colours % 2 ? g.colours : g.colours + 1));   // older games had 4 or 6
-    if (!g.level && !tut) { const c = customOf(g); $('newpours').value = c.free ? 'free' : 'limited'; $('newlength').value = String(c.deck); }
+    const eb = readEndlessStages();
+    $('endlessbest').textContent = eb ? 'Your best: ' + eb + (eb === 1 ? ' stage, ' : ' stages, ') + readBest({ endless: true }) + ' points.' : '';
+    if (!g.level && !g.endless && !tut) { const c = customOf(g); $('newpours').value = c.free ? 'free' : 'limited'; $('newlength').value = String(c.deck); }
     $('newcontinue').textContent = 'Continue: Level ' + continueLevel();
     $('newgame').showModal();
   }
+  $('newendless').onclick = () => { $('newgame').close(); startEndless(Date.now()); };
   $('newclassic').onclick = () => { $('newgame').close(); startGame(Date.now(), 'standard'); };   // the usual 5 colours
   $('newcustom').onclick = () => {
     const c = { colours: Number($('newcolours').value), free: $('newpours').value === 'free', deck: Number($('newlength').value) };
@@ -1185,7 +1280,8 @@ function start() {
   let themeNow = null;
   function applyGameTheme() {
     if (typeof applyTheme !== 'function') return;   // themes.js didn't load: keep the built-in colours
-    const name = g.level && !tut ? CHAPTER_THEMES[LEVELS[g.level - 1].chapter] : 'classic';
+    const name = tut ? 'classic' : g.level ? CHAPTER_THEMES[LEVELS[g.level - 1].chapter] :
+      g.endless ? CHAPTER_THEMES[(g.endless.stage - 1) % CHAPTER_THEMES.length] : 'classic';
     if (name === themeNow) return;
     themeNow = name; applyTheme(name); resize();   // resize re-reads the colours for the board
   }
@@ -1309,14 +1405,16 @@ function start() {
     $('restart').disabled = !!tut || g.start === undefined;
     $('overrestart').style.display = g.start === undefined ? 'none' : '';
     // the end card's main button: the next level after a win, otherwise a new game
-    const next = state === 'won' && g.level && g.level < LEVELS.length;
+    const next = state === 'won' && g.level && g.level < LEVELS.length, perks = state === 'won' && !!g.endless && !tut;
     $('overnext').style.display = next ? '' : 'none';
-    $('overnew').classList.toggle('primary', !next);
+    $('overnew').classList.toggle('primary', !next && !perks);
+    $('overperks').style.display = perks ? '' : 'none';
+    showPerks(perks);
     const st = $('status');
     st.classList.toggle('flash', !!flash);
     let text;
     if (flash) text = flash.text;
-    else if (state === 'won') text = 'Deck complete!';
+    else if (state === 'won') text = g.endless ? 'Stage cleared!' : 'Deck complete!';
     else if (state === 'over') text = 'No room left.';
     else if (state === 'full') text = 'Board full: pour to make room.';
     else if (poursLeft(g) < 1 && state !== 'over') text = 'No pours left: place a stack for ' + P.perPlace + ' more.';
@@ -1326,6 +1424,8 @@ function start() {
       const T = levelTargets(g.level);
       text = '★ place ' + g.deckSize + ' · ★★ ' + T.score + ' pts · ★★★ ' + T.top + (T.stones ? ' + stones' : ' pts');
     }
+    else if (g.endless && g.turn === 0 && !g.history.length)
+      text = 'Stage ' + g.endless.stage + ': place ' + g.deckSize + ' stacks' + (g.endless.perk ? ' · ' + ENDLESS_PERKS[g.endless.perk].name : '') + '.';
     else if (g.deckSize && g.turn === 0 && !g.history.length) text = 'Place all ' + g.deckSize + ' stacks in the deck to win.';
     else if (g.turn === 0 && !g.history.length) text = 'Drag a tray stack onto the board to start.';
     else if (P) text = 'Pour, then place a stack (+' + P.perPlace + ' pours).';
@@ -1335,7 +1435,8 @@ function start() {
     if ($('msg').scrollWidth > $('msg').clientWidth) st.classList.add('tight');
     $('giveup').style.display = state === 'full' ? 'inline-block' : 'none';
     $('over').classList.toggle('show', (state === 'over' || state === 'won') && !ending);
-    $('overtitle').textContent = state === 'won' ? 'Deck complete!' : 'No room left';
+    $('overtitle').textContent = g.endless ? (state === 'won' ? 'Stage ' + g.endless.stage + ' cleared!' : 'Run over') :
+      state === 'won' ? 'Deck complete!' : 'No room left';
     $('deck').style.visibility = g.deckSize ? 'visible' : 'hidden';
     $('deckbar').style.display = g.deckSize ? '' : 'none';   // no empty line under endless games
     if (g.deckSize) {
@@ -1355,8 +1456,24 @@ function start() {
     const made = g.hexadeks || 0;
     $('overtext').textContent = gameName(g) + '. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ').') +
       ' Hexadeks: ' + made + (g.level ? ' of ' + deckMax(g) + ' possible.' : '.');
+    if (g.endless) {
+      const n = endlessCleared(g), eb = readEndlessStages(), stages = k => k + (k === 1 ? ' stage' : ' stages');
+      $('overtext').textContent = state === 'won' ? 'Run total: ' + g.score + ' points. Choose a reward for stage ' + (n + 1) + ':' :
+        'No room left. You cleared ' + stages(n) + ', with ' + g.score + ' points' +
+        (n && n >= eb ? ': your best run!' : '. Best: ' + stages(eb) + ', ' + best + ' points.');
+    }
     $('overundo').style.display = g.history.length && undosLeft(g) > 0 && state !== 'won' ? '' : 'none';
   }
+  let perksKey = null;
+  function showPerks(on) {   // the two rewards on the end card, rebuilt only when the stage changes
+    const key = on ? g.endless.run + ':' + g.endless.stage : null;
+    if (key === perksKey) return;
+    perksKey = key;
+    $('overperks').replaceChildren(...(on ? endlessOffer(g.endless.run, g.endless.stage).map((id, i) =>
+      el('button', { type: 'button', class: i ? '' : 'primary', 'data-perk': id },
+        el('b', null, ENDLESS_PERKS[id].name), el('span', null, ENDLESS_PERKS[id].text))) : []));
+  }
+  $('overperks').addEventListener('click', e => { const b = e.target.closest('button'); if (b) nextStage(b.dataset.perk); });
 
   // ---- input ----
   function pt(e) {
