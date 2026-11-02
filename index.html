@@ -4,10 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hexadek</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Lexend: a typeface made for easy reading. Without a connection the system font stands in. -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=swap">
+<!-- Lexend: a typeface made for easy reading, bundled in fonts/. Without it the system font stands in. -->
+<link rel="stylesheet" href="fonts/lexend.css">
 <style>
 :root {
   --font: Lexend, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -745,6 +743,17 @@ const TUTORIAL = [
 
 // ---- the page ----
 function start() {
+  // Builds page elements from plain values: text is always text, never read as markup, so the page
+  // stays safe even if it someday shows something a player typed. el('li', { class: 'met' }, '✓ ', text)
+  function el(tag, attrs, ...kids) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v === false || v === null || v === undefined) continue;
+      if (k === 'style') e.style.cssText = v; else e.setAttribute(k, v === true ? '' : String(v));
+    }
+    for (const c of kids.flat()) if (c !== null && c !== undefined && c !== false) e.append(c instanceof Node ? c : String(c));
+    return e;
+  }
   const SAVE = 'hexadek.save.v1', BEST = 'hexadek.best', STARS = 'hexadek.stars.lv';   // .lv: the 72 levels (2026-11)
   const OLD = 'hexdek';   // the game's first name: saves made under it still load
   const TILE = 0.12;      // tile thickness, as a share of the hex size
@@ -1018,7 +1027,7 @@ function start() {
     let done = 0, stars = 0;
     for (let n = 1; n <= LEVEL_COUNT; n++) { const s = readStars(n); if (s) done++; stars += s; }
     $('introjourney').textContent = 'Journey so far: ' + done + ' of ' + LEVEL_COUNT + ' levels, ' + stars + ' of ' + LEVEL_COUNT * 3 + ' ★';
-    $('introgoals').innerHTML = goals.map(([s, t]) => '<li><b>' + s + '</b>' + t + '</li>').join('');
+    $('introgoals').replaceChildren(...goals.map(([s, t]) => el('li', null, el('b', null, s), t)));
     $('introgo').textContent = g.turn || g.score ? 'Back to the game' : 'Start';
     $('intro').classList.add('show');
     $('introgo').focus({ preventScroll: true });
@@ -1055,9 +1064,9 @@ function start() {
   $('newstandard').onclick = chosen('standard');
   $('newfree').onclick = chosen('free');
   $('newsurvive').onclick = chosen('survive');
-  $('levelstable').innerHTML = '<tr><th>Chapter</th><th>Levels</th><th>Brings</th></tr>' +
-    CHAPTERS.map((C, c) => '<tr><td>' + (c + 1) + ' · ' + C.name + '</td><td>' + (c * CHAPTER_SIZE + 1) + '–' +
-      (c + 1) * CHAPTER_SIZE + '</td><td>' + C.about + '</td></tr>').join('');
+  $('levelstable').replaceChildren(el('tr', null, el('th', null, 'Chapter'), el('th', null, 'Levels'), el('th', null, 'Brings')),
+    ...CHAPTERS.map((C, c) => el('tr', null, el('td', null, (c + 1) + ' · ' + C.name),
+      el('td', null, (c * CHAPTER_SIZE + 1) + '–' + (c + 1) * CHAPTER_SIZE), el('td', null, C.about))));
   // ---- levels: one deck each, the same every time; finish one to open the next ----
   const playLevel = n => startGame(LEVEL_SEED + n, 'level', null, n, true);
   const unlocked = n => n === 1 || (n - 1) % CHAPTER_SIZE === 0 || readStars(n - 1) > 0 || readStars(n) > 0;
@@ -1067,13 +1076,14 @@ function start() {
   }
   function showLevels() {
     const cont = continueLevel();
-    $('levelgrid').innerHTML = CHAPTERS.map((C, c) => '<section class="chap" style="' + chapterStyle(c) + '"><h3>Chapter ' + (c + 1) + ' · ' + C.name + '</h3><div class="lvgrid">' +
-      LEVELS.slice(c * CHAPTER_SIZE, (c + 1) * CHAPTER_SIZE).map(L => {
+    $('levelgrid').replaceChildren(...CHAPTERS.map((C, c) => el('section', { class: 'chap', style: chapterStyle(c) },
+      el('h3', null, 'Chapter ' + (c + 1) + ' · ' + C.name),
+      el('div', { class: 'lvgrid' }, LEVELS.slice(c * CHAPTER_SIZE, (c + 1) * CHAPTER_SIZE).map(L => {
         const open = unlocked(L.n), st = readStars(L.n);
-        return '<button type="button" class="lv' + (L.n === cont ? ' primary' : '') + '" data-n="' + L.n + '"' +
-          (open ? '' : ' disabled') + ' aria-label="Level ' + L.n + (open ? ', ' + st + ' stars' : ', locked') + '"><b>' + L.n +
-          '</b><span>' + (open ? starText(st) : 'locked') + '</span></button>';
-      }).join('') + '</div></section>').join('');
+        return el('button', { type: 'button', class: 'lv' + (L.n === cont ? ' primary' : ''), 'data-n': L.n, disabled: !open,
+                              'aria-label': 'Level ' + L.n + (open ? ', ' + st + ' stars' : ', locked') },
+          el('b', null, L.n), el('span', null, open ? starText(st) : 'locked'));
+      })))));
     $('levels').showModal();
     const cur = $('levelgrid').querySelector('.primary'); if (cur) cur.scrollIntoView({ block: 'center' });
   }
@@ -1248,8 +1258,8 @@ function start() {
     const key = n + ':' + stars.join();
     if (key === dotsKey) return;
     dotsKey = key;
-    $('chapdots').innerHTML = n ? '<b>Chapter ' + (LEVELS[n - 1].chapter + 1) + ' · ' + (n - first + 1) + ' of ' + CHAPTER_SIZE + '</b>' +
-      stars.map((d, i) => '<i class="' + (first + i === n ? 'now' : d ? 'done' : '') + '"></i>').join('') : '';
+    $('chapdots').replaceChildren(...(n ? [el('b', null, 'Chapter ' + (LEVELS[n - 1].chapter + 1) + ' · ' + (n - first + 1) + ' of ' + CHAPTER_SIZE),
+      ...stars.map((d, i) => el('i', { class: first + i === n ? 'now' : d ? 'done' : '' }))] : []));
     $('chapdots').title = n ? 'Level ' + (n - first + 1) + ' of ' + CHAPTER_SIZE + ' in chapter ' + (LEVELS[n - 1].chapter + 1) + '; gold dots: levels with stars' : '';
   }
   function hud() {
@@ -1314,7 +1324,7 @@ function start() {
       const n = starsFor(g);
       $('overstarbig').textContent = starText(n);
       $('overstarbig').setAttribute('aria-label', n + ' of 3 stars');
-      $('overgoals').innerHTML = goals.map(s => '<li class="' + (s.met ? 'met' : '') + '">' + (s.met ? '✓ ' : '· ') + s.text + '</li>').join('');
+      $('overgoals').replaceChildren(...goals.map(s => el('li', { class: s.met ? 'met' : '' }, (s.met ? '✓ ' : '· ') + s.text)));
     }
     const made = g.hexadeks || 0;
     $('overtext').textContent = gameName(g) + ' game. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ').') +
