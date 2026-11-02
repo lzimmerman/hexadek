@@ -1,38 +1,34 @@
 ---
 name: Bug report
-about: Create a report to help us improve
+about: Something in the game doesn't work or looks wrong
 title: ''
-labels: ''
+labels: bug
 assignees: ''
 
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+**Where did it happen?**
+Game mode (Journey, Standard, Survive, Free or Custom) and, for Journey, the level number:
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+**What did you do, and what happened?**
+A short description. What did you expect instead?
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+**Did Undo or Restart help?**
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+**Device and browser**
+For example: Pixel 8, Chrome 130 · iPhone 15, Safari · Windows 11, Firefox
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+**Screenshot** (optional)
+Most helpful for layout or display problems.
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+**Play data** (optional)
+In the game: How to play › Copy play data, then paste it here. It lists your games' levels,
+scores, stars, undos and play times, and holds no personal information.
 
-**Additional context**
-Add any other context about the problem here.
+<details><summary>Play data</summary>
+
+```
+paste here
+```
+
+</details>
