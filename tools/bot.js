@@ -28,7 +28,7 @@
 //                           pour (searched as one move of up to 4 pours, each paid for as usual)
 //     --bank                plays the banking strategy seen in play tests: single-colour stacks kept side
 //                           by side around the edge, corners most, as savings for later hexadeks
-//     --classic             Classic games to the end, with the colour ramp (--ramp EVERY,MAX to try others)
+//     --classic             Classic games to the end, with the colour ramp (--ramp EVERY,MAX to try others; --holes NAME)
 //     --daily A-B           daily puzzles from date A to B (YYYYMMDD): finish, ★★ and ★★★ rates by weekday
 //     --hub auto|point|line plays the hub strategy seen in play tests: keep a hub free (the centre, or a
 //                           line through it with more colours), place each new stack there, and pour
@@ -268,7 +268,7 @@ if (flag('classic')) {
   if (opt('ramp')) { const [e, m] = opt('ramp').split(',').map(Number); CLASSIC_RAMP.every = e; CLASSIC_RAMP.max = m; }
   const sk = opt('skill', 'player'), n = Number(opt('games', 12)), res = [];
   for (let i = 0; i < n; i++) {
-    const t0 = Date.now(), g = playGame(newGame(5000 + i, 'standard'), SKILLS[sk], mulberry(i * 13 + 1));
+    const t0 = Date.now(), g = playGame(newGame(5000 + i, 'standard', null, null, null, null, opt('holes')), SKILLS[sk], mulberry(i * 13 + 1));
     res.push({ turns: g.turn, deks: g.hexadeks || 0, score: g.score, colours: g.colours, s: Math.round((Date.now() - t0) / 1000) });
   }
   const q = (k, f) => { const a = res.map(r => r[k]).sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(f * a.length))]; };

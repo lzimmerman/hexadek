@@ -342,10 +342,11 @@ console.log('daily tests passed');
   console.log('hole tests passed');
 }
 
-// a custom game on a holed board: its shape, no Classic ramp, and its name
+// a custom game on a holed board: its shape, the Classic ramp with 5 colours, and its name
 {
   const g = newGame(5, 'standard', 5, null, null, null, 'ring');
-  assert.equal(g.holes, 'ring'); assert(!('0,0' in g.board)); assert(!g.ramp, 'a holed board is a custom game, not Classic');
+  assert.equal(g.holes, 'ring'); assert(!('0,0' in g.board)); assert(g.ramp, 'Classic on a ring still brings in colours');
+  assert(!newGame(5, 'standard', 7, null, null, null, 'ring').ramp, 'other colour counts stay fixed');
   assert.equal(R.gameName(g), 'Classic · Ring');
   assert(newGame(5, 'standard').ramp && !newGame(5, 'standard').holes);
   console.log('custom board tests passed');

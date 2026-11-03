@@ -135,6 +135,45 @@ test('Custom: a board with holes, kept by Restart and a reload', async ({ page, 
   expect(errors).toEqual([]);
 });
 
+test('End game: a Classic game ends on request, with its end card, and is logged', async ({ page, hasTouch }) => {
+  const errors = await openGame(page);
+  await page.locator('#new').click();
+  await expect(page.locator('#newwarnrow')).toBeHidden();   // nothing played yet
+  await page.locator('#newcancel').click();
+  await tap(page, hasTouch, await slotPoint(page, 0));   // a level in progress: no End game, as leaving loses it
+  await tap(page, hasTouch, await cellPoint(page, '0,0'));
+  await page.locator('#new').click();
+  await expect(page.locator('#newwarn')).toHaveText('The game you are playing will be lost.');
+  await expect(page.locator('#newend')).toBeHidden();
+  await page.locator('#newmode').selectOption('classic');
+  await page.locator('#newclassic').click();
+  await tap(page, hasTouch, await slotPoint(page, 0));
+  await tap(page, hasTouch, await cellPoint(page, '1,0'));
+  await expect.poll(() => game(page, () => window.__t.g.turn)).toBe(1);
+  await page.locator('#new').click();
+  await expect(page.locator('#newwarn')).toHaveText(/kept for your best/);
+  await page.locator('#newend').click();
+  await expect(page.locator('#over')).toBeVisible();
+  await expect(page.locator('#overtitle')).toHaveText('Game ended');
+  await expect(page.locator('#overundo')).toBeHidden();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hexadek.log')).pop().result)).toBe('ended');
+  await page.reload();   // still ended after a reload
+  await page.waitForFunction(() => window.__t && window.__t.g);
+  await expect(page.locator('#over')).toBeVisible();
+  await page.locator('#overnew').click();   // an ended game isn't in progress
+  await expect(page.locator('#newwarnrow')).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('end card: every dek but not ★★★ points to combos', async ({ page }) => {
+  const errors = await openGame(page);
+  await page.evaluate(() => { const T = window.__t, g = T.g, M = levelTargets(g.level).M;
+    g.turn = g.deckSize; g.hexadeks = M; g.score = M * 120; T.after(); });
+  await expect(page.locator('#over')).toBeVisible();
+  await expect(page.locator('#overtext')).toContainText('★★★ takes combos');
+  expect(errors).toEqual([]);
+});
+
 test('keeps the game after a reload', async ({ page, hasTouch }) => {
   await openGame(page);
   await tap(page, hasTouch, await slotPoint(page, 0));
