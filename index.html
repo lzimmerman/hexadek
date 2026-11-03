@@ -205,6 +205,10 @@ button.quiet { color: var(--danger); font-size: 13px; padding: 6px 10px; }
 #newgame .modebox > span { display: block; color: var(--muted); font-size: 14px; }
 #newmode { font-size: 16px; }
 .modebox label { white-space: nowrap; margin-right: 8px; }
+/* Custom's settings: a label, then its dropdown, one to a line; the labels share the widest one's width so the dropdowns line up */
+.modebox .opts { display: grid; grid-template-columns: max-content minmax(0, max-content); gap: 8px 10px; align-items: center; margin-top: 8px; }
+.modebox .opts label { display: contents; }
+.modebox .opts select { max-width: 100%; }
 .choices b { font-size: 16px; }
 .modebox > b { display: block; }
 #overperks { display: grid; gap: 8px; flex-basis: 100%; }   /* a row of its own, above Restart and New game */
@@ -355,7 +359,7 @@ dialog li { margin-bottom: 6px; }
       unlimited undos), and the length: <i>Fill board</i> (play until the board is full), or a deck of 30 or 50
       stacks to place without running out of room. The bar below the board shows how far through a deck you are.
       The board can also take another shape, with holes where cells are missing: fewer cells and fewer
-      neighbours make it harder.</li>
+      neighbours make it harder. The shapes are listed easiest first.</li>
     <li>Choose the mode under New game; it opens on the one you last played.</li>
   </ul>
   <h3>Placing</h3>
@@ -463,14 +467,14 @@ dialog li { margin-bottom: 6px; }
     <div class="row"><button type="button" id="newclassic" class="primary">Play Classic</button></div></div>
   <div class="modebox" data-mode="custom"><span>Your own rules. Fewer colours is easier; 5 is usual. Free pours come
       with unlimited undos. A board with holes is harder. Each mix keeps its own best score.</span>
-    <div class="row"><label class="row" for="newcolours">Colours
+    <div class="opts"><label for="newcolours">Colours
         <select id="newcolours"><option>3</option><option>5</option><option>7</option><option>9</option><option>11</option><option>13</option></select></label>
-      <label class="row" for="newpours">Pours
+      <label for="newpours">Pours
         <select id="newpours"><option value="limited">Limited</option><option value="free">Free</option></select></label>
-      <label class="row" for="newlength">Length
+      <label for="newlength">Length
         <select id="newlength"><option value="0">Fill board</option><option value="30">Deck of 30</option>
           <option value="50">Deck of 50</option></select></label>
-      <label class="row" for="newboard">Board
+      <label for="newboard">Board shape
         <select id="newboard"><option value="">Full</option></select></label></div>
     <div class="row"><button type="button" id="newcustom" class="primary">Play custom game</button></div></div>
   <div class="row"><span class="spacer"></span><button type="button" id="newcancel">Cancel</button></div>
@@ -544,12 +548,13 @@ const POURS_TIGHT = { start: 2, perPlace: 2, perClear: 1, max: 6 };
 const POURS_TIGHTER = { start: 2, perPlace: 2, perClear: 1, max: 5 };
 const S1 = [STONE], S2 = [STONE, STONE];
 // Holes: cells missing from the board, for new board shapes. Fewer cells means less room, and
-// fewer neighbours means fewer pours: chokepoints. A level's `holes` names one of these.
+// fewer neighbours means fewer pours: chokepoints. A level's `holes` names one of these. Easiest first
+// (player bot, 2026-11-03); names stay short to fit Custom's dropdown on a small phone.
 const BOARD_SHAPES = {
   ring:    { name: 'Ring', cells: ['0,0'] },                                  // 18 cells: no middle
-  corners: { name: 'Three corners', cells: ['2,-2', '-2,0', '0,2'] },          // 16 cells
-  wheel:   { name: 'Wheel', cells: ['0,0', '1,0', '-1,1', '0,-1'] },           // 15: a rim with three spokes
+  corners: { name: 'Corners', cells: ['2,-2', '-2,0', '0,2'] },                // 16 cells: three corners gone
   bridge:  { name: 'Bridge', cells: ['-2,0', '-1,0', '1,0', '2,0'] },          // 15: two islands of 7, joined in the middle
+  wheel:   { name: 'Wheel', cells: ['0,0', '1,0', '-1,1', '0,-1'] },           // 15: a rim with three spokes
   loop:    { name: 'Loop', cells: ['0,0', '1,0', '1,-1', '0,-1', '-1,0', '-1,1', '0,1'] },   // 12: the rim only
 };
 const STONE_LAYOUTS = {   // by number of stone cells; a stone two high takes two clears
@@ -1578,8 +1583,7 @@ function start() {
                 holes: $('newboard').value || null };
     $('newgame').close(); startGame(Date.now(), customMode(c), c.colours, null, false, c.deck || null, c.holes);
   };
-  $('newboard').append(...Object.keys(BOARD_SHAPES).map(k => el('option', { value: k },
-    BOARD_SHAPES[k].name + ' (' + (CELLS.length - BOARD_SHAPES[k].cells.length) + ' cells)')));
+  $('newboard').append(...Object.keys(BOARD_SHAPES).map(k => el('option', { value: k }, BOARD_SHAPES[k].name)));
   const P = CFG.pours;
   $('classicabout').textContent = 'Play until the board fills, for a best score. Start with ' + P.start +
     ' pours, get ' + P.perPlace + ' more for each stack you place and ' + P.perClear + ' for each dek, up to ' + P.max + ' saved. ' +
