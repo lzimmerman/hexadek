@@ -80,10 +80,15 @@ test('dialogs: How to play, play data, New game and All levels', async ({ page }
 test('New game: Classic, and a Custom game that Restart keeps', async ({ page }) => {
   const errors = await openGame(page);
   await page.locator('#new').click();
+  await expect(page.locator('#newmode')).toHaveValue('journey');   // the mode last played
+  await expect(page.locator('#newclassic')).toBeHidden();
+  await page.locator('#newmode').selectOption('classic');
   await page.locator('#newclassic').click();
   await expect(page.locator('#mode')).toHaveText('Classic');
   await expect(page.locator('#deckbar')).toBeHidden();
   await page.locator('#new').click();
+  await expect(page.locator('#newmode')).toHaveValue('classic');
+  await page.locator('#newmode').selectOption('custom');
   await page.locator('#newcolours').selectOption('3');
   await page.locator('#newpours').selectOption('free');
   await page.locator('#newlength').selectOption('50');
@@ -95,6 +100,7 @@ test('New game: Classic, and a Custom game that Restart keeps', async ({ page })
   expect(await game(page, () => ({ deck: window.__t.g.deckSize, tray: JSON.stringify(window.__t.g.tray) })))
     .toEqual({ deck: 50, tray: first });
   await page.locator('#new').click();   // the dialog remembers the custom settings
+  await expect(page.locator('#newmode')).toHaveValue('custom');
   await expect(page.locator('#newpours')).toHaveValue('free');
   await expect(page.locator('#newlength')).toHaveValue('50');
   await expect(page.locator('#newcolours')).toHaveValue('3');

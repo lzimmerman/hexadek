@@ -160,6 +160,9 @@ button.quiet { color: var(--danger); font-size: 13px; padding: 6px 10px; }
 /* a mode with its own buttons inside: framed like the mode buttons */
 .modebox { border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--cell-edge)); border-radius: 8px; }
 .modebox .row { margin-top: 8px; gap: 8px; }
+#newgame .modebox { margin: 8px 0 12px; padding: 10px 12px; }
+#newgame .modebox > span { display: block; color: var(--muted); font-size: 14px; }
+#newmode { font-size: 16px; }
 .modebox label { white-space: nowrap; margin-right: 8px; }
 .choices b { font-size: 16px; }
 .modebox > b { display: block; }
@@ -298,7 +301,7 @@ dialog li { margin-bottom: 6px; }
     <li><b>Custom</b>: choose the colours (3 to 13; fewer is easier), limited or free pours (free pours come with
       unlimited undos), and the length: <i>Fill board</i> (play until the board is full), or a deck of 30 or 50
       stacks to place without running out of room. The bar below the board shows how far through a deck you are.</li>
-    <li>Choose under New game.</li>
+    <li>Choose the mode under New game; it opens on the one you last played.</li>
   </ul>
   <h3>Placing</h3>
   <ul>
@@ -385,28 +388,28 @@ dialog li { margin-bottom: 6px; }
 <dialog id="newgame">
   <h2>New game</h2>
   <p id="newwarn"></p>
-  <div class="choices">
-    <div class="modebox"><b>Journey</b><span>72 levels in 6 chapters, each bringing something new. A fixed deck per
-      level, with up to 3 stars.</span>
-      <div class="row"><button type="button" id="newcontinue" class="primary">Continue: Level 1</button>
-        <button type="button" id="newchoose">All levels</button></div></div>
-  </div>
-  <h3>Other modes</h3>
-  <div class="choices">
-    <button type="button" id="newendless"><b>Endless</b><span>Stage after stage on fresh boards, harder as you go,
-      with a reward to pick after each. One lost stage ends the run. <i id="endlessbest"></i></span></button>
-    <button type="button" id="newclassic"><b>Classic</b><span></span></button>
-    <div class="modebox"><b>Custom</b><span>Your own rules. Fewer colours is easier; 5 is usual. Free pours come
+  <div class="row"><label class="row" for="newmode">Mode
+    <select id="newmode"><option value="journey">Journey</option><option value="endless">Endless</option>
+      <option value="classic">Classic</option><option value="custom">Custom</option></select></label></div>
+  <div class="modebox" data-mode="journey"><span>72 levels in 6 chapters, each bringing something new. A fixed deck
+      per level, with up to 3 stars.</span>
+    <div class="row"><button type="button" id="newcontinue" class="primary">Continue: Level 1</button>
+      <button type="button" id="newchoose">All levels</button></div></div>
+  <div class="modebox" data-mode="endless"><span>Stage after stage on fresh boards, harder as you go, with a reward
+      to pick after each. One lost stage ends the run. <i id="endlessbest"></i></span>
+    <div class="row"><button type="button" id="newendless" class="primary">Start a run</button></div></div>
+  <div class="modebox" data-mode="classic"><span id="classicabout"></span>
+    <div class="row"><button type="button" id="newclassic" class="primary">Play Classic</button></div></div>
+  <div class="modebox" data-mode="custom"><span>Your own rules. Fewer colours is easier; 5 is usual. Free pours come
       with unlimited undos. Each mix keeps its own best score.</span>
-      <div class="row"><label class="row" for="newcolours">Colours
-          <select id="newcolours"><option>3</option><option>5</option><option>7</option><option>9</option><option>11</option><option>13</option></select></label>
-        <label class="row" for="newpours">Pours
-          <select id="newpours"><option value="limited">Limited</option><option value="free">Free</option></select></label>
-        <label class="row" for="newlength">Length
-          <select id="newlength"><option value="0">Fill board</option><option value="30">Deck of 30</option>
-            <option value="50">Deck of 50</option></select></label></div>
-      <div class="row"><button type="button" id="newcustom">Play custom game</button></div></div>
-  </div>
+    <div class="row"><label class="row" for="newcolours">Colours
+        <select id="newcolours"><option>3</option><option>5</option><option>7</option><option>9</option><option>11</option><option>13</option></select></label>
+      <label class="row" for="newpours">Pours
+        <select id="newpours"><option value="limited">Limited</option><option value="free">Free</option></select></label>
+      <label class="row" for="newlength">Length
+        <select id="newlength"><option value="0">Fill board</option><option value="30">Deck of 30</option>
+          <option value="50">Deck of 50</option></select></label></div>
+    <div class="row"><button type="button" id="newcustom" class="primary">Play custom game</button></div></div>
   <div class="row"><span class="spacer"></span><button type="button" id="newcancel">Cancel</button></div>
   <div class="extra row"><span class="hint">Start over: clears every level's stars and all best scores.</span>
     <button type="button" id="resetall" class="quiet">Reset all progress</button></div>
@@ -1201,8 +1204,17 @@ function start() {
     $('endlessbest').textContent = eb ? 'Your best: ' + eb + (eb === 1 ? ' stage, ' : ' stages, ') + readBest({ endless: true }) + ' points.' : '';
     if (!g.level && !g.endless && !tut) { const c = customOf(g); $('newpours').value = c.free ? 'free' : 'limited'; $('newlength').value = String(c.deck); }
     $('newcontinue').textContent = 'Continue: Level ' + continueLevel();
+    $('newmode').value = tut ? 'journey' : modeOf(g);   // the mode last played
+    showMode();
     $('newgame').showModal();
   }
+  // the New game dialog: one mode at a time, chosen from the list
+  const modeOf = gm => gm.level ? 'journey' : gm.endless ? 'endless' :
+    gm.mode === 'standard' && gm.colours === CFG.colours && !gm.deckSize ? 'classic' : 'custom';
+  function showMode() {
+    for (const b of $('newgame').querySelectorAll('[data-mode]')) b.hidden = b.dataset.mode !== $('newmode').value;
+  }
+  $('newmode').onchange = showMode;
   $('newendless').onclick = () => { $('newgame').close(); startEndless(Date.now()); };
   $('newclassic').onclick = () => { $('newgame').close(); startGame(Date.now(), 'standard'); };   // the usual 5 colours
   $('newcustom').onclick = () => {
@@ -1210,7 +1222,7 @@ function start() {
     $('newgame').close(); startGame(Date.now(), customMode(c), c.colours, null, false, c.deck || null);
   };
   const P = CFG.pours;
-  $('newclassic').querySelector('span').textContent = 'Play until the board fills, for a best score. Start with ' + P.start +
+  $('classicabout').textContent = 'Play until the board fills, for a best score. Start with ' + P.start +
     ' pours, get ' + P.perPlace + ' more for each stack you place and ' + P.perClear + ' for each hexadek, up to ' + P.max + ' saved.';
   $('levelstable').replaceChildren(el('tr', null, el('th', null, 'Chapter'), el('th', null, 'Levels'), el('th', null, 'Brings')),
     ...CHAPTERS.map((C, c) => el('tr', null, el('td', null, (c + 1) + ' · ' + C.name),

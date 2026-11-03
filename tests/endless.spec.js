@@ -12,6 +12,7 @@ async function finishStage(page, hasTouch) {   // jump to the last stack of the 
 test('Endless: stages, rewards and the best run', async ({ page, hasTouch }) => {
   const errors = await openGame(page);
   await page.locator('#new').click();
+  await page.locator('#newmode').selectOption('endless');
   await expect(page.locator('#endlessbest')).toHaveText('');
   await page.locator('#newendless').click();
   await expect(page.locator('#mode')).toHaveText('Endless · Stage 1');
@@ -43,6 +44,7 @@ test('Endless: stages, rewards and the best run', async ({ page, hasTouch }) => 
   await expect(page.locator('#overtext')).toContainText('You cleared 1 stage, with 600 points: your best run!');
   await expect(page.locator('#overperks')).toBeHidden();
   await page.locator('#overnew').click();
+  await expect(page.locator('#newmode')).toHaveValue('endless');
   await expect(page.locator('#endlessbest')).toHaveText('Your best: 1 stage, 600 points.');
   expect(errors).toEqual([]);
 });
@@ -50,6 +52,7 @@ test('Endless: stages, rewards and the best run', async ({ page, hasTouch }) => 
 test('Endless: Restart asks before starting the run again', async ({ page }) => {
   await openGame(page);
   await page.locator('#new').click();
+  await page.locator('#newmode').selectOption('endless');
   await page.locator('#newendless').click();
   const run = await game(page, () => window.__t.g.endless.run);
   await game(page, () => { window.__t.g.endless.stage = 4; window.__t.after(); });   // well into a run
