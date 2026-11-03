@@ -115,7 +115,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #side { display: contents; }
 #wrap { position: relative; flex: 1; min-height: 0; order: 1; }
 #bar { order: 2; }
-#c { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+#c { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; -webkit-touch-callout: none; }
 #over, #intro { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
 #over.show, #intro.show { display: flex; }
 #introjourney { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
@@ -1024,7 +1024,8 @@ function start() {
   }
   function dailyShare() {   // a few lines to paste in a message
     const T = dailyTargets(g.daily.date), n = starsFor(g), won = isWon(g), made = g.hexadeks || 0, streak = dailyStreak();
-    return ['Hexadek ' + dailyName(g.daily.date) + (g.daily.v > 1 ? ' v' + g.daily.v : '') + ' · ' +   // the version only once it changes
+    const day = dailyDay(g.daily.date);
+    return ['Hexadek | ' + day.getDate() + ' ' + MONTHS[day.getMonth()] + (g.daily.v > 1 ? ' v' + g.daily.v : '') + ' · ' +   // the version only once it changes
         (won ? '⭐'.repeat(n) + '☆'.repeat(3 - n) : '💥 ' + g.turn + '/' + g.deckSize) + ' ' + g.score.toLocaleString('en') +
         (streak > 1 ? ' · 🔥' + streak : ''),
       '🟩'.repeat(Math.min(made, T.M)) + '⬜'.repeat(Math.max(0, T.M - made)) + ' ' + made + '/' + T.M + ' deks'].join('\n');
@@ -1711,7 +1712,14 @@ function start() {
     hud();
     dirty = true;
   });
-  canvas.addEventListener('pointercancel', () => { ui.press = ui.drag = ui.hover = ui.peek = null; dirty = true; });
+  const dropPress = () => { if (ui.press || ui.drag || ui.peek) { ui.press = ui.drag = ui.hover = ui.peek = null; dirty = true; } };
+  canvas.addEventListener('pointercancel', dropPress);
+  // a finger left resting on the board is a long press to the phone: no menu or text selection (it can
+  // take the touch away, in an app's web view: play test, daily puzzle in the claude.ai app), and if the
+  // touch is lost all the same, the peek and the half-made move go with it
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('lostpointercapture', dropPress);   // after pointerup, ui.press is already gone
+  window.addEventListener('blur', dropPress);
   canvas.addEventListener('pointerleave', e => {
     if (e.pointerType === 'mouse') { ui.hover = null; clearTimeout(hoverTimer); hoverKey = ''; hidePeek(); dirty = true; }
   });
