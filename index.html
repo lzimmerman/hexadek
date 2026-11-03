@@ -151,6 +151,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #introfacts { color: var(--muted); font-size: 13px; margin: -6px 0 10px; }
 .card { background: var(--panel); color: var(--ink); padding: 20px 24px; border-radius: 14px; text-align: center; max-width: 340px; margin: 16px;
   border: 1px solid var(--cell-edge); box-shadow: 0 12px 40px rgba(0,0,0,.35); max-height: calc(100% - 32px); overflow: auto; box-sizing: border-box; }
+#overnote { margin: -4px 0 12px; font-weight: 700; color: var(--accent); }
+#overnote:empty { display: none; }
 #sharetext { margin: 0 0 12px; padding: 8px 10px; background: var(--bg); border-radius: 10px; font: inherit; font-size: 14px;
   white-space: pre-wrap; text-align: left; user-select: text; -webkit-user-select: text; }   /* what Copy result copies */
 .card h2 { margin: 0 0 6px; font-size: 22px; }
@@ -260,7 +262,7 @@ dialog li { margin-bottom: 6px; }
     <button id="restart" class="icon" aria-label="Restart" title="Restart: this game again from the start, with the same stacks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v5h5"/></svg></button>
     <button id="help" class="icon" aria-label="How to play" title="How to play"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2.9-1.2 1.8v.6"/><circle cx="12" cy="17.4" r=".6" fill="currentColor"/></svg></button>
     <button id="settings" class="icon" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.3 10.5 L21.9 10.7 L21.9 13.3 L19.3 13.5 L18.8 14.8 L18.2 16.1 L19.9 18.1 L18.1 19.9 L16.1 18.2 L14.8 18.8 L13.5 19.3 L13.3 21.9 L10.7 21.9 L10.5 19.3 L9.2 18.8 L7.9 18.2 L5.9 19.9 L4.1 18.1 L5.8 16.1 L5.2 14.8 L4.7 13.5 L2.1 13.3 L2.1 10.7 L4.7 10.5 L5.2 9.2 L5.8 7.9 L4.1 5.9 L5.9 4.1 L7.9 5.8 L9.2 5.2 L10.5 4.7 L10.7 2.1 L13.3 2.1 L13.5 4.7 L14.8 5.2 L16.1 5.8 L18.1 4.1 L19.9 5.9 L18.2 7.9 L18.8 9.2 Z"/><circle cx="12" cy="12" r="3"/></svg></button>
-    <button id="new" class="icon" aria-label="New game" title="New game: modes and levels"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg></button>
+    <button id="new" class="icon" aria-label="New game" title="New game: modes and levels"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.0 2.5 L20.2 7.3 L20.2 16.8 L12.0 21.5 L3.8 16.8 L3.8 7.2 Z"/><path d="M12 8.5v7M8.5 12h7"/></svg></button>
   </nav>
   <span class="hbreak"></span>
   <span class="chip" id="mode"></span>
@@ -300,6 +302,7 @@ dialog li { margin-bottom: 6px; }
     <h2 id="overtitle">No room left</h2>
     <div id="overstars"><div id="overstarbig"></div><ul id="overgoals"></ul></div>
     <p id="overtext"></p>
+    <p id="overnote"></p>
     <pre id="sharetext" aria-label="Your result, to share"></pre>
     <div class="buttons">
       <button id="overnext" class="primary">Next level</button>   <!-- first: what most players want after a level -->
@@ -956,6 +959,34 @@ function canMakeRoom(start, maxPours, limit) {
   return false;
 }
 
+// ---- records and milestones: lifetime stats on this device, and the one line worth saying at a game's end ----
+const DEK_MILESTONES = [50, 100, 250, 500, 1000, 2500, 5000, 10000];
+const DAILY_MILESTONES = [7, 10, 30, 50, 100, 200, 365];
+const GAME_MILESTONES = [10, 50, 100, 250, 500, 1000];
+// st: the lifetime stats before this game; info: { chapterDone, dailies } from storage. Returns [new stats, note or ''].
+function tallyGame(g, st, info, ended) {
+  const n = Object.assign({ deks: 0, games: 0, combo: 0, classic: 0, endless: 0 }, st);
+  const crossed = (list, a, b) => list.filter(m => a < m && b >= m).pop();
+  const notes = [];
+  n.deks += g.hexadeks || 0; n.games++;
+  const dk = crossed(DEK_MILESTONES, st.deks || 0, n.deks);
+  if (dk) notes.push('Your ' + dk.toLocaleString('en') + 'th dek in all!');
+  if (ended && info.chapterDone) notes.push('Chapter ' + info.chapterDone + ', every level ★★★!');
+  if (g.mode === 'standard' && !g.level && !g.daily && !g.endless) {
+    if (st.classic && g.turn > st.classic) notes.push('Your longest Classic yet: ' + g.turn + ' turns.');
+    n.classic = Math.max(st.classic || 0, g.turn);
+  }
+  if (g.endless) {
+    const c = g.endless.stage - (isWon(g) ? 0 : 1);
+    if (st.endless && c > st.endless && !isWon(g)) notes.push('Your furthest Endless run yet: ' + c + ' stages.');
+    n.endless = Math.max(st.endless || 0, c);
+  }
+  if (ended && g.daily && DAILY_MILESTONES.includes(info.dailies)) notes.push('Your ' + info.dailies + 'th Daily puzzle!');
+  const gm = crossed(GAME_MILESTONES, st.games || 0, n.games);
+  if (gm) notes.push('Game ' + gm.toLocaleString('en') + '!');
+  return [n, ended ? notes[0] || '' : ''];   // the first is the rarest; one line is enough
+}
+
 // ---- hints: a good next move, not always the best ----
 // { why: 'dek' | 'room' | 'pour' | 'place', from, to } for a pour, { why: 'place', slot, to } for a tray stack, or null.
 // In order: a pour that finishes a dek; on a full board, the first pour of the shortest way to make room;
@@ -1089,6 +1120,15 @@ function start() {
     } catch (e) { return 0; }
   }
   let best = readBest(g);
+  if (g.prevBest === undefined) g.prevBest = best;   // a game saved before records: no mid-game "New best!" for it
+  const STATS = 'hexadek.stats';   // lifetime: deks, games, biggest combo, longest Classic, furthest Endless
+  const readStats = () => { try { return JSON.parse(localStorage.getItem(STATS)) || {}; } catch (e) { return {}; } };
+  function tally(ended, info) {   // once per game: at its end, or when it's left with moves made
+    if (tut || g.tallied || (!ended && !g.turn)) return;
+    const [n, note] = tallyGame(g, readStats(), info || {}, ended);
+    g.tallied = true; g.note = note;
+    try { localStorage.setItem(STATS, JSON.stringify(n)); } catch (e) {}
+  }
   let state = isWon(g) ? 'won' : roomState(g.board, poursLeft(g));
   const HOLD_MS = 150;   // a touch shorter than this is a tap: no preview while the finger is down
   const ui = { ghostAt: null, sel: null, trayPick: null, press: null, drag: null, hover: null, pos: null, touch: false, peek: null };
@@ -1278,6 +1318,13 @@ function start() {
       setFlash('Dek! +' + res.points + (res.mult > 1 ? ' (×' + res.mult + ')' : '') +
                (res.broke.length ? ' · ' + (res.broke.length > 1 ? res.broke.length + ' stones' : 'a stone') + ' broken' : '') +
                (res.newColour !== undefined ? ' · new colour: ' + tileName(res.newColour, 1) + '!' : ''));
+      if (res.mult >= 2 && !tut) {   // a lifetime record for combos
+        const st = readStats();
+        if (res.mult > (st.combo || 0)) {
+          flash.text += st.combo ? ' · biggest combo yet!' : ' · your first combo!';
+          st.combo = res.mult; try { localStorage.setItem(STATS, JSON.stringify(st)); } catch (e) {}
+        }
+      }
     }
     ui.sel = null;
     after();
@@ -1350,6 +1397,8 @@ function start() {
   }
   function beginGame(ng) {
     logGame('left');   // a game in progress that's replaced (Restart, New game, another level)
+    tally(false);   // its deks still count toward the totals
+    ng.prevBest = readBest(ng);
     lastInput = Date.now();   // the clock starts with the game, so the first move's thinking counts
     finishAnims(); ending = null;
     g = ng;
@@ -1570,7 +1619,19 @@ function start() {
     if (done) logGame(state);
     if (!done) ending = null;
     best = readBest(g);
+    if (!tut && !g.beatBest && g.prevBest > 0 && g.score > g.prevBest) {   // the moment it happens, once a game
+      g.beatBest = true;
+      if (flash) flash.text += ' · New best!'; else setFlash('New best!');
+    }
+    const hadStars = g.level ? readStars(g.level) : 0, hadDaily = g.daily ? !!readDaily()[g.daily.date] : true;
     save();
+    if (done && was !== state && !tut) {
+      const ch = g.level ? LEVELS[g.level - 1].chapter : -1, first = ch * CHAPTER_SIZE + 1;
+      const chapterDone = g.level && hadStars < 3 && starsFor(g) === 3 &&
+        Array.from({ length: CHAPTER_SIZE }, (_, i) => readStars(first + i)).every(v => v === 3) ? ch + 1 : 0;
+      tally(true, { chapterDone, dailies: hadDaily ? 0 : Object.keys(readDaily()).length });
+      save();
+    }
     hud();
     dirty = true;
   }
@@ -1739,6 +1800,7 @@ function start() {
     $('overtext').textContent = gameName(g) + '. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ').') +
       ' Deks: ' + made + (g.level ? ' of ' + deckMax(g) + ' possible.' : g.daily ? ' of ' + dailyTargets(g.daily.date).M + ' possible.' : '.');
     if (g.daily) { const n = dailyStreak(); if (n) $('overtext').textContent += ' Daily streak: ' + n + (n === 1 ? ' day.' : ' days.'); }
+    $('overnote').textContent = (state === 'won' || state === 'over') && !tut && g.note ? g.note : '';
     const sharing = g.daily && (state === 'won' || state === 'over') && !tut;
     $('overshare').style.display = $('sharetext').style.display = sharing ? '' : 'none';
     if (sharing) $('sharetext').textContent = dailyShare();
@@ -2172,8 +2234,8 @@ function start() {
         ctx.globalAlpha = 0.45; drawStack(x, y, S, hl.ghost.st, hl.ghost.st.length); ctx.globalAlpha = 1;
       }
       if (!st.length) continue;
-      let count = st.length - (hidden[k] || 0);
-      if (ui.drag && ui.drag.kind === 'pour' && ui.drag.from === k) count -= runLen(st);
+      let count = Math.max(0, st.length - (hidden[k] || 0));   // poured into and straight out of, mid-animation: more hidden than left
+      if (ui.drag && ui.drag.kind === 'pour' && ui.drag.from === k) count = Math.max(0, count - runLen(st));
       if (ui.sel === k) y -= S * 0.15;
       const f = fadeIn[k];   // a stack just placed fades and grows in where it lands
       if (f !== undefined) ctx.globalAlpha = 0.2 + 0.8 * f;

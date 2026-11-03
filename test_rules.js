@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, hintMove};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, hintMove, tallyGame};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -274,4 +274,23 @@ console.log('daily tests passed');
   h = R.hintMove(g);
   assert(h.why === 'room' && R.pourResult(g.board, h.from, h.to).emptiesFrom, 'a full board: a pour that makes room: ' + JSON.stringify(h));
   console.log('hint tests passed');
+}
+
+// records and milestones: totals add up, and one note at most, the rarest first
+{
+  const T = R.tallyGame;
+  const cl = R.newGame(3, 'standard'); cl.hexadeks = 12; cl.turn = 120;
+  let [n, note] = T(cl, { deks: 40, games: 9, classic: 100 }, {}, true);
+  assert.deepEqual([n.deks, n.games, n.classic], [52, 10, 120]);
+  assert.equal(note, 'Your 50th dek in all!', 'a dek milestone beats the Classic record and game 10');
+  [n, note] = T(cl, { deks: 60, games: 20, classic: 100 }, {}, true);
+  assert.equal(note, 'Your longest Classic yet: 120 turns.');
+  [n, note] = T(cl, { deks: 60, games: 20 }, {}, true);
+  assert.equal(note, '', 'no record to beat on the first Classic');
+  [n, note] = T(cl, { deks: 40, games: 9 }, {}, false);
+  assert.equal(note, '', 'a game that was left: counted, but nothing said');
+  assert.equal(n.deks, 52);
+  const lv = R.newGame(1001, 'level', null, 1);
+  assert.equal(T(lv, { deks: 0, games: 3 }, { chapterDone: 2 }, true)[1], 'Chapter 2, every level ★★★!');
+  console.log('record tests passed');
 }

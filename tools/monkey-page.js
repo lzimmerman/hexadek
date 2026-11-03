@@ -9,7 +9,7 @@ const HOOK = '  let ending = null;';
 function addHook(html) {
   if (!html.includes(HOOK)) throw new Error('the hook line is missing from index.html: ' + HOOK.trim());
   return html.replace(HOOK, HOOK + " window.__t = { get g() { return g; }, get state() { return state; }, get ending() { return ending; }," +
-    " get ui() { return ui; }, get S() { return S; }, cellXY: k => cellXY(k), slotXY: i => slotXY(i), after: () => after() };");
+    " get ui() { return ui; }, get S() { return S; }, cellXY: k => cellXY(k), slotXY: i => slotXY(i), after: () => after(), doPour: (a, b) => doPour(a, b), doPlace: (s, c) => doPlace(s, c) };");
 }
 
 function monkeyPage(html, { seed = 1234, steps = 3000, press = 0.12 } = {}) {
