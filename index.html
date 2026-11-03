@@ -48,7 +48,7 @@ body { display: flex; flex-direction: column; overscroll-behavior: none; user-se
 #bar { padding: 4px 16px calc(10px + env(safe-area-inset-bottom)); row-gap: 8px; }   /* clear of the phone's gesture bar */
 #decklabel { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
 #undo { min-width: 96px; }
-#deck { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; }
+#deck { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
 .deckbar { flex: 1 0 100%; box-sizing: border-box; height: 8px; border-radius: 5px; background: var(--cell); border: 1px solid var(--cell-edge); overflow: hidden; }
 #deckfill { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
 #deck.ending #decktext { color: var(--accent); }   /* the last few stacks of a deck */
@@ -58,19 +58,25 @@ button { touch-action: manipulation; }   /* no double-tap zoom */
 @media (pointer: coarse) {   /* thumbs: bigger buttons */
   button { min-height: 48px; padding: 10px 16px; }
   html select { min-height: 48px; }   /* html: outranks the plain select rule below */
-  #buttons, header { gap: 8px 10px; }
+  header { gap: 8px 10px; }
+  #buttons button.icon { width: 44px; height: 44px; min-height: 44px; padding: 0; }   /* #buttons: outranks the base rule below */
   .chip.tap { position: relative; } .chip.tap::before { content: ''; position: absolute; inset: -11px -4px; }   /* a bigger target than it looks */
 }
 @media (min-width: 700px) and (min-height: 700px) {   /* tablets: the controls a size up beside the big board */
-  header, #stats, #buttons, #status, #bar, #coach, .card, dialog { zoom: 1.2; }
+  header, #stats, #status, #bar, #coach, .card, dialog { zoom: 1.2; }
+  .hbreak { display: none; } #buttons { order: 5; }   /* room for everything on one line */
 }
-@media (max-width: 360px) {   /* the smallest phones: the three buttons on one line, and the deck count on its own */
-  #buttons button { padding-left: 8px; padding-right: 8px; font-size: 14px; }
-  #buttons { gap: 8px; }
-  #deck { order: -1; flex-basis: 100%; justify-content: flex-start; } #deckbar { order: -1; }
+@media (max-width: 360px) {   /* the smallest phones: the title and its four icons still share a line */
+  header h1 { font-size: 16px; letter-spacing: .06em; } header #buttons { gap: 2px; } #buttons button.icon { width: 42px; height: 42px; min-height: 42px; }
 }
 header { display: flex; align-items: center; gap: 10px 12px; padding: 10px 16px 6px; flex-wrap: wrap; }
-#buttons { padding: 4px 16px 6px; }
+#buttons { display: flex; gap: 4px; margin-left: auto; order: 1; }
+button.icon { width: 40px; height: 40px; min-height: 0; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+button.icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hbreak { order: 2; flex-basis: 100%; height: 0; }   /* the level chip and dots on the line under the title */
+#mode { order: 3; } #chapdots { order: 4; }
+.setrow { justify-content: space-between; align-items: center; gap: 12px; margin: 8px 0 12px; flex-wrap: nowrap; }
+.setrow > span { flex: 1; } .setrow button { flex: none; min-width: 72px; }
 h1 { font-size: 20px; margin: 0; letter-spacing: .08em; font-weight: 700; }
 h1 span { color: var(--accent); }
 .chip { font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--cell);
@@ -80,7 +86,7 @@ h1 span { color: var(--accent); }
 #chapdots { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 600; color: var(--muted);
   font-variant-numeric: tabular-nums; white-space: nowrap; }
 #chapdots:empty { display: none; }
-#chapdots:not(:empty) { cursor: pointer; }
+#chapdots:not(:empty) { cursor: pointer; padding: 8px 0; margin: -8px 0; }   /* opens the level grid; a taller target than it looks */
 #chapdots i { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--cell-edge); box-sizing: border-box; }
 #chapdots i.done { background: var(--gold); border-color: var(--gold); }
 #chapdots i.now { border-color: var(--accent); background: none; box-shadow: 0 0 0 1.5px var(--accent); }
@@ -90,7 +96,7 @@ h1 span { color: var(--accent); }
   /* a faint line above and below: the numbers sit in a band between the title and the buttons */
   border-top: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
   border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); }
-#buttons { padding-top: 10px; }
+
 .stat { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; font-weight: 600;
   text-transform: uppercase; letter-spacing: .06em; }
 .stat b { color: var(--ink); font-size: 18px; letter-spacing: 0; margin-left: 4px; }
@@ -234,7 +240,7 @@ dialog li { margin-bottom: 6px; }
   .card h2 { font-size: 19px; margin-bottom: 4px; } .card p { margin-bottom: 8px; }
   #introgoals, #overgoals { margin: 4px 0 8px; padding: 6px 10px; }
   button { min-height: 36px; padding: 4px 10px; font-size: 14px; }
-  #buttons, header, #bar { gap: 6px; } #stats { gap: 2px 14px; padding-bottom: 4px; } #buttons { padding-top: 6px; }
+  header, #bar { gap: 6px; } #stats { gap: 2px 14px; padding-bottom: 4px; }
 }
 </style>
 </head>
@@ -242,6 +248,13 @@ dialog li { margin-bottom: 6px; }
 <div id="side">   <!-- a column beside the board on short landscape screens; invisible to layout otherwise -->
 <header>
   <h1>HEXA<span>DEK</span></h1>
+  <nav id="buttons" aria-label="Game">   <!-- icons on the title line, as in most phone games -->
+    <button id="restart" class="icon" aria-label="Restart" title="Restart: this game again from the start, with the same stacks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v5h5"/></svg></button>
+    <button id="help" class="icon" aria-label="How to play" title="How to play"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2.9-1.2 1.8v.6"/><circle cx="12" cy="17.4" r=".6" fill="currentColor"/></svg></button>
+    <button id="settings" class="icon" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.3 10.5 L21.9 10.7 L21.9 13.3 L19.3 13.5 L18.8 14.8 L18.2 16.1 L19.9 18.1 L18.1 19.9 L16.1 18.2 L14.8 18.8 L13.5 19.3 L13.3 21.9 L10.7 21.9 L10.5 19.3 L9.2 18.8 L7.9 18.2 L5.9 19.9 L4.1 18.1 L5.8 16.1 L5.2 14.8 L4.7 13.5 L2.1 13.3 L2.1 10.7 L4.7 10.5 L5.2 9.2 L5.8 7.9 L4.1 5.9 L5.9 4.1 L7.9 5.8 L9.2 5.2 L10.5 4.7 L10.7 2.1 L13.3 2.1 L13.5 4.7 L14.8 5.2 L16.1 5.8 L18.1 4.1 L19.9 5.9 L18.2 7.9 L18.8 9.2 Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    <button id="new" class="icon" aria-label="New game" title="New game: modes and levels"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg></button>
+  </nav>
+  <span class="hbreak"></span>
   <span class="chip" id="mode"></span>
   <span id="chapdots" aria-hidden="true"></span>   <!-- on a level: where it sits in its chapter, and which levels have stars -->
 </header>
@@ -250,11 +263,6 @@ dialog li { margin-bottom: 6px; }
   <span class="stat" id="poursstat" title="Each pour uses one; placing a stack earns more">Pours <b id="pours">0</b></span>
   <span class="stat">Best <b id="best">0</b></span>
 </div>
-<nav class="row" id="buttons">   <!-- on the left: a page viewer may put its own controls in the top-right corner -->
-  <button id="restart" title="Play this game again from the start, with the same stacks">Restart</button>
-  <button id="new" title="A new game with new stacks">New game</button>
-  <button id="help">How to play</button>
-</nav>
 <div id="status" aria-live="polite"><span id="msg"></span><button id="giveup">Give up</button></div>
 <div id="peeklive" class="sr-only" aria-live="polite"></div>   <!-- a peeked stack's tiles, for screen readers -->
 <div id="coach" aria-live="polite">
@@ -265,7 +273,6 @@ dialog li { margin-bottom: 6px; }
 <footer id="bar" class="row">   <!-- below the board, where a thumb reaches -->
   <button id="undo" title="Undo a pour (Ctrl/Cmd+Z)">Undo</button>
   <div id="deck" aria-label="Deck progress"><span id="decklabel">Deck</span><span id="decktext"></span></div>
-  <button id="haptics" aria-pressed="false" title="Vibrate on pours and deks">Haptics: off</button>
   <div class="deckbar" id="deckbar"><div id="deckfill"></div></div>   <!-- full width, on its own line under the buttons -->
 </footer>
 </div>
@@ -278,7 +285,7 @@ dialog li { margin-bottom: 6px; }
     <p id="introfacts"></p>
     <ul id="introgoals"></ul>
     <p id="introjourney"></p>
-    <div class="buttons"><button id="introgo" class="primary">Start</button></div>
+    <div class="buttons"><button id="introgo" class="primary">Start</button><button id="introlevels">All levels</button></div>
   </div></div>
   <div id="over"><div class="card">
     <h2 id="overtitle">No room left</h2>
@@ -394,7 +401,8 @@ dialog li { margin-bottom: 6px; }
       the game skips its animations.</li>
     <li>Press and hold a stack, or rest the mouse on it, to see all its tiles.</li>
     <li>Undo is below the board. Esc lets go of a selected stack, and Ctrl+Z or Cmd+Z undoes a pour.</li>
-    <li>Haptics, also below the board, makes the phone vibrate on pours and deks. It's off to start with.</li>
+    <li>Settings (the gear at the top) has Haptics, which makes the phone vibrate on pours and deks (off to start
+      with), and Reset all progress.</li>
     <li><b>Restart</b> plays the same game again from the start, with the same stacks, to try another plan.
       <b>New game</b> deals new stacks.</li>
     <li><b>As an app:</b> on Android, open the browser menu and choose <i>Install app</i> or <i>Add to Home
@@ -442,6 +450,12 @@ dialog li { margin-bottom: 6px; }
           <option value="50">Deck of 50</option></select></label></div>
     <div class="row"><button type="button" id="newcustom" class="primary">Play custom game</button></div></div>
   <div class="row"><span class="spacer"></span><button type="button" id="newcancel">Cancel</button></div>
+</dialog>
+<dialog id="settingsbox">
+  <h2>Settings</h2>
+  <div class="row setrow"><span><b>Haptics</b><br><span class="hint">Vibrate on pours and deks (Android phones).</span></span>
+    <button type="button" id="haptics" aria-pressed="false" aria-label="Haptics">Off</button></div>
+  <div class="row"><span class="spacer"></span><button type="button" id="settingsclose">Close</button></div>
   <div class="extra row"><span class="hint">Start over: clears every level's stars and all best scores.</span>
     <button type="button" id="resetall" class="quiet">Reset all progress</button></div>
 </dialog>
@@ -1284,7 +1298,13 @@ function start() {
   const hideIntro = () => $('intro').classList.remove('show');
   const chipIntro = () => { if (g.level && !tut && !$('over').classList.contains('show')) showIntro(); };
   $('mode').onclick = chipIntro;
-  $('chapdots').onclick = chipIntro;
+  // the chapter dots: one tap to the level grid (in most level games the levels are a tap away)
+  const dotsLevels = () => { if (g.level && !tut && !$('over').classList.contains('show')) showLevels(); };
+  $('chapdots').onclick = dotsLevels;
+  $('chapdots').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dotsLevels(); } });
+  $('introlevels').onclick = () => { hideIntro(); showLevels(); };
+  $('settings').onclick = () => $('settingsbox').showModal();
+  $('settingsclose').onclick = () => $('settingsbox').close();
   $('mode').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); chipIntro(); } });
   $('introgo').onclick = hideIntro;
   $('intro').addEventListener('click', e => { if (e.target === $('intro')) hideIntro(); });   // a tap beside the card
@@ -1398,6 +1418,7 @@ function start() {
       localStorage.setItem(LOG, JSON.stringify(log.slice(-LOG_MAX)));
     } catch (e) {}
     if ($('newgame').open) $('newgame').close();
+    if ($('settingsbox').open) $('settingsbox').close();
     startGame(LEVEL_SEED + 1, 'level', null, 1, true);
   });
   $('rulesclose').onclick = () => $('rules').close();
@@ -1417,7 +1438,7 @@ function start() {
   }
   function showHaptics() {
     const b = $('haptics');
-    b.textContent = 'Haptics: ' + (haptics ? 'on' : 'off');
+    b.textContent = haptics ? 'On' : 'Off';
     b.setAttribute('aria-pressed', String(haptics));
     if (!navigator.vibrate) b.style.display = 'none';   // e.g. iPhones: no vibration from web pages
   }
@@ -1536,7 +1557,9 @@ function start() {
     dotsKey = key;
     $('chapdots').replaceChildren(...(n ? [el('b', null, 'Chapter ' + (LEVELS[n - 1].chapter + 1) + ' · ' + (n - first + 1) + ' of ' + CHAPTER_SIZE),
       ...stars.map((d, i) => el('i', { class: first + i === n ? 'now' : d ? 'done' : '' }))] : []));
-    $('chapdots').title = n ? 'Level ' + (n - first + 1) + ' of ' + CHAPTER_SIZE + ' in chapter ' + (LEVELS[n - 1].chapter + 1) + '; gold dots: levels with stars' : '';
+    $('chapdots').title = n ? 'Level ' + (n - first + 1) + ' of ' + CHAPTER_SIZE + ' in chapter ' + (LEVELS[n - 1].chapter + 1) + '; gold dots: levels with stars. Tap for all levels.' : '';
+    if (n) { $('chapdots').setAttribute('role', 'button'); $('chapdots').tabIndex = 0; $('chapdots').setAttribute('aria-label', 'All levels'); $('chapdots').removeAttribute('aria-hidden'); }
+    else { $('chapdots').removeAttribute('role'); $('chapdots').removeAttribute('tabindex'); $('chapdots').setAttribute('aria-hidden', 'true'); }
   }
   const DECK_ENDING = 5;   // the deck bar counts down the last stacks
   function hud() {

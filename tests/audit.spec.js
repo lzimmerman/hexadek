@@ -66,6 +66,7 @@ test('UX audit @audit', async ({ browser }, info) => {
     await shot('game', async () => { await closeAll(); await page.evaluate(() => { const g = window.__t.g; g.board['0,0'] = [0, 0, 1, 1, 2]; g.board['1,0'] = [3, 3, 3]; g.board['-1,1'] = [4]; window.__t.after(); }); });
     await shot('intro', async () => { await page.locator('#mode').click(); });
     await shot('rules', async () => { await closeAll(); await page.locator('#help').click(); });
+    await shot('settings', async () => { await closeAll(); await page.locator('#settings').click(); });
     for (const m of ['journey', 'daily', 'endless', 'classic', 'custom'])
       await shot('new-' + m, async () => { await closeAll(); await page.locator('#new').click(); await page.locator('#newmode').selectOption(m); });
     await shot('levels', async () => { await closeAll(); await page.locator('#new').click(); await page.locator('#newmode').selectOption('journey'); await page.locator('#newchoose').click(); });
