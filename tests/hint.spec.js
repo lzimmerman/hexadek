@@ -5,6 +5,11 @@ const { openGame } = require('./helpers');
 test('hint shows a move, counted once per position', async ({ page }) => {
   const errors = await openGame(page);
   await page.evaluate(() => document.getElementById('intro').classList.remove('show'));
+  // on an empty board: a tip, not a move, and not counted
+  await page.locator('#hint').click();
+  await expect(page.locator('#msg')).toHaveText('Start anywhere; keep the middle free.');
+  expect(await page.evaluate(() => window.__t.g.hints)).toBeUndefined();
+  await page.evaluate(() => { const t = window.__t; place(t.g, 0, '0,0'); t.after(); });
   const before = await page.evaluate(() => JSON.stringify(window.__t.g.board));
   await page.locator('#hint').click();
   await expect(page.locator('#msg')).toHaveText(/^Hint: /);

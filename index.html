@@ -202,7 +202,13 @@ button.quiet { color: var(--danger); font-size: 13px; padding: 6px 10px; }
 .modebox { border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--cell-edge)); border-radius: 8px; }
 .modebox .row { margin-top: 8px; gap: 8px; }
 #newgame .modebox { margin: 8px 0 12px; padding: 10px 12px; }
-#newwarnrow { margin-bottom: 12px; }   /* End game: apart from the mode list (the dialog focuses Mode, so Enter can't end a game) */
+/* a game without a deck in progress: a box about it, apart from starting a new one (play test: one "End game"
+   button above the mode's own Play button looked like the same thing twice). The dialog focuses Mode, not See results. */
+#newcurrent { border: 1px solid var(--cell-edge); border-radius: 8px; padding: 10px 12px; margin: 4px 0 14px; }
+#newcurrent > b, #newcurrent > span { display: block; }
+#newcurrent > span { color: var(--muted); font-size: 14px; }
+#newcurrent .row { margin-top: 8px; }
+#newstart { font-weight: 600; margin: 0 0 6px; }
 #newgame .modebox > span { display: block; color: var(--muted); font-size: 14px; }
 #newmode { font-size: 16px; }
 .modebox label { white-space: nowrap; margin-right: 8px; }
@@ -356,7 +362,7 @@ dialog li { margin-bottom: 6px; }
     <li><b>Classic</b>: play until the board fills, for a best score. Each pour uses one: you start with 3, get 3 more
       for each stack you place and 1 for each dek, and can save up to 9. Undo gives the pour back, and you have 5
       undos per game. It gets harder as you go: a new colour joins every 10 deks, up to 9. To stop before the
-      board fills, choose <i>End game</i> under New game: the score still counts.</li>
+      board fills, open New game and choose <i>See results</i>: the score still counts.</li>
     <li><b>Custom</b>: choose the colours (3 to 13; fewer is easier), limited or free pours (free pours come with
       unlimited undos), and the length: <i>Fill board</i> (play until the board is full), or a deck of 30 or 50
       stacks to place without running out of room. The bar below the board shows how far through a deck you are.
@@ -452,7 +458,10 @@ dialog li { margin-bottom: 6px; }
 </dialog>
 <dialog id="newgame">
   <h2>New game</h2>
-  <div class="row" id="newwarnrow"><span id="newwarn"></span><button type="button" id="newend">End game</button></div>
+  <p id="newwarn"></p>
+  <div id="newcurrent"><b>This game</b><span id="newcurtext"></span>
+    <div class="row"><button type="button" id="newend">See results</button></div></div>
+  <p id="newstart">Start a new game</p>
   <div class="row"><label class="row" for="newmode">Mode
     <select id="newmode" autofocus><option value="journey">Journey</option><option value="daily">Daily puzzle</option><option value="endless">Endless</option>
       <option value="classic">Classic</option><option value="custom">Custom</option></select></label></div>
@@ -1553,10 +1562,10 @@ function start() {
     // a game without a deck runs until the board fills, so stopping is a normal end: its score already counts
     // (best and records are saved as it goes); End game shows its end card (play test: the way to just stop wasn't clear)
     const open = busy && !g.deckSize && !g.level && !g.endless && !g.daily;
-    $('newwarn').textContent = !busy ? '' : open ? 'Your score in this game is kept for your best and records.' :
-      'The game you are playing will be lost.';
-    $('newwarnrow').style.display = busy ? '' : 'none';
-    $('newend').style.display = open ? '' : 'none';
+    $('newwarn').textContent = busy && !open ? 'The game you are playing will be lost.' : '';
+    $('newwarn').style.display = busy && !open ? '' : 'none';
+    $('newcurtext').textContent = gameName(g) + ' · ' + g.score.toLocaleString('en') + ' points. Its score is kept for your best and records.';
+    $('newcurrent').style.display = $('newstart').style.display = open ? '' : 'none';
     $('newcolours').value = String(Math.min(13, g.colours % 2 ? g.colours : g.colours + 1));   // older games had 4 or 6
     const eb = readEndlessStages();
     $('endlessbest').textContent = eb ? 'Your best: ' + eb + (eb === 1 ? ' stage, ' : ' stages, ') + readBest({ endless: true }) + ' points.' : '';
@@ -2075,6 +2084,12 @@ function start() {
   $('hint').onclick = () => {
     if (tut || state === 'won' || state === 'over') return;
     finishAnims();
+    // an empty board (stones aside): every cell is as good as another, so a tip instead of an arbitrary move
+    // (play test, 2026-11-03: it pointed at the top corner); not counted as a hint
+    if (cellsOf(g.board).every(k => g.board[k].every(c => c === STONE))) {
+      setFlash('Start anywhere; keep the middle free.');   // short: the status line is one line on a phone
+      hud(); return;
+    }
     const h = hintMove(g);
     if (!h) { setFlash('No hint: there is no good move here.'); hud(); return; }
     ui.sel = h.from || null; ui.trayPick = h.from ? null : h.slot;

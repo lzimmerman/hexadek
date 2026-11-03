@@ -135,23 +135,25 @@ test('Custom: a board with holes, kept by Restart and a reload', async ({ page, 
   expect(errors).toEqual([]);
 });
 
-test('End game: a Classic game ends on request, with its end card, and is logged', async ({ page, hasTouch }) => {
+test('See results: a Classic game ends on request, with its end card, and is logged', async ({ page, hasTouch }) => {
   const errors = await openGame(page);
   await page.locator('#new').click();
-  await expect(page.locator('#newwarnrow')).toBeHidden();   // nothing played yet
+  await expect(page.locator('#newwarn')).toBeHidden();   // nothing played yet
+  await expect(page.locator('#newcurrent')).toBeHidden();
   await page.locator('#newcancel').click();
   await tap(page, hasTouch, await slotPoint(page, 0));   // a level in progress: no End game, as leaving loses it
   await tap(page, hasTouch, await cellPoint(page, '0,0'));
   await page.locator('#new').click();
   await expect(page.locator('#newwarn')).toHaveText('The game you are playing will be lost.');
-  await expect(page.locator('#newend')).toBeHidden();
+  await expect(page.locator('#newcurrent')).toBeHidden();
   await page.locator('#newmode').selectOption('classic');
   await page.locator('#newclassic').click();
   await tap(page, hasTouch, await slotPoint(page, 0));
   await tap(page, hasTouch, await cellPoint(page, '1,0'));
   await expect.poll(() => game(page, () => window.__t.g.turn)).toBe(1);
   await page.locator('#new').click();
-  await expect(page.locator('#newwarn')).toHaveText(/kept for your best/);
+  await expect(page.locator('#newwarn')).toBeHidden();
+  await expect(page.locator('#newcurtext')).toHaveText(/^Classic · \d+ points\. Its score is kept/);
   await page.locator('#newend').click();
   await expect(page.locator('#over')).toBeVisible();
   await expect(page.locator('#overtitle')).toHaveText('Game ended');
@@ -161,7 +163,7 @@ test('End game: a Classic game ends on request, with its end card, and is logged
   await page.waitForFunction(() => window.__t && window.__t.g);
   await expect(page.locator('#over')).toBeVisible();
   await page.locator('#overnew').click();   // an ended game isn't in progress
-  await expect(page.locator('#newwarnrow')).toBeHidden();
+  await expect(page.locator('#newcurrent')).toBeHidden();
   expect(errors).toEqual([]);
 });
 
