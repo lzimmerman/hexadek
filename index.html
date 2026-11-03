@@ -77,6 +77,9 @@ button.icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; s
 #mode { order: 3; } #chapdots { order: 4; }
 .setrow { justify-content: space-between; align-items: center; gap: 12px; margin: 8px 0 12px; flex-wrap: nowrap; }
 .setrow > span { flex: 1; } .setrow button { flex: none; min-width: 72px; }
+.iconkey { list-style: none; padding: 0; margin: 4px 0 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px 12px; }
+.iconkey li { display: flex; align-items: center; gap: 8px; }
+.iconkey svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .setline { border-top: 1px solid var(--line); padding-top: 12px; }
 .setclose { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px; }
 h1 { font-size: 20px; margin: 0; letter-spacing: .08em; font-weight: 700; }
@@ -309,6 +312,8 @@ dialog li { margin-bottom: 6px; }
   <p>Hexadek is a puzzle about sorting coloured tiles. Each cell of the board holds a stack of hex tiles.
     Your goal is to build <b>stacks of 12 tiles all of one colour</b>, called a <b>hexadek</b>, or
     <b>dek</b> for short. A finished dek clears from the board and scores points.</p>
+  <h3>The buttons at the top</h3>
+  <ul class="iconkey"></ul>
   <h3>Stacks</h3>
   <div class="fig"><canvas data-fig="stack"></canvas>
     <p>The tiles on top that share a colour are the stack's <b>top run</b>. The symbol on top shows its colour,
@@ -470,6 +475,8 @@ dialog li { margin-bottom: 6px; }
 <dialog id="welcome">
   <h2>Welcome to Hexadek</h2>
   <p>New to games like this? A short tutorial shows the moves, in about two minutes.</p>
+  <p class="hint">The buttons at the top:</p>
+  <ul class="iconkey"></ul>
   <div class="row"><button type="button" id="welcometut">Play the tutorial</button><button type="button" id="welcomeclose">Just play</button></div>
 </dialog>
 
@@ -2287,6 +2294,10 @@ function start() {
   hud();
   coach();
   requestAnimationFrame(frame);
+  // the icon key (welcome and How to play): the top bar's own icons, so the two always match
+  for (const ul of document.querySelectorAll('.iconkey'))
+    ul.replaceChildren(...[...$('buttons').querySelectorAll('button')].map(b =>
+      el('li', null, b.querySelector('svg').cloneNode(true), b.getAttribute('aria-label'))));
   if (firstVisit) $('welcome').showModal();
 }
 
