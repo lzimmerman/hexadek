@@ -1408,7 +1408,7 @@ function start() {
     const T = g.level ? levelTargets(g.level) : g.daily ? dailyTargets(g.daily.date) : null;
     const perk = g.endless && ENDLESS_PERKS[g.endless.perk];   // Endless: the reward this stage was played with
     const rec = { t: stamp(), game: gameName(g) + (perk ? ' · ' + perk.name : ''), level: g.level || null, result,
-      score: g.score, stars: g.level || g.daily ? starsFor(g) : null, hexadeks: g.hexadeks || 0, M: T ? T.M : null,
+      score: g.score, stars: g.level || g.daily ? starsFor(g) : null, hexadeks: g.hexadeks || 0, M: T ? T.M : g.endless ? endlessRewardDeks(g) : null,
       placed: g.turn, deck: g.deckSize || null, colours: g.colours, undos: pourRule(g) ? (g.undoStart || CFG.undos) - undosLeft(g) : null,
       time: g.ms ? mmss(g.ms) : null };
     try {
@@ -1437,7 +1437,7 @@ function start() {
       if (b || st) bests.push('L' + n + ': ' + b + ' ' + ('★'.repeat(st) || '-'));
     }
     lines.push(bests.length ? bests.join(' | ') : '(none yet)', '',
-      'Games (date, game, result, score, stars, hexadeks/M, placed/deck, undos used, active play time m:ss):');
+      'Games (date, game, result, score, stars, hexadeks/M (Endless: /the 🎁 reward target), placed/deck, undos used, active play time m:ss):');
     let log = []; try { log = JSON.parse(localStorage.getItem(LOG) || '[]'); } catch (e) {}
     for (const r of log) lines.push([r.t, r.game, r.result, r.score, r.stars === null ? '' : r.stars + '★',
       r.hexadeks + (r.M ? '/' + r.M : ''), r.placed + (r.deck ? '/' + r.deck : ''), r.undos === null ? '' : r.undos, r.time || ''].join(', ') + ';');   // ';' keeps records apart if a paste drops the line breaks
