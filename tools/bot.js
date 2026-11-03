@@ -27,6 +27,7 @@
 //                           pour (searched as one move of up to 4 pours, each paid for as usual)
 //     --bank                plays the banking strategy seen in play tests: single-colour stacks kept side
 //                           by side around the edge, corners most, as savings for later hexadeks
+//     --daily A-B           daily puzzles from date A to B (YYYYMMDD): finish, ★★ and ★★★ rates by weekday
 //     --hub auto|point|line plays the hub strategy seen in play tests: keep a hub free (the centre, or a
 //                           line through it with more colours), place each new stack there, and pour
 //                           its colours out to home areas around it, one area per colour.
@@ -46,9 +47,10 @@ const file = opt('file', path.join(__dirname, '..', 'index.html'));
 const html = fs.readFileSync(file, 'utf8');
 eval(html.match(/<script>([\s\S]*)<\/script>/)[1] +
   ';global.R={CFG,CELLS,neighbours,runLen,topOf,newGame,pourResult,pour,place,roomState,poursLeft,isWon,LEVELS,STONE,starsFor,deckMax,STONE_LAYOUTS,' +
-  'ENDLESS_TIERS,ENDLESS_SEED,ENDLESS_POOL,ENDLESS_RAMP,endlessTier,endlessSpec,endlessStart}');
+  'ENDLESS_TIERS,ENDLESS_SEED,ENDLESS_POOL,ENDLESS_RAMP,endlessTier,endlessSpec,endlessStart,dailyGame,dailyTargets,dailyDay,DAYS}');
 const { CFG, CELLS, neighbours, runLen, topOf, newGame, pourResult, pour, place, roomState, poursLeft, isWon, LEVELS, STONE,
-        starsFor, deckMax, STONE_LAYOUTS, ENDLESS_TIERS, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_RAMP, endlessTier, endlessSpec, endlessStart } = R;
+        starsFor, deckMax, STONE_LAYOUTS, ENDLESS_TIERS, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_RAMP, endlessTier, endlessSpec, endlessStart,
+        dailyGame, dailyTargets, dailyDay, DAYS } = R;
 
 const SKILLS = {   // beam: boards kept per depth; depth: pours searched per turn; noise: randomness in judging
   // player: matched to the play tests through level 60 (2026-11-01): it finishes about as often as a
@@ -250,6 +252,32 @@ function playGame(g, skill, rnd) {
   }
   return g;
 }
+
+// ---- Daily puzzle: how often each star comes, by weekday, over a span of dates ----
+//   --daily 20261102-20261129 [--skill player --games 6]
+if (opt('daily')) {
+  const [from, to] = opt('daily').split('-').map(Number), sk = opt('skill', 'player'), n = Number(opt('games', 6));
+  const days = {}, over = [];   // weekday: [finished, ★★, ★★★, games]; over: hexadeks' worth of score beyond M, per finish
+  for (let d = dailyDay(from); dailyDayNum(d) <= to; d.setDate(d.getDate() + 1)) {
+    const date = dailyDayNum(d), w = DAYS[d.getDay()], r = days[w] = days[w] || [0, 0, 0, 0];
+    for (let i = 0; i < n; i++) {
+      const pg = playGame(dailyGame(date), SKILLS[sk], mulberry(date * 7 + i)), s = starsFor(pg);
+      if (isWon(pg)) over.push(pg.score / (CFG.hexadek * CFG.pointsPerTile) - dailyTargets(date).M);
+      r[0] += s >= 1; r[1] += s >= 2; r[2] += s >= 3; r[3]++;
+    }
+  }
+  const P = (a, b) => (100 * a / b).toFixed(0).padStart(4) + '%';
+  console.log(sk + ', daily ' + from + '–' + to + ', ' + n + ' games a day');
+  for (const w of ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']) if (days[w]) {
+    const [a, b, c, t] = days[w]; console.log(w + '  finish' + P(a, t) + '  ★★' + P(b, t) + '  ★★★' + P(c, t) + '  (' + t + ' games)');
+  }
+  over.sort((a, b) => a - b);
+  const q = f => over[Math.min(over.length - 1, Math.floor(f * over.length))];
+  console.log('score − M (in hexadeks), finished games: 25% ' + q(0.25) + ', median ' + q(0.5) + ', 75% ' + q(0.75) + ', 90% ' + q(0.9));
+  if (flag('json')) console.log('DAILYOVER ' + JSON.stringify(over));
+  process.exit(0);
+}
+function dailyDayNum(d) { return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
 
 // ---- Endless ----
 if (flag('endless')) {

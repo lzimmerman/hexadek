@@ -268,6 +268,7 @@ dialog li { margin-bottom: 6px; }
       <button id="overnext" class="primary">Next level</button>   <!-- first: what most players want after a level -->
       <div id="overperks" role="radiogroup" aria-label="Reward for the next stage"></div>   <!-- Endless: pick one... -->
       <div id="overstagerow"><button id="overstage" class="primary" disabled>Next stage</button></div>   <!-- ...then go -->
+      <button id="overshare">Copy result</button>   <!-- Daily: a few lines to paste in a message -->
       <button id="overundo">Undo last pour</button>
       <button id="overrestart">Restart</button>
       <button id="overnew">New game</button>
@@ -293,6 +294,9 @@ dialog li { margin-bottom: 6px; }
     <li>Only neighbours: the six cells touching it.</li>
     <li>A stack holds at most 12 tiles. If the whole run doesn't fit, only what fits moves.</li>
     <li><b>Journey</b>: 72 levels, each a fixed deck with its own rules. See <i>Journey: levels and stars</i> below.</li>
+    <li><b>Daily puzzle</b>: one deck a day, the same for everyone with the same date, with up to 3 stars.
+      Monday's is the gentlest and the week climbs to Sunday. Finish it on days in a row for a streak, and
+      Copy result to share how you did.</li>
     <li><b>Endless</b>: a run of stages. Each <b>stage</b> is one deck on a fresh board, and they get harder, up
       to about the difficulty of Journey's last chapter. After each stage, pick one of two rewards for the next: a
       bigger pour budget, a shorter deck, lighter stacks (more of a single colour) or a stone gone. Losing a stage
@@ -393,12 +397,14 @@ dialog li { margin-bottom: 6px; }
   <h2>New game</h2>
   <p id="newwarn"></p>
   <div class="row"><label class="row" for="newmode">Mode
-    <select id="newmode"><option value="journey">Journey</option><option value="endless">Endless</option>
+    <select id="newmode"><option value="journey">Journey</option><option value="daily">Daily puzzle</option><option value="endless">Endless</option>
       <option value="classic">Classic</option><option value="custom">Custom</option></select></label></div>
   <div class="modebox" data-mode="journey"><span>72 levels in 6 chapters, each bringing something new. A fixed deck
       per level, with up to 3 stars.</span>
     <div class="row"><button type="button" id="newcontinue" class="primary">Continue: Level 1</button>
       <button type="button" id="newchoose">All levels</button></div></div>
+  <div class="modebox" data-mode="daily"><span><span id="dailyabout"></span> <i id="dailybest"></i></span>
+    <div class="row"><button type="button" id="newdaily" class="primary">Play today's puzzle</button></div></div>
   <div class="modebox" data-mode="endless"><span>A run of stages: each stage is one deck on a fresh board, harder as
       you go, with a reward to pick after each. One lost stage ends the run. <i id="endlessbest"></i></span>
     <div class="row"><button type="button" id="newendless" class="primary">Start a run</button></div></div>
@@ -452,7 +458,7 @@ const CFG = {
 // teal hexagon, pink flower, orange sun, brown mountain, lime leaf, navy night moon,
 // maroon berry, sky-blue cloud.
 const COLOURS = [
-  ['#e5484d', 'heart'], ['#f2b705', 'star'], ['#2fa86a', 'clover'],
+  ['#e5484d', 'heart'], ['#f2b705', 'star'], ['#1f8f4e', 'clover'],
   ['#3b82e6', 'drop'], ['#9b5de5', 'diamond'], ['#14b8a6', 'hexagon'], ['#f472b6', 'flower'],
   ['#f97316', 'sun'], ['#8b5e3c', 'triangle'],
   ['#84cc16', 'leaf'], ['#1e3a8a', 'crescent'], ['#9f1239', 'circle'], ['#38bdf8', 'cloud'],
@@ -587,7 +593,7 @@ function newStack(g) {
 }
 // mode: 'standard' (Classic: limited pours), 'free' (unlimited pours and undos), 'survive' (limited pours and a
 // deck), 'level' or 'endless'. deck: a deck size for a custom game; Survive's default is CFG.deck.
-// spec: settings like a level's, for an Endless stage (endlessGame).
+// spec: settings like a level's, for an Endless stage (endlessGame) or a daily puzzle ('daily', dailyGame).
 function newGame(seed, mode, colours, level, deck, spec) {
   mode = mode || 'standard';
   const L = spec || (mode === 'level' ? LEVELS[level - 1] : null);
@@ -696,6 +702,29 @@ function endlessGame(run, stage, perk, total) {
   g.score = total || 0;
   return endlessStart(g, perk);
 }
+// ---- Daily puzzle: one deck a day, the same for everyone on the same date ----
+// The player's own date (YYYYMMDD, like a newspaper puzzle) picks a deck from the Endless pools, so
+// every daily deck has been checked winnable, and it needs no network. The week climbs: Monday is
+// gentle, Saturday about chapter 6, and Sunday draws one of the top tiers. DAILY_VERSION goes in
+// the share text: change it only if the deck a date gives changes, so players know they compared
+// the same puzzle.
+const DAILY_VERSION = 1, DAILY_TIERS = [-1, 1, 2, 3, 4, 5, 7];   // by weekday, Sunday first; -1: a top tier
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const dailyDate = (d = new Date()) => d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+const dailyDay = date => new Date(Math.floor(date / 10000), Math.floor(date / 100) % 100 - 1, date % 100);
+const dailyName = date => { const d = dailyDay(date); return DAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()]; };
+function dailyTier(date) {
+  const t = DAILY_TIERS[dailyDay(date).getDay()];
+  return t >= 0 ? t : ENDLESS_RAMP + Math.floor(endlessRng(date, 0, 1)() * (ENDLESS_TIERS.length - ENDLESS_RAMP));
+}
+function dailyGame(date) {   // stage 0 of the "run" `date`: Endless stages start at 1, so no run deals it
+  const tier = dailyTier(date);
+  const g = newGame(endlessDeckSeed(date, 0, tier), 'daily', null, null, null, endlessSpec(tier));
+  g.daily = { date, tier, v: DAILY_VERSION };
+  g.undoStart = g.undos;
+  return g;
+}
 // A deck: the game is won once every stack in it has been placed.
 function isWon(g) { return !!g.deckSize && g.turn >= g.deckSize; }
 const stonesLeft = board => CELLS.reduce((n, k) => n + board[k].filter(c => c === STONE).length, 0);
@@ -723,7 +752,7 @@ function levelTargets(n) {
   return { M, score, top, stones };
 }
 function starGoals(g) {
-  const T = levelTargets(g.level), won = isWon(g), hit = won && g.score >= T.score;
+  const T = g.daily ? dailyTargets(g.daily.date) : levelTargets(g.level), won = isWon(g), hit = won && g.score >= T.score;
   return [
     { text: 'Finish the deck', met: won },
     { text: 'Score ' + T.score, met: hit },
@@ -737,20 +766,32 @@ const deckMaxCache = {};
 function deckMax(g) {
   const key = g.start + '.' + g.level + '.' + LEVELS[g.level - 1].colours + '.' + LEVELS[g.level - 1].deck;
   if (key in deckMaxCache) return deckMaxCache[key];
-  const d = newGame(g.start, 'level', null, g.level), per = {};
+  return deckMaxCache[key] = dealtMax(newGame(g.start, 'level', null, g.level));
+}
+function dealtMax(d) {   // d: a fresh game, dealt to the end of its deck
+  const per = {};
   for (let i = 0; i < d.deckSize; i++) {
     const slot = d.tray.findIndex(t => t); if (slot < 0) break;
     for (const c of d.tray[slot]) per[c] = (per[c] || 0) + 1;
     const cell = CELLS.find(k => !d.board[k].length);
     place(d, slot, cell); d.board[cell] = [];
   }
-  return deckMaxCache[key] = Object.values(per).reduce((a, n) => a + Math.floor(n / CFG.hexadek), 0);
+  return Object.values(per).reduce((a, n) => a + Math.floor(n / CFG.hexadek), 0);
 }
-function starsFor(g) { return g.level ? starGoals(g).filter(s => s.met).length : 0; }
+// A daily deck's star targets, from the most hexadeks its tiles allow (M), set from the computer
+// player's daily games (tools/bot.js --daily): its median score is M − 2 hexadeks' worth, so ★★
+// comes in about half of finished games; ★★★ at M (combos score extra) in about one in seven.
+function dailyTargets(date) {
+  const M = date in deckMaxCache ? deckMaxCache[date] : (deckMaxCache[date] = dealtMax(dailyGame(date)));
+  const pts = CFG.hexadek * CFG.pointsPerTile;
+  return { M, score: (M - 2) * pts, top: M * pts, stones: false };
+}
+function starsFor(g) { return g.level || g.daily ? starGoals(g).filter(s => s.met).length : 0; }
 // Classic, or a custom game named by what differs: "Deck of 30 · free pours · 7 colours".
 function gameName(g) {
   if (g.level) return 'Level ' + g.level + ' · ' + LEVELS[g.level - 1].name;
   if (g.endless) return 'Endless · Stage ' + g.endless.stage;
+  if (g.daily) return 'Daily · ' + dailyName(g.daily.date);
   return [g.deckSize ? 'Deck of ' + g.deckSize : 'Classic', g.mode === 'free' ? 'free pours' : null,
           g.colours !== CFG.colours ? g.colours + ' colours' : null].filter(Boolean).join(' · ');
 }
@@ -912,7 +953,7 @@ function start() {
   let firstVisit = false;
   try { firstVisit = !saved && !localStorage.getItem('hexadek.seen'); localStorage.setItem('hexadek.seen', '1'); } catch (e) {}
   // a best score for each mode and colour count; the old single best was from Free games
-  const bestKey = gm => BEST + '.' + (gm.level ? 'lv' + gm.level : gm.endless ? 'endless' : gm.mode +
+  const bestKey = gm => BEST + '.' + (gm.level ? 'lv' + gm.level : gm.endless ? 'endless' : gm.daily ? 'daily.' + gm.daily.date : gm.mode +
     (gm.deckSize && gm.deckSize !== (gm.mode === 'survive' ? CFG.deck : 0) ? '.d' + gm.deckSize : '') +
     (gm.colours !== CFG.colours ? '.' + gm.colours + 'c' : ''));
   function readBest(gm) {
@@ -963,7 +1004,31 @@ function start() {
     if (g.endless && endlessCleared(g) > readEndlessStages())   // Endless: the most stages cleared in a run
       try { localStorage.setItem(BEST + '.endless.stages', String(endlessCleared(g))); } catch (e) {}
     const st = starsFor(g);   // only the best result counts
-    if (st > readStars(g.level)) try { localStorage.setItem(STARS + g.level, String(st)); } catch (e) {}
+    if (g.level && st > readStars(g.level)) try { localStorage.setItem(STARS + g.level, String(st)); } catch (e) {}
+    if (g.daily) {   // each day's best score and stars, for the streak and the New game panel
+      const r = readDaily(), d = g.daily.date, old = r[d] || [0, 0];
+      if (g.score > old[0] || st > old[1]) {
+        r[d] = [Math.max(g.score, old[0]), Math.max(st, old[1])];
+        try { localStorage.setItem(DAILY, JSON.stringify(r)); } catch (e) {}
+      }
+    }
+  }
+  const DAILY = 'hexadek.daily';   // { YYYYMMDD: [best score, best stars] }
+  function readDaily() { try { return JSON.parse(localStorage.getItem(DAILY)) || {}; } catch (e) { return {}; } }
+  function dailyStreak() {   // days in a row with the puzzle finished, up to today (or yesterday, if today's is still to do)
+    const r = readDaily(), d = new Date();
+    if (!(r[dailyDate(d)] || [0, 0])[1]) d.setDate(d.getDate() - 1);
+    let n = 0;
+    while ((r[dailyDate(d)] || [0, 0])[1]) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+  function dailyShare() {   // a few lines to paste in a message
+    const T = dailyTargets(g.daily.date), n = starsFor(g), won = isWon(g), made = g.hexadeks || 0, streak = dailyStreak();
+    return ['Hexadek daily · ' + dailyName(g.daily.date) + ' · v' + g.daily.v,
+      (won ? '⭐'.repeat(n) + '☆'.repeat(3 - n) : '💥 ' + g.turn + '/' + g.deckSize + ' stacks') + ' ' +
+        g.score.toLocaleString('en') + ' points' + (streak > 1 ? ' · 🔥 ' + streak + ' days' : ''),
+      '🟩'.repeat(Math.min(made, T.M)) + '⬜'.repeat(Math.max(0, T.M - made)) + ' ' + made + ' of ' + T.M + ' hexadeks',
+      'lzimmerman.github.io/hexadek'].join('\n');
   }
   const endlessCleared = gm => gm.endless.stage - (isWon(gm) ? 0 : 1);
   function readEndlessStages() { try { return Number(localStorage.getItem(BEST + '.endless.stages')) || 0; } catch (e) { return 0; } }
@@ -1113,10 +1178,10 @@ function start() {
   function logGame(result) {
     if (tut || !g || g.logged || (!g.turn && result === 'left')) return;
     g.logged = true;
-    const T = g.level ? levelTargets(g.level) : null;
+    const T = g.level ? levelTargets(g.level) : g.daily ? dailyTargets(g.daily.date) : null;
     const perk = g.endless && ENDLESS_PERKS[g.endless.perk];   // Endless: the reward this stage was played with
     const rec = { t: stamp(), game: gameName(g) + (perk ? ' · ' + perk.name : ''), level: g.level || null, result,
-      score: g.score, stars: g.level ? starsFor(g) : null, hexadeks: g.hexadeks || 0, M: T ? T.M : null,
+      score: g.score, stars: g.level || g.daily ? starsFor(g) : null, hexadeks: g.hexadeks || 0, M: T ? T.M : null,
       placed: g.turn, deck: g.deckSize || null, colours: g.colours, undos: pourRule(g) ? (g.undoStart || CFG.undos) - undosLeft(g) : null,
       time: g.ms ? mmss(g.ms) : null };
     try {
@@ -1201,7 +1266,7 @@ function start() {
     const busy = g.endless ? state !== 'over' && (g.endless.stage > 1 || g.turn > 0) :
       (g.turn > 0 || g.history.length) && state !== 'over' && state !== 'won';
     if (again) {
-      const go = g.endless ? () => startEndless(g.endless.run) :
+      const go = g.endless ? () => startEndless(g.endless.run) : g.daily ? () => beginGame(dailyGame(g.daily.date)) :
         () => startGame(g.start, g.mode, g.colours, g.level, false, g.level ? null : g.deckSize);
       if (busy) ask(g.endless ? 'Restart this run from stage 1, with the same decks?' :
         'Restart this game from the beginning, with the same stacks?', 'Restart', go); else go();
@@ -1212,20 +1277,32 @@ function start() {
     $('newcolours').value = String(Math.min(13, g.colours % 2 ? g.colours : g.colours + 1));   // older games had 4 or 6
     const eb = readEndlessStages();
     $('endlessbest').textContent = eb ? 'Your best: ' + eb + (eb === 1 ? ' stage, ' : ' stages, ') + readBest({ endless: true }) + ' points.' : '';
-    if (!g.level && !g.endless && !tut) { const c = customOf(g); $('newpours').value = c.free ? 'free' : 'limited'; $('newlength').value = String(c.deck); }
+    showDaily();
+    if (!g.level && !g.endless && !g.daily && !tut) { const c = customOf(g); $('newpours').value = c.free ? 'free' : 'limited'; $('newlength').value = String(c.deck); }
     $('newcontinue').textContent = 'Continue: Level ' + continueLevel();
     $('newmode').value = tut ? 'journey' : modeOf(g);   // the mode last played
     showMode();
     $('newgame').showModal();
   }
   // the New game dialog: one mode at a time, chosen from the list
-  const modeOf = gm => gm.level ? 'journey' : gm.endless ? 'endless' :
+  const modeOf = gm => gm.level ? 'journey' : gm.endless ? 'endless' : gm.daily ? 'daily' :
     gm.mode === 'standard' && gm.colours === CFG.colours && !gm.deckSize ? 'classic' : 'custom';
   function showMode() {
     for (const b of $('newgame').querySelectorAll('[data-mode]')) b.hidden = b.dataset.mode !== $('newmode').value;
   }
   $('newmode').onchange = showMode;
   $('newendless').onclick = () => { $('newgame').close(); startEndless(Date.now()); };
+  const todayInPlay = () => g.daily && !tut && g.daily.date === dailyDate() && state !== 'over' && state !== 'won';
+  function showDaily() {   // the Daily panel: today's puzzle, how today has gone, and the streak
+    const d = dailyDate(), r = readDaily()[d], streak = dailyStreak(), day = dailyDay(d).getDay();
+    $('dailyabout').textContent = 'Today, ' + dailyName(d) + ': ' + ['the week\'s hardest', 'the week\'s gentlest', 'an easy one',
+      'a steady one', 'a middling one', 'a tricky one', 'a hard one'][day] + '. One deck, the same for everyone today, ' +
+      'with up to 3 stars; the puzzles climb from Monday to Sunday.';
+    $('dailybest').textContent = (r ? 'Today: ' + starText(r[1]) + ' ' + r[0] + ' points. ' : '') +
+      (streak ? 'Streak: ' + streak + (streak === 1 ? ' day.' : ' days.') : '');
+    $('newdaily').textContent = todayInPlay() ? 'Back to today\'s puzzle' : r ? 'Play it again' : 'Play today\'s puzzle';
+  }
+  $('newdaily').onclick = () => { $('newgame').close(); if (!todayInPlay()) beginGame(dailyGame(dailyDate())); };
   $('newclassic').onclick = () => { $('newgame').close(); startGame(Date.now(), 'standard'); };   // the usual 5 colours
   $('newcustom').onclick = () => {
     const c = { colours: Number($('newcolours').value), free: $('newpours').value === 'free', deck: Number($('newlength').value) };
@@ -1330,7 +1407,8 @@ function start() {
   function applyGameTheme() {
     if (typeof applyTheme !== 'function') return;   // themes.js didn't load: keep the built-in colours
     const name = tut ? 'classic' : g.level ? CHAPTER_THEMES[LEVELS[g.level - 1].chapter] :
-      g.endless ? CHAPTER_THEMES[(g.endless.stage - 1) % CHAPTER_THEMES.length] : 'classic';
+      g.endless ? CHAPTER_THEMES[(g.endless.stage - 1) % CHAPTER_THEMES.length] :
+      g.daily ? CHAPTER_THEMES[dailyDay(g.daily.date).getDay() % CHAPTER_THEMES.length] : 'classic';
     if (name === themeNow) return;
     themeNow = name; applyTheme(name); resize();   // resize re-reads the colours for the board
   }
@@ -1473,8 +1551,8 @@ function start() {
     else if (g.deckSize && g.deckSize - g.turn === 1 && !ui.sel) text = g.endless ? 'Last stack: place it to clear the stage!' : 'Last stack: place it to finish!';
     else if (g.deckSize && g.deckSize - g.turn <= 3 && !ui.sel) text = (g.deckSize - g.turn) + ' stacks to go.';
     else if (ui.sel) text = 'Tap a glowing neighbour to pour.';
-    else if (g.level && g.turn === 0 && !g.history.length) {   // short: it has to fit a phone's status line
-      const T = levelTargets(g.level);
+    else if ((g.level || g.daily) && g.turn === 0 && !g.history.length) {   // short: it has to fit a phone's status line
+      const T = g.daily ? dailyTargets(g.daily.date) : levelTargets(g.level);
       text = '★ place ' + g.deckSize + ' · ★★ ' + T.score + ' pts · ★★★ ' + T.top + (T.stones ? ' + stones' : ' pts');
     }
     else if (g.endless && g.turn === 0 && !g.history.length)
@@ -1500,7 +1578,7 @@ function start() {
       $('deck').title = left + ' stacks left to place';
       $('deck').classList.toggle('ending', ending); $('deckbar').classList.toggle('ending', ending);
     }
-    const goals = g.level ? starGoals(g) : null;
+    const goals = g.level || g.daily ? starGoals(g) : null;
     $('overstars').style.display = goals ? '' : 'none';
     if (goals) {
       const n = starsFor(g);
@@ -1510,7 +1588,9 @@ function start() {
     }
     const made = g.hexadeks || 0;
     $('overtext').textContent = gameName(g) + '. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ').') +
-      ' Hexadeks: ' + made + (g.level ? ' of ' + deckMax(g) + ' possible.' : '.');
+      ' Hexadeks: ' + made + (g.level ? ' of ' + deckMax(g) + ' possible.' : g.daily ? ' of ' + dailyTargets(g.daily.date).M + ' possible.' : '.');
+    if (g.daily) { const n = dailyStreak(); if (n) $('overtext').textContent += ' Daily streak: ' + n + (n === 1 ? ' day.' : ' days.'); }
+    $('overshare').style.display = g.daily && (state === 'won' || state === 'over') && !tut ? '' : 'none';
     if (g.endless) {
       const n = endlessCleared(g), eb = readEndlessStages(), stages = k => k + (k === 1 ? ' stage' : ' stages');
       $('overtext').textContent = state === 'won' ? 'Run total: ' + g.score + ' points. Choose a reward for stage ' + (n + 1) + ', then Next stage.' :
@@ -1664,6 +1744,12 @@ function start() {
   $('new').onclick = () => doNew(false);
   $('overnew').onclick = () => doNew(false);
   $('overnext').onclick = () => playLevel(g.level + 1);
+  $('overshare').onclick = () => {   // the clipboard, or the phone's share sheet if copying isn't allowed
+    const text = dailyShare(), b = $('overshare');
+    const done = ok => { b.textContent = ok ? 'Copied!' : 'Copy result'; if (ok) setTimeout(() => { b.textContent = 'Copy result'; }, 2500); };
+    const share = () => navigator.share ? navigator.share({ text }).then(() => done(false), () => done(false)) : done(false);
+    try { navigator.clipboard.writeText(text).then(() => done(true), share); } catch (e) { share(); }
+  };
   $('restart').onclick = () => doNew(true);
   $('overrestart').onclick = () => doNew(true);
   $('giveup').onclick = () => { state = 'over'; hud(); };

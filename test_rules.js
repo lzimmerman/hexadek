@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -224,3 +224,24 @@ const ew = R.endlessGame(9, 1, null, 0);
 for (let i = 0; i < ew.deckSize; i++) { assert(place(ew, ew.tray.findIndex(t => t), '0,0')); ew.board['0,0'] = []; }
 assert(R.isWon(ew));
 console.log('endless tests passed');
+
+// the daily puzzle: one deck per date, from the checked Endless pools; the week climbs
+assert.equal(R.dailyDate(new Date(2026, 10, 2)), 20261102);
+assert.equal(R.dailyName(20261102), 'Mon 2 Nov');
+assert.equal(R.dailyTier(20261102), 1, 'Monday is gentle');
+assert.equal(R.dailyTier(20261107), 7, 'Saturday is hard');
+for (const d of [20261101, 20261108, 20261115, 20261122]) assert(R.dailyTier(d) >= R.ENDLESS_RAMP, 'Sunday draws a top tier');
+const d1 = R.dailyGame(20261102);
+assert.deepEqual(d1.tray, R.dailyGame(20261102).tray, 'the same date deals the same deck');
+assert.notDeepEqual(d1.start, R.dailyGame(20261109).start, 'another date, another deck');
+assert.equal(d1.mode, 'daily'); assert.equal(R.gameName(d1), 'Daily · Mon 2 Nov');
+for (let d = 20261101; d <= 20261130; d++) {   // every deck from the checked part of its pool
+  const g = R.dailyGame(d), i = g.start - R.ENDLESS_SEED - 1000 * g.daily.tier;
+  assert(i >= 0 && i < R.ENDLESS_POOL && !(R.ENDLESS_SKIP[g.daily.tier] || []).includes(i), 'daily ' + d + ' is a checked deck');
+  const T = R.dailyTargets(d); assert(T.M > 3 && T.score < T.top, 'daily ' + d + ' has sensible targets');
+}
+const dw = R.dailyGame(20261103), DT = R.dailyTargets(20261103);
+for (let i = 0; i < dw.deckSize; i++) { assert(place(dw, dw.tray.findIndex(t => t), '0,0')); dw.board['0,0'] = []; }
+assert.equal(R.starsFor(dw), 1, 'finishing is a star'); dw.score = DT.top; assert.equal(R.starsFor(dw), 3);
+console.log('daily tests passed');
+
