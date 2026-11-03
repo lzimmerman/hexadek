@@ -16,7 +16,7 @@ test('Endless: stages, rewards and the best run', async ({ page, hasTouch }) => 
   await expect(page.locator('#endlessbest')).toHaveText('');
   await page.locator('#newendless').click();
   await expect(page.locator('#mode')).toHaveText('Endless · Stage 1');
-  await expect(page.locator('#msg')).toHaveText(/^Stage 1: place 30 stacks · 🎁 \d+ deks$/u);
+  await expect(page.locator('#msg')).toHaveText(/^Stage 1: place 30 · 🎁 \d+ deks$/u);
   await game(page, () => { window.__t.g.score = 600; window.__t.g.hexadeks = 99; });   // enough deks to earn a reward
   await finishStage(page, hasTouch);
   await expect(page.locator('#over')).toHaveClass(/show/, { timeout: 10000 });
@@ -33,7 +33,7 @@ test('Endless: stages, rewards and the best run', async ({ page, hasTouch }) => 
   await expect(page.locator('#mode')).toHaveText('Endless · Stage 1');   // picking doesn't start the stage
   await page.locator('#overstage').click();
   await expect(page.locator('#mode')).toHaveText('Endless · Stage 2');
-  await expect(page.locator('#msg')).toHaveText(new RegExp('^Stage 2: place ' + (perk === 'short' ? 25 : 30) + ' stacks · 🎁 \\d+ deks · ' + name.replace(/^✓ /, '') + '$', 'u'));
+  await expect(page.locator('#msg')).toHaveText(new RegExp('^Stage 2: place ' + (perk === 'short' ? 25 : 30) + ' · 🎁 \\d+ deks · ' + name.replace(/^✓ /, '') + '$', 'u'));
   expect(await game(page, () => [window.__t.g.score, window.__t.g.endless.perk])).toEqual([600, perk]);
   // too few deks: no reward, straight on to the next stage
   await finishStage(page, hasTouch);

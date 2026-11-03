@@ -138,6 +138,10 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #msg { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 420px) { #status { font-size: 14px; padding: 6px 10px; } }
 #status.tight #msg { font-size: 12.5px; }   /* a message that wouldn't fit steps down rather than touching the edge */
+/* ...and one that still wouldn't takes two smaller lines in the same height, so the board never moves and no
+   message is cut off with no way to read it (play test, 2026-11-03: a hint ended in "…") */
+#status.two { padding-top: 2px; padding-bottom: 2px; }
+#status.two #msg { white-space: normal; font-size: 11.5px; line-height: 1.2; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 #status.flash { color: var(--good); font-weight: 700; border-left-color: var(--good); }
 #status.pulse { animation: pulse 900ms ease-out; }
 @keyframes pulse { from { background: color-mix(in srgb, var(--good) 28%, var(--panel)); } to { background: var(--panel); } }
@@ -1078,6 +1082,11 @@ function tallyGame(g, st, info, ended) {
 }
 
 // ---- hints: a good next move, not always the best ----
+// Their messages, short enough for one line of the status bar on a 360px phone (tests/hint.spec.js checks).
+// start: on an empty board, where every cell is as good as another.
+const HINT_TEXT = { dek: 'Hint: this pour finishes a dek.', room: 'Hint: this pour starts to make room.',
+                    pour: 'Hint: this pour builds a long run.', place: 'Hint: place it on the glowing cell.',
+                    start: 'Start anywhere; keep the middle free.' };
 // { why: 'dek' | 'room' | 'pour' | 'place', from, to } for a pour, { why: 'place', slot, to } for a tray stack, or null.
 // In order: a pour that finishes a dek; on a full board, the first pour of the shortest way to make room;
 // a pour that builds a long run of one colour; the tray stack and cell that best match their neighbours.
@@ -1313,6 +1322,10 @@ function start() {
     for (const v of ['cell', 'cell-edge', 'plate', 'accent', 'ink', 'muted', 'panel', 'font', 'bg', 'gold', 'good']) theme[v] = css.getPropertyValue('--' + v).trim();
     dirty = true;
   }
+  // The canvas changed size without the ResizeObserver saying so: at start in WebKit, the header's rows fill in after
+  // the first layout, and neither the observer nor animation frames ran until the first touch, so the board was
+  // laid out for the old size and taps missed (browser tests, 2026-11-03). hud() changes the header, so it checks too.
+  function fitCanvas() { const r = canvas.getBoundingClientRect(); if (r.width !== W || r.height !== H) resize(); }
   function cellXY(k) {
     const [q, r] = k.split(',').map(Number);
     return [BX + S * R3 * (q + r / 2), BY + S * 1.5 * r];
@@ -1872,17 +1885,18 @@ function start() {
     else if ((g.level || g.daily) && g.turn === 0 && !g.history.length) {   // short: it has to fit a phone's status line
       const T = g.daily ? dailyTargets(g.daily.date) : levelTargets(g.level);
       const C = collectGoal(g);
-      text = '★ place ' + g.deckSize + ' · ★★ ' + (C ? collectText(C) : T.score + ' pts') + ' · ★★★ ' + T.top + (T.stones ? ' + stones' : C ? ' + collect' : ' pts');
+      text = '★ place ' + g.deckSize + ' · ★★ ' + (C ? collectText(C) : T.score + ' pts') + ' · ★★★ ' + (C ? '+' : '') + T.top + (T.stones ? ' + stones' : ' pts');   // collect: ★★'s deks plus the score
     }
     else if (g.endless && g.turn === 0 && !g.history.length)
-      text = 'Stage ' + g.endless.stage + ': place ' + g.deckSize + ' stacks · 🎁 ' + endlessRewardDeks(g) + ' deks' + (g.endless.perk ? ' · ' + ENDLESS_PERKS[g.endless.perk].name : '');
+      text = 'Stage ' + g.endless.stage + ': place ' + g.deckSize + ' · 🎁 ' + endlessRewardDeks(g) + ' deks' + (g.endless.perk ? ' · ' + ENDLESS_PERKS[g.endless.perk].name : '');
     else if (g.deckSize && g.turn === 0 && !g.history.length) text = 'Place all ' + g.deckSize + ' stacks in the deck to win.';
     else if (g.turn === 0 && !g.history.length) text = 'Drag a tray stack onto the board to start.';
     else if (P) text = 'Pour, then place a stack (+' + P.perPlace + ' pours).';
     else text = 'Pour freely, then place a stack.';
     $('msg').replaceChildren(...rich(text));
-    st.classList.remove('tight');
+    st.classList.remove('tight', 'two');
     if ($('msg').scrollWidth > $('msg').clientWidth) st.classList.add('tight');
+    if ($('msg').scrollWidth > $('msg').clientWidth) st.classList.add('two');   // still too long: two lines rather than an ending cut off
     $('giveup').style.display = state === 'full' ? 'inline-block' : 'none';
     $('over').classList.toggle('show', (state === 'over' || state === 'won') && !ending);
     $('overtitle').textContent = g.endless ? (state === 'won' ? 'Stage ' + g.endless.stage + ' cleared!' : 'Run over') :
@@ -1934,6 +1948,7 @@ function start() {
         (n && n >= eb ? ': your best run!' : '. Best: ' + stages(eb) + ', ' + best + ' points.');
     }
     $('overundo').style.display = g.history.length && undosLeft(g) > 0 && state !== 'won' && !g.ended ? '' : 'none';
+    fitCanvas();   // the header may have changed height
   }
   let perksKey = null, perkPick = null;
   function showPerks(on) {   // the two rewards on the end card, rebuilt only when the stage changes
@@ -2084,15 +2099,13 @@ function start() {
   });
   $('undo').onclick = doUndo;
   // ---- hints: the move is shown, not made ----
-  const HINT_TEXT = { dek: 'Hint: pour onto the glowing stack to finish a dek.', room: 'Hint: this pour starts to make room.',
-                      pour: 'Hint: this pour builds a long run of one colour.', place: 'Hint: place this stack on the glowing cell.' };
   $('hint').onclick = () => {
     if (tut || state === 'won' || state === 'over') return;
     finishAnims();
     // an empty board (stones aside): every cell is as good as another, so a tip instead of an arbitrary move
     // (play test, 2026-11-03: it pointed at the top corner); not counted as a hint
     if (cellsOf(g.board).every(k => g.board[k].every(c => c === STONE))) {
-      setFlash('Start anywhere; keep the middle free.', 4000);   // short: the status line is one line on a phone
+      setFlash(HINT_TEXT.start, 4000);
       anims.push({ type: 'outline', t0: performance.now(), dur: 1600 });   // the whole board lights up: anywhere
       pulseStatus(); hud(); return;
     }
@@ -2586,6 +2599,7 @@ function start() {
   }
 
   function frame(now) {
+    fitCanvas();
     if (flash && now > flash.until) { flash = null; hud(); }
     if (dirty || anims.length || tutExpect() || ending) { dirty = false; render(now); }
     requestAnimationFrame(frame);
