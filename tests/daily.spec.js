@@ -41,3 +41,14 @@ test('Daily puzzle: today\'s deck, stars, Copy result and the streak', async ({ 
   await expect(page.locator('#newdaily')).toHaveText('Back to today\'s puzzle');
   expect(errors).toEqual([]);
 });
+
+test('Daily puzzle: a shape Wednesday says so, and its result is v2', async ({ page }) => {
+  await page.clock.setFixedTime(new Date(2026, 10, 4, 12, 0));   // Wednesday 4 November 2026: the first, on Ring
+  const errors = await openGame(page);
+  await page.locator('#new').click();
+  await page.locator('#newmode').selectOption('daily');
+  await expect(page.locator('#dailyabout')).toContainText('Today, Wed 4 Nov: a steady one, on the Ring board.');
+  await page.locator('#newdaily').click();
+  expect(await game(page, () => [window.__t.g.holes, window.__t.g.daily.v])).toEqual(['ring', 2]);
+  expect(errors).toEqual([]);
+});

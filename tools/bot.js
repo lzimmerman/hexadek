@@ -22,7 +22,8 @@
 //                           --json prints a line per tier; --from DIR combines such lines instead of
 //                           playing; --write puts the skip lists into index.html (ENDLESS_SKIP)
 //                           --perk ID plays every stage with that reward (pours, short, stone, undos,
-//                           or the candidates colour, simple), to compare what each is worth; --quick skips the expert
+//                           or the candidates colour, simple), to compare what each is worth; --quick skips the expert;
+//                           --holes NAME plays every stage on that board shape
 //     --leapfrog            plays the leapfrog strategy seen in play tests: a colour's top run can hop on
 //                           across stacks with the same colour on top, so it travels further than one
 //                           pour (searched as one move of up to 4 pours, each paid for as usual)
@@ -279,17 +280,21 @@ if (flag('classic')) {
 }
 
 // ---- Daily puzzle: how often each star comes, by weekday, over a span of dates ----
-//   --daily 20261102-20261129 [--skill player --games 6]
+//   --daily 20261102-20261129 [--skill player --games 6] [--weekday Wed]
+//   (--weekday: only that day of the week; the dates where no game finished are listed)
 if (opt('daily')) {
   const [from, to] = opt('daily').split('-').map(Number), sk = opt('skill', 'player'), n = Number(opt('games', 6));
-  const days = {}, over = [];   // weekday: [finished, ★★, ★★★, games]; over: hexadeks' worth of score beyond M, per finish
+  const days = {}, over = [], never = [];   // weekday: [finished, ★★, ★★★, games]; over: hexadeks' worth of score beyond M, per finish
   for (let d = dailyDay(from); dailyDayNum(d) <= to; d.setDate(d.getDate() + 1)) {
-    const date = dailyDayNum(d), w = DAYS[d.getDay()], r = days[w] = days[w] || [0, 0, 0, 0];
+    const date = dailyDayNum(d), w = DAYS[d.getDay()];
+    if (opt('weekday') && opt('weekday') !== w) continue;
+    const r = days[w] = days[w] || [0, 0, 0, 0], had = r[0];
     for (let i = 0; i < n; i++) {
       const pg = playGame(dailyGame(date), SKILLS[sk], mulberry(date * 7 + i)), s = starsFor(pg);
       if (isWon(pg)) over.push(pg.score / (CFG.hexadek * CFG.pointsPerTile) - dailyTargets(date).M);
       r[0] += s >= 1; r[1] += s >= 2; r[2] += s >= 3; r[3]++;
     }
+    if (r[0] === had) never.push(date);
   }
   const P = (a, b) => (100 * a / b).toFixed(0).padStart(4) + '%';
   console.log(sk + ', daily ' + from + '–' + to + ', ' + n + ' games a day');
@@ -299,6 +304,7 @@ if (opt('daily')) {
   over.sort((a, b) => a - b);
   const q = f => over[Math.min(over.length - 1, Math.floor(f * over.length))];
   console.log('score − M (in hexadeks), finished games: 25% ' + q(0.25) + ', median ' + q(0.5) + ', 75% ' + q(0.75) + ', 90% ' + q(0.9));
+  if (never.length) console.log('no game finished on: ' + never.join(', '));
   if (flag('json')) console.log('DAILYOVER ' + JSON.stringify(over));
   process.exit(0);
 }
@@ -307,7 +313,8 @@ function dailyDayNum(d) { return d.getFullYear() * 10000 + (d.getMonth() + 1) * 
 // ---- Endless ----
 if (flag('endless')) {
   const sk = opt('skill', 'player'), pool = Number(opt('pool', ENDLESS_POOL)), perk = opt('perk', null);
-  const stage = (t, seed) => endlessStart(newGame(seed, 'endless', null, null, null, endlessSpec(t, perk)), perk);
+  const shape = opt('holes') ? { holes: opt('holes') } : {};   // --holes NAME: every stage on that board
+  const stage = (t, seed) => endlessStart(newGame(seed, 'endless', null, null, null, Object.assign(endlessSpec(t, perk), shape)), perk);
   const tspan = (opt('tiers', '1-' + ENDLESS_TIERS.length) + '-').split('-').map(Number);
   const tiers = {};   // tier (0-based): { skip: [indices], pass: share the player clears, n }
   if (opt('from')) {

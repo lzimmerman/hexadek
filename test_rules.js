@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, hintMove, tallyGame, collectGoal, BOARD_SHAPES, cellsOf, canMakeRoom};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, dailyShape, hintMove, tallyGame, collectGoal, BOARD_SHAPES, cellsOf, canMakeRoom};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -136,7 +136,7 @@ LEVELS.forEach((L, i) => {
   for (let j = 0; j < 9000; j++) counts[R.pickBands([1, 4, 4], 6, j / 9000)]++;
   assert.deepEqual(counts, [0, 1000, 4000, 4000]);
   assert.equal(R.pickBands([1, 4, 4], 2, 0.99), 2); }
-assert.equal(LEVELS.length, 72); assert.equal(R.CHAPTERS.length, 6);
+assert.equal(LEVELS.length, 84); assert.equal(R.CHAPTERS.length, 7);
 const l1 = newGame(1001, 'level', null, 1); assert.equal(R.poursLeft(l1), Infinity); assert.equal(R.undosLeft(l1), Infinity);
 const tb = LEVELS.findIndex(L => L.pours && L.pours.max === 6) + 1, l3 = newGame(1000 + tb, 'level', null, tb), P3 = LEVELS[tb - 1].pours;
 assert.equal(R.poursLeft(l3), P3.start);
@@ -243,6 +243,14 @@ for (let d = 20261101; d <= 20261130; d++) {   // every deck from the checked pa
 const dw = R.dailyGame(20261103), DT = R.dailyTargets(20261103);
 for (let i = 0; i < dw.deckSize; i++) { assert(place(dw, dw.tray.findIndex(t => t), '0,0')); dw.board['0,0'] = []; }
 assert.equal(R.starsFor(dw), 1, 'finishing is a star'); dw.score = DT.top; assert.equal(R.starsFor(dw), 3);
+// shape Wednesdays from 2026-11-04: Ring, Corners, Bridge in turn, on Tuesday's tier; earlier dates keep their decks
+assert.deepEqual([20261104, 20261111, 20261118, 20261125, 20270331].map(R.dailyShape), ['ring', 'corners', 'bridge', 'ring', 'ring']);
+assert.deepEqual([20261028, 20261103, 20261105, 20261108].map(R.dailyShape), [null, null, null, null]);
+const dsh = R.dailyGame(20261104);
+assert.equal(dsh.holes, 'ring'); assert.equal(R.cellsOf(dsh.board).length, 18); assert.equal(dsh.daily.tier, 2);
+assert.equal(R.gameName(dsh), 'Daily · Wed 4 Nov · Ring');
+assert.equal(R.dailyGame(20261028).daily.tier, 3); assert(!R.dailyGame(20261028).holes);
+assert.deepEqual([dsh.daily.v, R.dailyGame(20261105).daily.v], [2, 1], 'only the changed decks are v2');
 console.log('daily tests passed');
 
 
@@ -297,7 +305,7 @@ console.log('daily tests passed');
 
 // collect levels: two per chapter, the goal from the deck, ★★ for the colour
 {
-  assert.deepEqual(R.LEVELS.filter(L => L.collect).map(L => L.n), [9, 11, 17, 23, 27, 32, 41, 48, 53, 60, 64, 72]);
+  assert.deepEqual(R.LEVELS.filter(L => L.collect).map(L => L.n), [9, 11, 17, 23, 27, 32, 41, 48, 53, 60, 64, 72, 75, 81]);
   const g = R.newGame(1009, 'level', null, 9), C = R.collectGoal(g);
   assert(C && C.deks >= 1 && C.colour >= 0, 'level 9 has a collect goal');
   assert.equal(R.collectGoal(R.newGame(1008, 'level', null, 8)), null, 'level 8 does not');
@@ -349,5 +357,11 @@ console.log('daily tests passed');
   assert(!newGame(5, 'standard', 7, null, null, null, 'ring').ramp, 'other colour counts stay fixed');
   assert.equal(R.gameName(g), 'Classic · Ring');
   assert(newGame(5, 'standard').ramp && !newGame(5, 'standard').holes);
+  // chapter 7: a new shape every three levels, on the level's own board, and its card says so
+  assert.deepEqual(LEVELS.slice(72).map(L => L.holes), ['ring', 'ring', 'ring', 'corners', 'corners', 'corners',
+    'bridge', 'bridge', 'bridge', 'wheel', 'wheel', 'wheel']);
+  assert.equal(R.cellsOf(newGame(1082, 'level', null, 82).board).length, 15);
+  assert.equal(R.levelAbout(76), 'A new board shape: Corners.');
+  assert(!LEVELS.slice(0, 72).some(L => L.holes), 'chapters 1 to 6 keep the full board');
   console.log('custom board tests passed');
 }

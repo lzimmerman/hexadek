@@ -14,7 +14,8 @@
 // formula (elsewhere within LOOSE), so the computer player
 // evens out the outliers without reshaping levels that already play well.
 // Then caps: ★★ at most (M - 1) hexadeks, ★★★ at most (M + 1), so neither needs a perfect run plus combos.
-// Prints the table next to the old formula; --write puts it into index.html (LEVEL_TARGETS).
+// Prints the table next to the old formula; --write puts it into index.html (LEVEL_TARGETS), keeping the
+// current targets of levels DIR has no games for (so a new chapter can be added on its own).
 
 const fs = require('fs'), path = require('path');
 const dir = process.argv[2], write = process.argv.includes('--write');
@@ -29,7 +30,7 @@ const PTS = 120;
 // 1080); a play test made 10 of 13. Lowered to 1200.
 const PLAYTESTED = { 68: { score: 1200 } };
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-const { LEVELS } = eval('(() => {' + html.match(/<script>([\s\S]*)<\/script>/)[1] + '; return { LEVELS }; })()');   // for which levels have stones
+const { LEVELS, LEVEL_TARGETS } = eval('(() => {' + html.match(/<script>([\s\S]*)<\/script>/)[1] + '; return { LEVELS, LEVEL_TARGETS }; })()');   // which have stones; the current table
 
 const runs = {};   // runs[level][skill] = games
 for (const f of fs.readdirSync(dir)) for (const line of fs.readFileSync(path.join(dir, f), 'utf8').split('\n')) {
@@ -76,12 +77,14 @@ const early = rows.filter(r => r.n <= 16);
 if (early.length) console.log(`\nlevels 1-16, mean change: ★★ ${avg(early, r => r.score - r.oldScore).toFixed(0)}, ★★★ ${avg(early, r => r.top - r.oldTop).toFixed(0)} points`);
 
 if (write) {
-  if (rows.length !== 72) { console.error('--write needs all 72 levels'); process.exit(1); }
+  const table = LEVELS.map((L, i) => { const r = rows.find(r => r.n === i + 1); return r ? [r.score, r.top] : LEVEL_TARGETS[i]; });
+  const missing = table.map((t, i) => t ? 0 : i + 1).filter(Boolean);
+  if (missing.length) { console.error('--write: no games and no current target for levels ' + missing.join(', ')); process.exit(1); }
   const file = path.join(__dirname, '..', 'index.html');
   const re = /(\/\/ LEVEL_TARGETS:begin[^\n]*\n)[\s\S]*?(\n\/\/ LEVEL_TARGETS:end)/;
   if (!re.test(html)) { console.error('index.html has no LEVEL_TARGETS markers'); process.exit(1); }
-  const body = 'const LEVEL_TARGETS = [   // [★★ score, ★★★ score] for levels 1 to 72\n' +
-    rows.reduce((out, r, i) => out + (i % 6 ? ' ' : '  ') + '[' + r.score + ', ' + r.top + '],' + (i % 6 === 5 ? '\n' : ''), '') + '];';
+  const body = 'const LEVEL_TARGETS = [   // [★★ score, ★★★ score] for levels 1 to ' + LEVELS.length + '\n' +
+    table.reduce((out, t, i) => out + (i % 6 ? ' ' : '  ') + '[' + t[0] + ', ' + t[1] + '],' + (i % 6 === 5 ? '\n' : ''), '') + '];';
   fs.writeFileSync(file, html.replace(re, (m, a, b) => a + body + b));
   console.log('\nWrote LEVEL_TARGETS into index.html.');
 }

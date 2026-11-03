@@ -69,11 +69,11 @@ test('dialogs: How to play, play data, New game and All levels', async ({ page }
   await page.locator('#new').click();
   await expect(page.locator('#newgame')).toBeVisible();
   await page.locator('#newchoose').click();
-  await expect(page.locator('#levelgrid button.lv')).toHaveCount(72);
+  await expect(page.locator('#levelgrid button.lv')).toHaveCount(84);
   await expect(page.locator('#levelgrid button.lv.primary')).toHaveText(/^3/);   // the next level to play
   await page.locator('#levelgrid button.lv[data-n="2"]').click();
   await expect(page.locator('#intro')).toHaveClass(/show/);
-  await expect(page.locator('#introlevel')).toContainText('Level 2 of 72');
+  await expect(page.locator('#introlevel')).toContainText('Level 2 of 84');
   expect(errors).toEqual([]);
 });
 

@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hexadek</title>
-<meta name="description" content="A hex-grid stacking puzzle. Pour matching colours, make hexadeks of 12, and play 72 levels in your browser.">
+<meta name="description" content="A hex-grid stacking puzzle. Pour matching colours, make hexadeks of 12, and play 84 levels in your browser.">
 <!-- Link previews (Open Graph): the picture and text shown when the address is shared -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Hexadek: a hex stacking puzzle">
-<meta property="og:description" content="Pour matching colours. Make 12 of a kind. 72 levels, plays in your browser.">
+<meta property="og:description" content="Pour matching colours. Make 12 of a kind. 84 levels, plays in your browser.">
 <meta property="og:url" content="https://lzimmerman.github.io/hexadek/">
 <meta property="og:image" content="https://lzimmerman.github.io/hexadek/icons/social-preview.png">
 <meta property="og:image:width" content="1280">
@@ -355,7 +355,7 @@ dialog li { margin-bottom: 6px; }
     <li>Its whole top run moves: onto a stack with the same top colour, or onto an empty cell.</li>
     <li>Only neighbours: the six cells touching it.</li>
     <li>A stack holds at most 12 tiles. If the whole run doesn't fit, only what fits moves.</li>
-    <li><b>Journey</b>: 72 levels, each a fixed deck with its own rules. See <i>Journey: levels and stars</i> below.</li>
+    <li><b>Journey</b>: 84 levels, each a fixed deck with its own rules. See <i>Journey: levels and stars</i> below.</li>
     <li><b>Daily puzzle</b>: one deck a day, the same for everyone with the same date, with up to 3 stars.
       Monday's is the gentlest and the week climbs to Sunday. Finish it on days in a row for a streak, and
       Copy result for two lines to paste in a message: your stars and score, and the deks you made.</li>
@@ -364,7 +364,7 @@ dialog li { margin-bottom: 6px; }
       and you earn a reward for the next, one of two: a bigger pour budget, a shorter deck, lighter stacks (more of
       a single colour) or a stone gone. Losing a stage
       ends the run; your best is the most stages cleared. Every deck has been checked: it can be finished.</li>
-    <li>So a <b>level</b> is one of Journey's 72, always the same, with stars; a <b>stage</b> is one deck in an
+    <li>So a <b>level</b> is one of Journey's 84, always the same, with stars; a <b>stage</b> is one deck in an
       Endless run, different every run.</li>
     <li><b>Classic</b>: play until the board fills, for a best score. Each pour uses one: you start with 3, get 3 more
       for each stack you place and 1 for each dek, and can save up to 9. Undo gives the pour back, and you have 5
@@ -396,7 +396,7 @@ dialog li { margin-bottom: 6px; }
   <h3>The end</h3>
   <p>Each turn adds a stack, so the board fills up. The game ends when there's no empty cell and no pour can make one.</p>
   <h3>Journey: levels and stars</h3>
-  <p>Journey is the main game: 72 levels in 6 chapters, each bringing something new. Each level is a fixed
+  <p>Journey is the main game: 84 levels in 7 chapters, each bringing something new. Each level is a fixed
     deck of stacks, the same every time you play it. Place every stack to finish it, and the next level opens.
     Under New game, Journey › Continue goes to your next level, and All levels shows them all with your stars. The first
     level of each chapter is always open.</p>
@@ -472,7 +472,7 @@ dialog li { margin-bottom: 6px; }
   <div class="row"><label class="row" for="newmode">Mode
     <select id="newmode" autofocus><option value="journey">Journey</option><option value="daily">Daily puzzle</option><option value="endless">Endless</option>
       <option value="classic">Classic</option><option value="custom">Custom</option></select></label></div>
-  <div class="modebox" data-mode="journey"><span>72 levels in 6 chapters, each bringing something new. A fixed deck
+  <div class="modebox" data-mode="journey"><span>84 levels in 7 chapters, each bringing something new. A fixed deck
       per level, with up to 3 stars.</span>
     <div class="row"><button type="button" id="newcontinue" class="primary">Continue: Level 1</button>
       <button type="button" id="newchoose">All levels</button></div></div>
@@ -552,7 +552,7 @@ const CLASSIC_RAMP = { every: 10, max: 9 };
 const STONE = 99;   // a grey stone tile: it can't be poured, and breaks when a neighbouring stack clears
                     // (it was 9 until there were more than 9 colours; load() converts older saves)
 const STONE_COLOUR = '#6b7280';
-// Levels: 72, in 6 chapters of 12. A level's settings come from its number (levelSpec), and its
+// Levels: 84, in 7 chapters of 12. A level's settings come from its number (levelSpec), and its
 // deck from a fixed seed (1000 + n), so it plays the same every time. Difficulty rises through
 // a chapter and eases a little at the start of the next, which brings in something new.
 // pours: undefined is Standard's budget, null is free pouring.
@@ -561,7 +561,7 @@ const STONE_COLOUR = '#6b7280';
 // (tools/targets.js), so each level asks the same of the player whatever its deck allows.
 // Without a table entry: score = (M - 1) × 120 and top = (M + 2) × 120, with M the most
 // hexadeks the deck's tiles allow (deckMax).
-const LEVEL_COUNT = 72, CHAPTER_SIZE = 12, LEVEL_SEED = 1000;
+const LEVEL_COUNT = 84, CHAPTER_SIZE = 12, LEVEL_SEED = 1000;
 const POURS_TIGHT = { start: 2, perPlace: 2, perClear: 1, max: 6 };
 const POURS_TIGHTER = { start: 2, perPlace: 2, perClear: 1, max: 5 };
 const S1 = [STONE], S2 = [STONE, STONE];
@@ -589,7 +589,11 @@ const CHAPTERS = [
   { name: 'More colours', about: 'Six colours, then seven. Sorting gets harder: keep each colour together.' },
   { name: 'Long haul', about: 'Longer decks, and later, stacks with more colours mixed in.' },
   { name: 'Mastery', about: 'Everything at once: more colours, a tight budget and stones, over the longest decks.' },
+  { name: 'Shapes', about: 'The board changes shape: holes where cells are missing. Fewer cells and fewer neighbours, so plan your space.' },
 ];
+// Chapter 7 (2026-11-03): a new board shape every three levels, easiest first (BOARD_SHAPES' order; Loop is too hard
+// for a level). It eases back from Mastery, as each chapter does, so the shape is what's new.
+const SHAPE_STEPS = ['ring', 'corners', 'bridge', 'wheel'];
 function levelSpec(n) {
   const c = Math.floor((n - 1) / CHAPTER_SIZE), i = (n - 1) % CHAPTER_SIZE;   // chapter, and step within it
   const L = { n, chapter: c, step: i, name: CHAPTERS[c].name, colours: 5, bands: [1, 3], pours: undefined, stones: null };
@@ -603,6 +607,9 @@ function levelSpec(n) {
   if (c === 5) Object.assign(L, { colours: i < 6 ? 6 : 7, deck: 38 + i, bands: i < 8 ? [1, 3] : [2, 3],
                                   pours: i < 4 ? undefined : i < 9 ? POURS_TIGHT : POURS_TIGHTER,
                                   stones: i % 2 ? STONE_LAYOUTS[2 + (i >> 2)] : null });
+  if (c === 6) Object.assign(L, { holes: SHAPE_STEPS[Math.floor(i / 3)], deck: 30 + i, ...[
+                                    { colours: 6, pours: POURS_TIGHT }, { colours: 6, pours: POURS_TIGHT }, { colours: 6 }, { colours: 4 }][Math.floor(i / 3)] });
+  // (player bot, 2026-11-03: Wheel with 5 colours finished 10–38%; with 4, 100% falling to 78%, like chapter 5's end)
   if (COLLECT_STEPS[c].includes(i)) L.collect = true;   // the colour and count come from the deck (collectGoal)
   return Object.assign(L, LEVEL_TWEAKS[n]);
 }
@@ -612,13 +619,13 @@ function levelSpec(n) {
 // The goal is every
 // dek the deck's most common colour allows, less collectSlack where the player bot (which doesn't aim at the
 // colour) almost never made it: tools/bot.js --skill player, ★★ in 40–95% of games, 10% at level 17.
-const COLLECT_STEPS = [[8, 10], [4, 10], [2, 7], [4, 11], [4, 11], [3, 11]], COLLECT_SLACK = 0;   // by chapter
+const COLLECT_STEPS = [[8, 10], [4, 10], [2, 7], [4, 11], [4, 11], [3, 11], [2, 8]], COLLECT_SLACK = 0;   // by chapter
 // Hand-tuned levels. Play tests (2026-11-01) showed stacks that are all mixed (2-3 colours) under a
 // tight pour budget were far harder for people than for the computer player: level 60 took 25 tries.
 // These levels deal mostly mixed stacks with an occasional single colour (odds of 1, 2, 3 colours),
 // tuned with tools/bot.js --skill player to about level 58's difficulty, which took 3 tries.
 const LEVEL_TWEAKS = {
-  9: { collectSlack: 1 }, 32: { collectSlack: 1 },   // collect goals (COLLECT_SLACK); 60 and 72 below too
+  9: { collectSlack: 1 }, 32: { collectSlack: 1 }, 81: { collectSlack: 1 },   // collect goals (COLLECT_SLACK); 60 and 72 below too
   60: { bandOdds: [1, 4, 4], collectSlack: 1 },
   69: { bandOdds: [1, 4, 4] },
   70: { bandOdds: [1, 2, 2] },
@@ -636,6 +643,7 @@ function levelAbout(n) {
   if (P.pours === null && L.pours !== null) news.push('Pours now come from a budget: place stacks to earn more.');
   else if (rule(L) && rule(P) && rule(L).max < rule(P).max) news.push('Fewer pours to go around.');
   if (L.bands[0] > P.bands[0] || L.bands[1] > P.bands[1]) news.push('More mixed stacks.');
+  if (L.holes && L.holes !== P.holes) news.push('A new board shape: ' + BOARD_SHAPES[L.holes].name + '.');
   if (stoneCells(L) > stoneCells(P)) news.push(stoneCells(P) ? 'More stones.' : 'Stones are back.');
   else if (!stoneCells(L) && stoneCells(P)) news.push('No stones this time.');
   if (L.deck > P.deck && !news.length) news.push('A slightly longer deck.');
@@ -829,23 +837,34 @@ function endlessRewardDeks(g) {
 // ---- Daily puzzle: one deck a day, the same for everyone on the same date ----
 // The player's own date (YYYYMMDD, like a newspaper puzzle) picks a deck from the Endless pools, so
 // every daily deck has been checked winnable, and it needs no network. The week climbs: Monday is
-// gentle, Saturday about chapter 6, and Sunday draws one of the top tiers. DAILY_VERSION goes in
-// the share text: change it only if the deck a date gives changes, so players know they compared
-// the same puzzle.
-const DAILY_VERSION = 1, DAILY_TIERS = [-1, 1, 2, 3, 4, 5, 7];   // by weekday, Sunday first; -1: a top tier
+// gentle, Saturday about chapter 6, and Sunday draws one of the top tiers. A date's version goes in
+// the share text (from v2): raise it only for the dates whose deck changes, so players know they
+// compared the same puzzle. v2 (2026-11-04): shape Wednesdays, below; every other date is still v1.
+const dailyVersion = date => dailyShape(date) ? 2 : 1;
+const DAILY_TIERS = [-1, 1, 2, 3, 4, 5, 7];   // by weekday, Sunday first; -1: a top tier
+// Shape Wednesdays: Ring, Corners and Bridge in turn, from DAILY_SHAPES_FROM, on Tuesday's tier: on Wednesday's own
+// the player bot's ★★ fell from 61% to 36%, as hard as Thursday (2026-11-03). Wheel and Loop are too hard for midweek.
+const DAILY_SHAPES = ['ring', 'corners', 'bridge'], DAILY_SHAPE_DAY = 3, DAILY_SHAPES_FROM = 20261104;
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dailyDate = (d = new Date()) => d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
 const dailyDay = date => new Date(Math.floor(date / 10000), Math.floor(date / 100) % 100 - 1, date % 100);
 const dailyName = date => { const d = dailyDay(date); return DAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()]; };
 function dailyTier(date) {
-  const t = DAILY_TIERS[dailyDay(date).getDay()];
+  const t = DAILY_TIERS[dailyDay(date).getDay()] - (dailyShape(date) ? 1 : 0);
   return t >= 0 ? t : ENDLESS_RAMP + Math.floor(endlessRng(date, 0, 1)() * (ENDLESS_TIERS.length - ENDLESS_RAMP));
 }
+function dailyShape(date) {
+  const d = dailyDay(date);
+  if (date < DAILY_SHAPES_FROM || d.getDay() !== DAILY_SHAPE_DAY) return null;
+  const weeks = Math.round((d - dailyDay(DAILY_SHAPES_FROM)) / (7 * 864e5));   // round: a week can be an hour short (clocks)
+  return DAILY_SHAPES[weeks % DAILY_SHAPES.length];
+}
 function dailyGame(date) {   // stage 0 of the "run" `date`: Endless stages start at 1, so no run deals it
-  const tier = dailyTier(date);
-  const g = newGame(endlessDeckSeed(date, 0, tier), 'daily', null, null, null, endlessSpec(tier));
-  g.daily = { date, tier, v: DAILY_VERSION };
+  const tier = dailyTier(date), L = endlessSpec(tier);
+  if (dailyShape(date)) L.holes = dailyShape(date);
+  const g = newGame(endlessDeckSeed(date, 0, tier), 'daily', null, null, null, L);
+  g.daily = { date, tier, v: dailyVersion(date) };
   g.undoStart = g.undos;
   return g;
 }
@@ -854,7 +873,7 @@ function isWon(g) { return !!g.deckSize && g.turn >= g.deckSize; }
 const stonesLeft = board => cellsOf(board).reduce((n, k) => n + board[k].filter(c => c === STONE).length, 0);
 // Each star's goal and whether it's met; stars count only as far as the goals in a row are met.
 // LEVEL_TARGETS:begin (written by tools/targets.js: edit there, or by hand)
-const LEVEL_TARGETS = [   // [★★ score, ★★★ score] for levels 1 to 72
+const LEVEL_TARGETS = [   // [★★ score, ★★★ score] for levels 1 to 84
   [360, 600], [480, 720], [600, 840], [600, 840], [840, 1080], [1080, 1320],
   [720, 960], [840, 1200], [960, 1200], [840, 1080], [840, 1080], [1080, 1320],
   [600, 840], [840, 1080], [720, 960], [840, 1200], [720, 1080], [1080, 1320],
@@ -867,6 +886,8 @@ const LEVEL_TARGETS = [   // [★★ score, ★★★ score] for levels 1 to 72
   [1200, 1440], [1320, 1680], [1320, 1560], [960, 1440], [960, 1560], [1200, 1800],
   [1320, 1560], [1080, 1440], [1200, 1440], [1320, 1560], [1080, 1320], [1080, 1560],
   [960, 1320], [1200, 1680], [1080, 1440], [1200, 1800], [960, 1440], [1200, 1680],
+  [600, 840], [720, 960], [720, 1080], [600, 840], [960, 1200], [1080, 1440],
+  [960, 1200], [960, 1320], [1200, 1440], [840, 1200], [1320, 1680], [960, 1560],
 ];
 // LEVEL_TARGETS:end
 function levelTargets(n) {
@@ -941,7 +962,7 @@ function starsFor(g) { return g.level || g.daily ? starGoals(g).filter(s => s.me
 function gameName(g) {
   if (g.level) return 'Level ' + g.level + ' · ' + LEVELS[g.level - 1].name;
   if (g.endless) return 'Endless · Stage ' + g.endless.stage;
-  if (g.daily) return 'Daily · ' + dailyName(g.daily.date);
+  if (g.daily) return 'Daily · ' + dailyName(g.daily.date) + (g.holes ? ' · ' + BOARD_SHAPES[g.holes].name : '');
   return [g.deckSize ? 'Deck of ' + g.deckSize : 'Classic', g.mode === 'free' ? 'free pours' : null,
           g.colours !== CFG.colours ? g.colours + ' colours' : null, g.holes ? BOARD_SHAPES[g.holes].name : null].filter(Boolean).join(' · ');
 }
@@ -1194,7 +1215,7 @@ function start() {
     for (const c of kids.flat()) if (c !== null && c !== undefined && c !== false) e.append(c instanceof Node ? c : String(c));
     return e;
   }
-  const SAVE = 'hexadek.save.v1', BEST = 'hexadek.best', STARS = 'hexadek.stars.lv';   // .lv: the 72 levels (2026-11)
+  const SAVE = 'hexadek.save.v1', BEST = 'hexadek.best', STARS = 'hexadek.stars.lv';   // .lv: the Journey levels (2026-11)
   const OLD = 'hexdek';   // the game's first name: saves made under it still load
   const TILE = 0.12;      // tile thickness, as a share of the hex size
   const R3 = Math.sqrt(3);
@@ -1538,7 +1559,7 @@ function start() {
     $('introtitle').textContent = L.name;
     $('introabout').textContent = levelAbout(g.level);
     $('introfacts').textContent = L.deck + ' stacks · ' + L.colours + ' colours · ' +
-      (P ? 'pours: start ' + P.start + ', up to ' + P.max : 'unlimited pours');
+      (P ? 'pours: start ' + P.start + ', up to ' + P.max : 'unlimited pours') + (L.holes ? ' · board: ' + BOARD_SHAPES[L.holes].name : '');
     const C = collectGoal(g), what = C && collectText(C);
     const goals = C ? [['★', 'Place all ' + L.deck + ' stacks'], ['★★', 'Make ' + what + ' (collect)'], ['★★★', 'Score ' + T.top + ' and make ' + what]] :
                   [['★', 'Place all ' + L.deck + ' stacks'], ['★★', 'Score ' + T.score],
@@ -1605,7 +1626,8 @@ function start() {
   function showDaily() {   // the Daily panel: today's puzzle, how today has gone, and the streak
     const d = dailyDate(), r = readDaily()[d], streak = dailyStreak(), day = dailyDay(d).getDay();
     $('dailyabout').textContent = 'Today, ' + dailyName(d) + ': ' + ['the week\'s hardest', 'the week\'s gentlest', 'an easy one',
-      'a steady one', 'a middling one', 'a tricky one', 'a hard one'][day] + '. One deck, the same for everyone today, ' +
+      'a steady one', 'a middling one', 'a tricky one', 'a hard one'][day] +
+      (dailyShape(d) ? ', on the ' + BOARD_SHAPES[dailyShape(d)].name + ' board' : '') + '. One deck, the same for everyone today, ' +
       'with up to 3 stars; the puzzles climb from Monday to Sunday.';
     $('dailybest').textContent = (r ? 'Today: ' + starText(r[1]) + ' ' + r[0] + ' points. ' : '') +
       (streak ? 'Streak: ' + streak + (streak === 1 ? ' day.' : ' days.') : '');
@@ -1721,7 +1743,7 @@ function start() {
     if (typeof applyTheme !== 'function') return;   // themes.js didn't load: keep the built-in colours
     const name = tut ? 'classic' : g.level ? CHAPTER_THEMES[LEVELS[g.level - 1].chapter] :
       g.endless ? CHAPTER_THEMES[(g.endless.stage - 1) % CHAPTER_THEMES.length] :
-      g.daily ? CHAPTER_THEMES[dailyDay(g.daily.date).getDay() % CHAPTER_THEMES.length] : 'classic';
+      g.daily ? (g.holes ? CHAPTER_THEMES[6] : CHAPTER_THEMES[dailyDay(g.daily.date).getDay() % CHAPTER_THEMES.length]) : 'classic';   // a shape: chapter 7's
     if (name === themeNow) return;
     themeNow = name; applyTheme(name); resize();   // resize re-reads the colours for the board
   }

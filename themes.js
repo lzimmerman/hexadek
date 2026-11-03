@@ -95,9 +95,18 @@ const THEMES = {
              plate: '#101a14', accent: '#a9c9f2', 'on-accent': '#0b1626', good: '#7fd6a0', warn: '#f5b74f',
              danger: '#f59a8b', gold: '#f0b457', line: '#24332a' },
   },
+  tidepools: {   // chapter 7, Shapes: rock pools at low tide, sea-glass water and a coral accent (holes in the rock)
+    name: 'Tide pools',
+    light: { bg: '#edf5f3', panel: '#ffffff', ink: '#13232a', muted: '#465a5f', cell: '#dbe6e3', 'cell-edge': '#86a09b',
+             plate: '#bfd2ce', accent: '#b0304f', 'on-accent': '#ffffff', good: '#2b7a4b', warn: '#9a5807',
+             danger: '#a61b1b', gold: '#b07b00', line: '#d2e1de' },
+    dark:  { bg: '#0d1719', panel: '#152225', ink: '#e7f2f1', muted: '#a1b6b7', cell: '#24343a', 'cell-edge': '#4b6469',
+             plate: '#122023', accent: '#ff93ad', 'on-accent': '#2a0c16', good: '#72d4a2', warn: '#f2c14e',
+             danger: '#f59a8b', gold: '#f2c14e', line: '#24363a' },
+  },
 };
 
-const CHAPTER_THEMES = ['meadow', 'dunes', 'riverbed', 'autumn', 'dusk', 'nightforest'];
+const CHAPTER_THEMES = ['meadow', 'dunes', 'riverbed', 'autumn', 'dusk', 'nightforest', 'tidepools'];
 
 // The board keeps the classic colours in every theme (2026-11-01): tinted cells sat close to some
 // tile colours and muted the bands in a stack. A theme can keep its own board with ownBoard: true.
