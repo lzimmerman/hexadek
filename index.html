@@ -291,10 +291,12 @@ dialog li { margin-bottom: 6px; }
     <li>Only neighbours: the six cells touching it.</li>
     <li>A stack holds at most 12 tiles. If the whole run doesn't fit, only what fits moves.</li>
     <li><b>Journey</b>: 72 levels, each a fixed deck with its own rules. See <i>Journey: levels and stars</i> below.</li>
-    <li><b>Endless</b>: one stage after another, each a deck on a fresh board, rising to about the difficulty of
-      the last chapter. After each stage, pick one of two rewards for the next: a bigger pour budget, a shorter
-      deck, lighter stacks (more of a single colour) or a stone gone. Losing a stage ends the run; your best is the most stages cleared. Every deck has been
-      checked: it can be finished.</li>
+    <li><b>Endless</b>: a run of stages. Each <b>stage</b> is one deck on a fresh board, and they get harder, up
+      to about the difficulty of Journey's last chapter. After each stage, pick one of two rewards for the next: a
+      bigger pour budget, a shorter deck, lighter stacks (more of a single colour) or a stone gone. Losing a stage
+      ends the run; your best is the most stages cleared. Every deck has been checked: it can be finished.</li>
+    <li>So a <b>level</b> is one of Journey's 72, always the same, with stars; a <b>stage</b> is one deck in an
+      Endless run, different every run.</li>
     <li><b>Classic</b>: play until the board fills, for a best score. Each pour uses one: you start with 3, get 3 more
       for each stack you place and 1 for each hexadek, and can save up to 9. Undo gives the pour back, and you have 5
       undos per game.</li>
@@ -395,8 +397,8 @@ dialog li { margin-bottom: 6px; }
       per level, with up to 3 stars.</span>
     <div class="row"><button type="button" id="newcontinue" class="primary">Continue: Level 1</button>
       <button type="button" id="newchoose">All levels</button></div></div>
-  <div class="modebox" data-mode="endless"><span>Stage after stage on fresh boards, harder as you go, with a reward
-      to pick after each. One lost stage ends the run. <i id="endlessbest"></i></span>
+  <div class="modebox" data-mode="endless"><span>A run of stages: each stage is one deck on a fresh board, harder as
+      you go, with a reward to pick after each. One lost stage ends the run. <i id="endlessbest"></i></span>
     <div class="row"><button type="button" id="newendless" class="primary">Start a run</button></div></div>
   <div class="modebox" data-mode="classic"><span id="classicabout"></span>
     <div class="row"><button type="button" id="newclassic" class="primary">Play Classic</button></div></div>
@@ -669,6 +671,7 @@ function endlessSpec(tier, perk) {
   if (perk === 'stone' && T.stones) {
     const tall = Object.keys(T.stones).sort((a, b) => T.stones[b].length - T.stones[a].length)[0];
     L.stones = Object.assign({}, T.stones); delete L.stones[tall];
+    L.gone = tall;   // shown breaking as the stage starts
   }
   if (perk === 'colour') L.colours -= 1;                 // one colour fewer
   if (perk === 'simple') L.bandOdds = [2, 2, 1];         // more single-colour stacks
@@ -684,9 +687,10 @@ function endlessStart(g, perk) {   // the rewards that change the game's counter
 }
 // Stage `stage` of the run `run`, with a reward, carrying on from the run's score so far.
 function endlessGame(run, stage, perk, total) {
-  const tier = endlessTier(run, stage);
-  const g = newGame(endlessDeckSeed(run, stage, tier), 'endless', null, null, null, endlessSpec(tier, perk));
+  const tier = endlessTier(run, stage), L = endlessSpec(tier, perk);
+  const g = newGame(endlessDeckSeed(run, stage, tier), 'endless', null, null, null, L);
   g.endless = { run: run | 0, stage, tier, perk: perk || null };
+  if (L.gone) g.endless.gone = L.gone;
   g.score = total || 0;
   return endlessStart(g, perk);
 }
@@ -1161,7 +1165,11 @@ function start() {
     $('intro').classList.remove('show');
   }
   const startEndless = run => beginGame(endlessGame(run, 1, null, 0));
-  const nextStage = perk => beginGame(endlessGame(g.endless.run, g.endless.stage + 1, perk, g.score));
+  const nextStage = perk => {
+    beginGame(endlessGame(g.endless.run, g.endless.stage + 1, perk, g.score));
+    // Break a stone: the stone stands a moment where it was, then shatters, like one broken by a hexadek
+    if (g.endless.gone && !still()) anims.push({ type: 'break', cell: g.endless.gone, at: 0, t0: performance.now(), wait: 700, dur: 600, crack: true });
+  };
   function showIntro() {   // a card describing the level: what's new in it and the star goals
     const L = LEVELS[g.level - 1], T = levelTargets(g.level), P = pourRule(g);
     $('introlevel').textContent = 'Level ' + g.level + ' of ' + LEVELS.length + ' · Chapter ' + (L.chapter + 1) + ' (' + (L.step + 1) + '/' + CHAPTER_SIZE + ')';
@@ -1913,6 +1921,7 @@ function start() {
         const [x, y] = cellXY(a.cell), t = Math.max(0, (now - a.t0 - a.wait) / a.dur);
         ctx.globalAlpha = 1 - t;
         tile(x, y - a.at * h - t * S * 0.3, S * (1 + 0.3 * t), STONE);
+        if (a.crack) crack(x, y - a.at * h - t * S * 0.3, S * (1 + 0.3 * t));   // a whole stone, until it goes
         ctx.globalAlpha = 1;
       } else if (a.type === 'pour') {
         const [x0, y0] = cellXY(a.a), [x1, y1] = cellXY(a.b);

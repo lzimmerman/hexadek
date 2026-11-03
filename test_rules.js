@@ -218,6 +218,8 @@ assert(!R.endlessOffer(1, 0).includes('budget'), 'no bigger budget for a stage t
 const stoneCells = g => CELLS.filter(k => g.board[k].includes(STONE)).length;
 assert.equal(stoneCells(R.endlessGame(5, 3, 'stone', 0)), stoneCells(R.endlessGame(5, 3, null, 0)) - 1, 'a stone gone');
 assert.deepEqual(ET[2].stones, R.STONE_LAYOUTS[2], 'the reward leaves the tier itself alone');
+const gone = R.endlessGame(5, 3, 'stone', 0).endless.gone;
+assert(ET[2].stones[gone] && !R.endlessGame(5, 3, 'stone', 0).board[gone].length, 'the game knows which stone went');
 const ew = R.endlessGame(9, 1, null, 0);
 for (let i = 0; i < ew.deckSize; i++) { assert(place(ew, ew.tray.findIndex(t => t), '0,0')); ew.board['0,0'] = []; }
 assert(R.isWon(ew));
