@@ -245,7 +245,7 @@ dialog li { margin-bottom: 6px; }
 <footer id="bar" class="row">   <!-- below the board, where a thumb reaches -->
   <button id="undo" title="Undo a pour (Ctrl/Cmd+Z)">Undo</button>
   <div id="deck" aria-label="Deck progress"><span id="decklabel">Deck</span><span id="decktext"></span></div>
-  <button id="haptics" aria-pressed="false" title="Vibrate on pours and hexadeks">Haptics: off</button>
+  <button id="haptics" aria-pressed="false" title="Vibrate on pours and deks">Haptics: off</button>
   <div class="deckbar" id="deckbar"><div id="deckfill"></div></div>   <!-- full width, on its own line under the buttons -->
 </footer>
 </div>
@@ -278,8 +278,8 @@ dialog li { margin-bottom: 6px; }
 <dialog id="rules">
   <h2 tabindex="-1">How to play</h2>
   <p>Hexadek is a puzzle about sorting coloured tiles. Each cell of the board holds a stack of hex tiles.
-    Your goal is to build <b>stacks of 12 tiles all of one colour</b>, called a hexadek. A finished hexadek
-    clears from the board and scores points.</p>
+    Your goal is to build <b>stacks of 12 tiles all of one colour</b>, called a <b>hexadek</b>, or
+    <b>dek</b> for short. A finished dek clears from the board and scores points.</p>
   <h3>Stacks</h3>
   <div class="fig"><canvas data-fig="stack"></canvas>
     <p>The tiles on top that share a colour are the stack's <b>top run</b>. The symbol on top shows its colour,
@@ -296,7 +296,7 @@ dialog li { margin-bottom: 6px; }
     <li><b>Journey</b>: 72 levels, each a fixed deck with its own rules. See <i>Journey: levels and stars</i> below.</li>
     <li><b>Daily puzzle</b>: one deck a day, the same for everyone with the same date, with up to 3 stars.
       Monday's is the gentlest and the week climbs to Sunday. Finish it on days in a row for a streak, and
-      Copy result to share how you did.</li>
+      Copy result for two lines to paste in a message: your stars and score, and the deks you made.</li>
     <li><b>Endless</b>: a run of stages. Each <b>stage</b> is one deck on a fresh board, and they get harder, up
       to about the difficulty of Journey's last chapter. After each stage, pick one of two rewards for the next: a
       bigger pour budget, a shorter deck, lighter stacks (more of a single colour) or a stone gone. Losing a stage
@@ -304,7 +304,7 @@ dialog li { margin-bottom: 6px; }
     <li>So a <b>level</b> is one of Journey's 72, always the same, with stars; a <b>stage</b> is one deck in an
       Endless run, different every run.</li>
     <li><b>Classic</b>: play until the board fills, for a best score. Each pour uses one: you start with 3, get 3 more
-      for each stack you place and 1 for each hexadek, and can save up to 9. Undo gives the pour back, and you have 5
+      for each stack you place and 1 for each dek, and can save up to 9. Undo gives the pour back, and you have 5
       undos per game.</li>
     <li><b>Custom</b>: choose the colours (3 to 13; fewer is easier), limited or free pours (free pours come with
       unlimited undos), and the length: <i>Fill board</i> (play until the board is full), or a deck of 30 or 50
@@ -320,7 +320,7 @@ dialog li { margin-bottom: 6px; }
   <div class="fig"><canvas data-fig="full"></canvas>
     <p>12 tiles of one colour clear: 120 points.</p></div>
   <h3>Combos</h3>
-  <p>A turn lasts from one placement to the next, and you can pour as often as your pours allow. Each hexadek
+  <p>A turn lasts from one placement to the next, and you can pour as often as your pours allow. Each dek
     you make in the same turn is worth more: the first 120, the second 240 (×2), the third 360 (×3), and so on.
     The status line shows the multiplier.</p>
   <ul>
@@ -341,7 +341,7 @@ dialog li { margin-bottom: 6px; }
   <ul>
     <li>★ Finish the deck.</li>
     <li>★★ Finish, and reach the level's score target.</li>
-    <li>★★★ Finish with a higher score: it takes nearly every hexadek the deck allows, plus a few double or
+    <li>★★★ Finish with a higher score: it takes nearly every dek the deck allows, plus a few double or
       triple clears in one turn. On levels with stones, ★★★ also needs every stone broken, with a slightly lower score.</li>
   </ul>
   <p>Each level's goals show at the start of the game, and the end screen ticks off the ones you met. Your best
@@ -364,7 +364,7 @@ dialog li { margin-bottom: 6px; }
     <li>Use an empty cell to park a top run and uncover the colour underneath.</li>
     <li>Try not to bury a colour under a different one.</li>
     <li>Keep two or three cells empty when you can, and check the next stack before you place.</li>
-    <li>When pours are limited, spend them where they finish or set up a hexadek, and save the rest for a crowded board.</li>
+    <li>When pours are limited, spend them where they finish or set up a dek, and save the rest for a crowded board.</li>
     <li>Undo is free until you place, so experiment.</li>
   </ul>
   <h3>Controls</h3>
@@ -373,7 +373,7 @@ dialog li { margin-bottom: 6px; }
       the game skips its animations.</li>
     <li>Press and hold a stack, or rest the mouse on it, to see all its tiles.</li>
     <li>Undo is below the board. Esc lets go of a selected stack, and Ctrl+Z or Cmd+Z undoes a pour.</li>
-    <li>Haptics, also below the board, makes the phone vibrate on pours and hexadeks. It's off to start with.</li>
+    <li>Haptics, also below the board, makes the phone vibrate on pours and deks. It's off to start with.</li>
     <li><b>Restart</b> plays the same game again from the start, with the same stacks, to try another plan.
       <b>New game</b> deals new stacks.</li>
     <li><b>As an app:</b> on Android, open the browser menu and choose <i>Install app</i> or <i>Add to Home
@@ -383,7 +383,7 @@ dialog li { margin-bottom: 6px; }
   <div class="row"><button type="button" id="tutor">Play the tutorial</button><span class="spacer"></span><button type="button" id="rulesclose">Close</button></div>
   <div class="extra">   <!-- for testing: below the buttons, out of the way -->
     <h3>Your play data</h3>
-    <p>The game keeps a short log of your finished games on this device (score, stars, hexadeks), for testing and
+    <p>The game keeps a short log of your finished games on this device (score, stars, deks), for testing and
       tuning. Copy it to share it.</p>
     <div class="row"><button type="button" id="copylog">Copy play data</button><span id="copied" class="hint"></span></div>
     <textarea id="logtext" readonly hidden aria-label="Play data"></textarea>
@@ -489,7 +489,7 @@ const STONE_LAYOUTS = {   // by number of stone cells; a stone two high takes tw
 const CHAPTERS = [
   { name: 'First steps', about: 'A gentle start: four colours, and at first you can pour as much as you like.' },
   { name: 'Tight budget', about: 'Fewer pours to go around. Every one counts, so look before you pour.' },
-  { name: 'Stones', about: 'Grey stones block part of the board. A hexadek next to a stone breaks it. Stones two high take two.' },
+  { name: 'Stones', about: 'Grey stones block part of the board. A dek next to a stone breaks it. Stones two high take two.' },
   { name: 'More colours', about: 'Six colours, then seven. Sorting gets harder: keep each colour together.' },
   { name: 'Long haul', about: 'Longer decks, and later, stacks with more colours mixed in.' },
   { name: 'Mastery', about: 'Everything at once: more colours, a tight budget and stones, over the longest decks.' },
@@ -907,7 +907,7 @@ function tutorialGame() {
 const TUTORIAL = [
   { text: 'Each cell holds a stack of hex tiles. The symbol on top shows the top colour, and the number shows ' +
           'how many tiles of that colour are on top: the top run. Your goal is to build a stack of 12 tiles all ' +
-          'of one colour, called a hexadek.' },
+          'of one colour, called a hexadek, or dek for short.' },
   { text: 'Pouring moves a top run onto a neighbouring stack with the same top colour. Tap the marked red stack ' +
           '(red heart, 3), then tap the red stack next to it.', expect: { pour: ['-1,0', '0,0'] } },
   { text: 'All 3 red tiles moved across: that stack now has 5 reds on top. You can also pour onto an empty cell. ' +
@@ -918,7 +918,7 @@ const TUTORIAL = [
           'Drag the marked red stack onto the marked cell, or tap it and then tap the cell.', expect: { place: [0, '1,0'] } },
   { text: 'The big stack has 9 reds, and the new one has 3. Pour the new one onto it to make 12 of one colour.',
     expect: { pour: ['1,0', '0,0'] } },
-  { text: "A hexadek! It cleared from the board and scored 120 points. Combos: a second hexadek before you place " +
+  { text: "A dek! It cleared from the board and scored 120 points. Combos: a second dek before you place " +
           "again scores ×2 (240), a third ×3. " +
           "Each turn adds a stack, so the board fills up: the game ends when there's no empty cell and no pour can " +
           "make one. Undo is free until you place, so experiment. How to play has tips any time.", last: true },
@@ -1024,11 +1024,10 @@ function start() {
   }
   function dailyShare() {   // a few lines to paste in a message
     const T = dailyTargets(g.daily.date), n = starsFor(g), won = isWon(g), made = g.hexadeks || 0, streak = dailyStreak();
-    return ['Hexadek daily · ' + dailyName(g.daily.date) + ' · v' + g.daily.v,
-      (won ? '⭐'.repeat(n) + '☆'.repeat(3 - n) : '💥 ' + g.turn + '/' + g.deckSize + ' stacks') + ' ' +
-        g.score.toLocaleString('en') + ' points' + (streak > 1 ? ' · 🔥 ' + streak + ' days' : ''),
-      '🟩'.repeat(Math.min(made, T.M)) + '⬜'.repeat(Math.max(0, T.M - made)) + ' ' + made + ' of ' + T.M + ' hexadeks',
-      'lzimmerman.github.io/hexadek'].join('\n');
+    return ['Hexadek ' + dailyName(g.daily.date) + (g.daily.v > 1 ? ' v' + g.daily.v : '') + ' · ' +   // the version only once it changes
+        (won ? '⭐'.repeat(n) + '☆'.repeat(3 - n) : '💥 ' + g.turn + '/' + g.deckSize) + ' ' + g.score.toLocaleString('en') +
+        (streak > 1 ? ' · 🔥' + streak : ''),
+      '🟩'.repeat(Math.min(made, T.M)) + '⬜'.repeat(Math.max(0, T.M - made)) + ' ' + made + '/' + T.M + ' deks'].join('\n');
   }
   const endlessCleared = gm => gm.endless.stage - (isWon(gm) ? 0 : 1);
   function readEndlessStages() { try { return Number(localStorage.getItem(BEST + '.endless.stages')) || 0; } catch (e) { return 0; } }
@@ -1149,7 +1148,7 @@ function start() {
                    wait: pa.dur + stagger * (res.n - 1), dur: 340 });
       if (!still()) for (const k of res.broke)
         anims.push({ type: 'break', cell: k, at: g.board[k].length, t0: now, wait: pa.dur + stagger * (res.n - 1), dur: 340 });
-      setFlash('Hexadek! +' + res.points + (res.mult > 1 ? ' (×' + res.mult + ')' : '') +
+      setFlash('Dek! +' + res.points + (res.mult > 1 ? ' (×' + res.mult + ')' : '') +
                (res.broke.length ? ' · ' + (res.broke.length > 1 ? res.broke.length + ' stones' : 'a stone') + ' broken' : ''));
     }
     ui.sel = null;
@@ -1245,7 +1244,7 @@ function start() {
     $('introfacts').textContent = L.deck + ' stacks · ' + L.colours + ' colours · ' +
       (P ? 'pours: start ' + P.start + ', up to ' + P.max : 'unlimited pours');
     const goals = [['★', 'Place all ' + L.deck + ' stacks'], ['★★', 'Score ' + T.score],
-                   ['★★★', 'Score ' + T.top + (T.stones ? ' and break every stone' : ' (combos: several hexadeks in one turn)')]];
+                   ['★★★', 'Score ' + T.top + (T.stones ? ' and break every stone' : ' (combos: several deks in one turn)')]];
     let done = 0, stars = 0;
     for (let n = 1; n <= LEVEL_COUNT; n++) { const s = readStars(n); if (s) done++; stars += s; }
     $('introjourney').textContent = 'Journey so far: ' + done + ' of ' + LEVEL_COUNT + ' levels, ' + stars + ' of ' + LEVEL_COUNT * 3 + ' ★';
@@ -1310,7 +1309,7 @@ function start() {
   };
   const P = CFG.pours;
   $('classicabout').textContent = 'Play until the board fills, for a best score. Start with ' + P.start +
-    ' pours, get ' + P.perPlace + ' more for each stack you place and ' + P.perClear + ' for each hexadek, up to ' + P.max + ' saved.';
+    ' pours, get ' + P.perPlace + ' more for each stack you place and ' + P.perClear + ' for each dek, up to ' + P.max + ' saved.';
   $('levelstable').replaceChildren(el('tr', null, el('th', null, 'Chapter'), el('th', null, 'Levels'), el('th', null, 'Brings')),
     ...CHAPTERS.map((C, c) => el('tr', null, el('td', null, (c + 1) + ' · ' + C.name),
       el('td', null, (c * CHAPTER_SIZE + 1) + '–' + (c + 1) * CHAPTER_SIZE), el('td', null, C.about))));
@@ -1588,7 +1587,7 @@ function start() {
     }
     const made = g.hexadeks || 0;
     $('overtext').textContent = gameName(g) + '. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ').') +
-      ' Hexadeks: ' + made + (g.level ? ' of ' + deckMax(g) + ' possible.' : g.daily ? ' of ' + dailyTargets(g.daily.date).M + ' possible.' : '.');
+      ' Deks: ' + made + (g.level ? ' of ' + deckMax(g) + ' possible.' : g.daily ? ' of ' + dailyTargets(g.daily.date).M + ' possible.' : '.');
     if (g.daily) { const n = dailyStreak(); if (n) $('overtext').textContent += ' Daily streak: ' + n + (n === 1 ? ' day.' : ' days.'); }
     $('overshare').style.display = g.daily && (state === 'won' || state === 'over') && !tut ? '' : 'none';
     if (g.endless) {
@@ -1918,7 +1917,7 @@ function start() {
   function previewText(a, b) {
     const r = pourResult(g.board, a, b);
     let t = r.after + ' / ' + CFG.hexadek;
-    if (r.clears) t += ' · hexadek!';
+    if (r.clears) t += ' · dek!';
     if (r.n < runLen(g.board[a])) t += ' (moves ' + r.n + ')';
     return t;
   }

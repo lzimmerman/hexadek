@@ -31,7 +31,7 @@ test('Daily puzzle: today\'s deck, stars, Copy result and the streak', async ({ 
     await page.locator('#overshare').click();
     await expect(page.locator('#overshare')).toHaveText('Copied!');
     const text = await page.evaluate(() => navigator.clipboard.readText());
-    expect(text).toMatch(/^Hexadek daily · Mon 2 Nov · v1\n⭐⭐⭐ [\d,]+ points\n🟩{5}⬜+ 5 of \d+ hexadeks\nlzimmerman\.github\.io\/hexadek$/u);
+    expect(text).toMatch(/^Hexadek Mon 2 Nov · ⭐⭐⭐ [\d,]+\n(?:🟩){5}(?:⬜)+ 5\/\d+ deks$/u);
   }
   await page.locator('#overrestart').click();   // the same deck again
   expect(await game(page, () => [window.__t.g.start, window.__t.g.daily.date, window.__t.g.turn])).toEqual([start, 20261102, 0]);
