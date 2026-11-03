@@ -755,9 +755,13 @@ const ENDLESS_TIERS = [   // like a level's settings; deck lengths stay short so
   { colours: 7, deck: 36, bands: [1, 3], pours: POURS_TIGHTER, bandOdds: [1, 3, 3], top: 'Budget' },
   { colours: 7, deck: 36, bands: [1, 3], pours: POURS_TIGHT, bandOdds: [1, 4, 4], top: 'Mixed' },
   { colours: 7, deck: 36, bands: [1, 3], pours: POURS_TIGHTER, stones: STONE_LAYOUTS[3], bandOdds: [1, 2, 2], top: 'Crowded' },
+  // a board shape, each deck on one of these (by its place in the pool, so the skip list holds); lighter otherwise, since
+  // a shape on the tiers above cut the player bot's clears by 20-40 points, and Bridge and Wheel by far more (2026-11-03)
+  { colours: 7, deck: 36, bands: [1, 3], pours: POURS_TIGHT, bandOdds: [1, 2, 2], shapes: ['ring', 'corners'], top: 'Shapes' },
 ];
+const DAILY_TOPS = 4;   // Sunday's Daily draws from the first four top tiers, so earlier Sundays keep their decks
 // ENDLESS_SKIP:begin (written by tools/bot.js --endless --write)
-const ENDLESS_SKIP = { 4: [316, 337, 364, 375], 6: [36, 57, 337], 8: [20, 37, 51, 68, 113, 210, 233, 263, 270, 278, 315, 345, 348, 385, 436, 437, 454, 474, 489], 10: [161, 445], 11: [2, 10, 17, 50, 58, 70, 71, 83, 90, 111, 133, 167, 185, 206, 229, 235, 257, 259, 360, 430, 437, 488] };   // tier: pool indices whose deck the expert couldn't finish
+const ENDLESS_SKIP = { 4: [316, 337, 364, 375], 6: [36, 57, 337], 8: [20, 37, 51, 68, 113, 210, 233, 263, 270, 278, 315, 345, 348, 385, 436, 437, 454, 474, 489], 10: [161, 445], 11: [2, 10, 17, 50, 58, 70, 71, 83, 90, 111, 133, 167, 185, 206, 229, 235, 257, 259, 360, 430, 437, 488], 12: [181, 205, 240, 457] };   // tier: pool indices whose deck the expert couldn't finish
 // ENDLESS_SKIP:end
 // A reward, chosen after each stage, for the next one only. Measured with the player bot on the top
 // tiers (2026-11-02; clears 81% with no reward): Bigger budget 85%, Shorter deck 88%, Lighter stacks
@@ -793,8 +797,9 @@ function endlessOffer(run, stage) {
 }
 // A tier's settings with a reward applied. 'colour' and 'simple' are candidates measured with the
 // computer player (tools/bot.js --endless --perk), not offered in the game.
-function endlessSpec(tier, perk) {
+function endlessSpec(tier, perk, seed) {   // seed: the deck's, which picks the board on a tier with shapes
   const T = ENDLESS_TIERS[tier], L = Object.assign({}, T);
+  if (T.shapes) L.holes = T.shapes[(seed - ENDLESS_SEED) % T.shapes.length];
   if (perk === 'short') L.deck -= 5;
   if (perk === 'stone' && T.stones) {
     const tall = Object.keys(T.stones).sort((a, b) => T.stones[b].length - T.stones[a].length)[0];
@@ -815,8 +820,8 @@ function endlessStart(g, perk) {   // the rewards that change the game's counter
 }
 // Stage `stage` of the run `run`, with a reward, carrying on from the run's score so far.
 function endlessGame(run, stage, perk, total) {
-  const tier = endlessTier(run, stage), L = endlessSpec(tier, perk);
-  const g = newGame(endlessDeckSeed(run, stage, tier), 'endless', null, null, null, L);
+  const tier = endlessTier(run, stage), seed = endlessDeckSeed(run, stage, tier), L = endlessSpec(tier, perk, seed);
+  const g = newGame(seed, 'endless', null, null, null, L);
   g.endless = { run: run | 0, stage, tier, perk: perk || null };
   if (L.gone) g.endless.gone = L.gone;
   g.score = total || 0;
@@ -852,7 +857,7 @@ const dailyDay = date => new Date(Math.floor(date / 10000), Math.floor(date / 10
 const dailyName = date => { const d = dailyDay(date); return DAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()]; };
 function dailyTier(date) {
   const t = DAILY_TIERS[dailyDay(date).getDay()] - (dailyShape(date) ? 1 : 0);
-  return t >= 0 ? t : ENDLESS_RAMP + Math.floor(endlessRng(date, 0, 1)() * (ENDLESS_TIERS.length - ENDLESS_RAMP));
+  return t >= 0 ? t : ENDLESS_RAMP + Math.floor(endlessRng(date, 0, 1)() * DAILY_TOPS);
 }
 function dailyShape(date) {
   const d = dailyDay(date);
@@ -861,7 +866,7 @@ function dailyShape(date) {
   return DAILY_SHAPES[weeks % DAILY_SHAPES.length];
 }
 function dailyGame(date) {   // stage 0 of the "run" `date`: Endless stages start at 1, so no run deals it
-  const tier = dailyTier(date), L = endlessSpec(tier);
+  const tier = dailyTier(date), L = endlessSpec(tier);   // no seed: Daily's tiers have no shapes of their own
   if (dailyShape(date)) L.holes = dailyShape(date);
   const g = newGame(endlessDeckSeed(date, 0, tier), 'daily', null, null, null, L);
   g.daily = { date, tier, v: dailyVersion(date) };
@@ -961,7 +966,7 @@ function starsFor(g) { return g.level || g.daily ? starGoals(g).filter(s => s.me
 // Classic, or a custom game named by what differs: "Deck of 30 · free pours · 7 colours".
 function gameName(g) {
   if (g.level) return 'Level ' + g.level + ' · ' + LEVELS[g.level - 1].name;
-  if (g.endless) return 'Endless · Stage ' + g.endless.stage;
+  if (g.endless) return 'Endless · Stage ' + g.endless.stage + (g.holes ? ' · ' + BOARD_SHAPES[g.holes].name : '');
   if (g.daily) return 'Daily · ' + dailyName(g.daily.date) + (g.holes ? ' · ' + BOARD_SHAPES[g.holes].name : '');
   return [g.deckSize ? 'Deck of ' + g.deckSize : 'Classic', g.mode === 'free' ? 'free pours' : null,
           g.colours !== CFG.colours ? g.colours + ' colours' : null, g.holes ? BOARD_SHAPES[g.holes].name : null].filter(Boolean).join(' · ');
@@ -1742,7 +1747,7 @@ function start() {
   function applyGameTheme() {
     if (typeof applyTheme !== 'function') return;   // themes.js didn't load: keep the built-in colours
     const name = tut ? 'classic' : g.level ? CHAPTER_THEMES[LEVELS[g.level - 1].chapter] :
-      g.endless ? CHAPTER_THEMES[(g.endless.stage - 1) % CHAPTER_THEMES.length] :
+      g.endless ? (g.holes ? CHAPTER_THEMES[6] : CHAPTER_THEMES[(g.endless.stage - 1) % CHAPTER_THEMES.length]) :
       g.daily ? (g.holes ? CHAPTER_THEMES[6] : CHAPTER_THEMES[dailyDay(g.daily.date).getDay() % CHAPTER_THEMES.length]) : 'classic';   // a shape: chapter 7's
     if (name === themeNow) return;
     themeNow = name; applyTheme(name); resize();   // resize re-reads the colours for the board

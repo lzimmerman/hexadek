@@ -20,7 +20,7 @@
 //                           with the expert (decks it can't finish are skipped by the game) and with
 //                           --skill (default player), then simulate runs from the pass rates.
 //                           --json prints a line per tier; --from DIR combines such lines instead of
-//                           playing; --write puts the skip lists into index.html (ENDLESS_SKIP)
+//                           playing; --write puts the skip lists of the tiers played into index.html (ENDLESS_SKIP)
 //                           --perk ID plays every stage with that reward (pours, short, stone, undos,
 //                           or the candidates colour, simple), to compare what each is worth; --quick skips the expert;
 //                           --holes NAME plays every stage on that board shape
@@ -50,7 +50,7 @@ const file = opt('file', path.join(__dirname, '..', 'index.html'));
 const html = fs.readFileSync(file, 'utf8');
 eval(html.match(/<script>([\s\S]*)<\/script>/)[1] +
   ';global.R={CFG,CELLS,neighbours,runLen,topOf,newGame,pourResult,pour,place,roomState,poursLeft,isWon,LEVELS,STONE,starsFor,deckMax,STONE_LAYOUTS,BOARD_SHAPES,cellsOf,' +
-  'ENDLESS_TIERS,ENDLESS_SEED,ENDLESS_POOL,ENDLESS_RAMP,endlessTier,endlessSpec,endlessStart,dailyGame,dailyTargets,dailyDay,DAYS,CLASSIC_RAMP,dealtMax}');
+  'ENDLESS_TIERS,ENDLESS_SEED,ENDLESS_POOL,ENDLESS_RAMP,ENDLESS_SKIP,endlessTier,endlessSpec,endlessStart,dailyGame,dailyTargets,dailyDay,DAYS,CLASSIC_RAMP,dealtMax}');
 const { CFG, CELLS: ALL_CELLS, BOARD_SHAPES, cellsOf, neighbours, runLen, topOf, newGame, pourResult, pour, place, roomState, poursLeft, isWon, LEVELS, STONE,
         starsFor, deckMax, STONE_LAYOUTS, ENDLESS_TIERS, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_RAMP, endlessTier, endlessSpec, endlessStart,
         dailyGame, dailyTargets, dailyDay, DAYS, CLASSIC_RAMP } = R;
@@ -314,7 +314,7 @@ function dailyDayNum(d) { return d.getFullYear() * 10000 + (d.getMonth() + 1) * 
 if (flag('endless')) {
   const sk = opt('skill', 'player'), pool = Number(opt('pool', ENDLESS_POOL)), perk = opt('perk', null);
   const shape = opt('holes') ? { holes: opt('holes') } : {};   // --holes NAME: every stage on that board
-  const stage = (t, seed) => endlessStart(newGame(seed, 'endless', null, null, null, Object.assign(endlessSpec(t, perk), shape)), perk);
+  const stage = (t, seed) => endlessStart(newGame(seed, 'endless', null, null, null, Object.assign(endlessSpec(t, perk, seed), shape)), perk);
   const tspan = (opt('tiers', '1-' + ENDLESS_TIERS.length) + '-').split('-').map(Number);
   const tiers = {};   // tier (0-based): { skip: [indices], pass: share the player clears, n }
   if (opt('from')) {
@@ -358,7 +358,8 @@ if (flag('endless')) {
   }
   if (flag('write')) {
     const file = path.join(__dirname, '..', 'index.html'), re = /(\/\/ ENDLESS_SKIP:begin[^\n]*\n)[\s\S]*?(\n\/\/ ENDLESS_SKIP:end)/;
-    const skip = {}; for (const t in tiers) if (tiers[t].skip.length) skip[t] = tiers[t].skip;
+    const skip = Object.assign({}, R.ENDLESS_SKIP);   // tiers not played keep their lists
+    for (const t in tiers) { if (tiers[t].skip.length) skip[t] = tiers[t].skip; else delete skip[t]; }
     const body = 'const ENDLESS_SKIP = { ' + Object.keys(skip).map(t => t + ': [' + skip[t].join(', ') + ']').join(', ') + ' }' +
       ';   // tier: pool indices whose deck the expert couldn\'t finish';
     fs.writeFileSync(file, html.replace(re, (m, a, b) => a + body + b));

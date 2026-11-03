@@ -205,6 +205,15 @@ for (let run = 1; run < 40; run++) for (let s = 1; s < 30; s++) {
   assert(offer.every(id => EP[id] && (id !== 'stone' || next.stones)), 'only rewards that help next stage');
 }
 assert.deepEqual(R.endlessGame(5, 3).tray, R.endlessGame(5, 3).tray, 'a run deals the same decks again');
+{ // the Shapes top tier: each of its decks on Ring or Corners, both coming up; the other tiers on the full board
+  const shapes = new Set();
+  for (let run = 1; run < 60; run++) for (let st = ER + 1; st < ER + 20; st++) {
+    const e = R.endlessGame(run, st, null, 0);
+    if (ET[e.endless.tier].shapes) { assert(ET[e.endless.tier].shapes.includes(e.holes)); shapes.add(e.holes); }
+    else assert(!e.holes, 'a tier without shapes has the full board');
+  }
+  assert.deepEqual([...shapes].sort(), ['corners', 'ring']);
+}
 const e1 = R.endlessGame(5, 1, null, 0); assert.equal(e1.deckSize, ET[0].deck); assert.equal(R.gameName(e1), 'Endless · Stage 1');
 assert(!e1.level && R.starsFor(e1) === 0);
 const e3 = R.endlessGame(5, 3, 'budget', 2400), t3 = ET[2];
