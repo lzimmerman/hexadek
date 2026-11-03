@@ -57,7 +57,14 @@ body { display: flex; flex-direction: column; overscroll-behavior: none; user-se
 button { touch-action: manipulation; }   /* no double-tap zoom */
 @media (pointer: coarse) {   /* thumbs: bigger buttons */
   button { min-height: 48px; padding: 10px 16px; }
+  html select { min-height: 48px; }   /* html: outranks the plain select rule below */
   #buttons, header { gap: 8px 10px; }
+  .chip.tap { position: relative; } .chip.tap::before { content: ''; position: absolute; inset: -11px -4px; }   /* a bigger target than it looks */
+}
+@media (max-width: 360px) {   /* the smallest phones: the three buttons on one line, and the deck count on its own */
+  #buttons button { padding-left: 8px; padding-right: 8px; font-size: 14px; }
+  #buttons { gap: 8px; }
+  #deck { order: -1; flex-basis: 100%; justify-content: flex-start; } #deckbar { order: -1; }
 }
 header { display: flex; align-items: center; gap: 10px 12px; padding: 10px 16px 6px; flex-wrap: wrap; }
 #buttons { padding: 4px 16px 6px; }
@@ -116,13 +123,15 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #wrap { position: relative; flex: 1; min-height: 0; order: 1; }
 #bar { order: 2; }
 #c { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; -webkit-touch-callout: none; }
-#over, #intro { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
+#over, #intro { position: fixed; inset: 0; z-index: 5; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
 #over.show, #intro.show { display: flex; }
 #introjourney { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
 #introlevel { color: var(--accent); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
 #introfacts { color: var(--muted); font-size: 13px; margin: -6px 0 10px; }
 .card { background: var(--panel); color: var(--ink); padding: 20px 24px; border-radius: 14px; text-align: center; max-width: 340px; margin: 16px;
-  border: 1px solid var(--cell-edge); box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+  border: 1px solid var(--cell-edge); box-shadow: 0 12px 40px rgba(0,0,0,.35); max-height: calc(100% - 32px); overflow: auto; box-sizing: border-box; }
+#sharetext { margin: 0 0 12px; padding: 8px 10px; background: var(--bg); border-radius: 10px; font: inherit; font-size: 14px;
+  white-space: pre-wrap; text-align: left; user-select: text; -webkit-user-select: text; }   /* what Copy result copies */
 .card h2 { margin: 0 0 6px; font-size: 22px; }
 .card .buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .card p { margin: 0 0 14px; }
@@ -140,10 +149,11 @@ dialog h3 { font-size: 16px; margin: 16px 0 4px; padding-top: 10px; border-top: 
 dialog h3.first { margin-top: 4px; padding-top: 0; border-top: 0; }
 .chap { background: var(--bg); color: var(--ink); border-radius: 10px; padding: 2px 10px 8px; margin: 8px 0; }
 .chap h3 { border-top: 0; margin-top: 8px; padding-top: 0; }
-.lvgrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 6px 0 4px; }
+.lvgrid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin: 6px 0 4px; }
 .lvgrid .lv { display: flex; flex-direction: column; align-items: center; padding: 6px 0; min-height: 0; }
 .lvgrid .lv b { font-size: 16px; }
-.lvgrid .lv span { font-size: 11px; letter-spacing: 0; color: var(--gold); }
+.lvgrid .lv span { font-size: 12px; letter-spacing: 0; color: var(--gold); line-height: 1.2; }
+.lvgrid .lv svg { width: 11px; height: 13px; margin-top: 2px; }
 .lvgrid .lv.primary span { color: var(--on-accent); }
 .lvgrid .lv:disabled span { color: var(--muted); }
 dialog h2:focus { outline: none; }   /* focused only so the help opens at the top */
@@ -264,11 +274,12 @@ dialog li { margin-bottom: 6px; }
     <h2 id="overtitle">No room left</h2>
     <div id="overstars"><div id="overstarbig"></div><ul id="overgoals"></ul></div>
     <p id="overtext"></p>
+    <pre id="sharetext" aria-label="Your result, to share"></pre>
     <div class="buttons">
       <button id="overnext" class="primary">Next level</button>   <!-- first: what most players want after a level -->
       <div id="overperks" role="radiogroup" aria-label="Reward for the next stage"></div>   <!-- Endless: pick one... -->
       <div id="overstagerow"><button id="overstage" class="primary" disabled>Next stage</button></div>   <!-- ...then go -->
-      <button id="overshare">Copy result</button>   <!-- Daily: a few lines to paste in a message -->
+      <button id="overshare">Copy result</button>   <!-- Daily: the lines shown above, to paste in a message -->
       <button id="overundo">Undo last pour</button>
       <button id="overrestart">Restart</button>
       <button id="overnew">New game</button>
@@ -1237,6 +1248,12 @@ function start() {
     // Break a stone: the stone stands a moment where it was, then shatters, like one broken by a hexadek
     if (g.endless.gone && !still()) anims.push({ type: 'break', cell: g.endless.gone, at: 0, t0: performance.now(), wait: 700, dur: 600, crack: true });
   };
+  function lockIcon() {   // a small padlock, in the text colour (the word 'locked' didn't fit a small phone's grid)
+    const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.setAttribute('viewBox', '0 0 11 13'); s.setAttribute('aria-hidden', 'true');
+    s.innerHTML = '<path d="M2.5 6V4a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="0.5" y="6" width="10" height="7" rx="1.5" fill="currentColor"/>';
+    return s;
+  }
   function showIntro() {   // a card describing the level: what's new in it and the star goals
     const L = LEVELS[g.level - 1], T = levelTargets(g.level), P = pourRule(g);
     $('introlevel').textContent = 'Level ' + g.level + ' of ' + LEVELS.length + ' · Chapter ' + (L.chapter + 1) + ' (' + (L.step + 1) + '/' + CHAPTER_SIZE + ')';
@@ -1329,7 +1346,7 @@ function start() {
         const open = unlocked(L.n), st = readStars(L.n);
         return el('button', { type: 'button', class: 'lv' + (L.n === cont ? ' primary' : ''), 'data-n': L.n, disabled: !open,
                               'aria-label': 'Level ' + L.n + (open ? ', ' + st + ' stars' : ', locked') },
-          el('b', null, L.n), el('span', null, open ? starText(st) : 'locked'));
+          el('b', null, L.n), open ? el('span', null, starText(st)) : lockIcon());
       })))));
     $('levels').showModal();
     const cur = $('levelgrid').querySelector('.primary'); if (cur) cur.scrollIntoView({ block: 'center' });
@@ -1590,7 +1607,9 @@ function start() {
     $('overtext').textContent = gameName(g) + '. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ').') +
       ' Deks: ' + made + (g.level ? ' of ' + deckMax(g) + ' possible.' : g.daily ? ' of ' + dailyTargets(g.daily.date).M + ' possible.' : '.');
     if (g.daily) { const n = dailyStreak(); if (n) $('overtext').textContent += ' Daily streak: ' + n + (n === 1 ? ' day.' : ' days.'); }
-    $('overshare').style.display = g.daily && (state === 'won' || state === 'over') && !tut ? '' : 'none';
+    const sharing = g.daily && (state === 'won' || state === 'over') && !tut;
+    $('overshare').style.display = $('sharetext').style.display = sharing ? '' : 'none';
+    if (sharing) $('sharetext').textContent = dailyShare();
     if (g.endless) {
       const n = endlessCleared(g), eb = readEndlessStages(), stages = k => k + (k === 1 ? ' stage' : ' stages');
       $('overtext').textContent = state === 'won' ? 'Run total: ' + g.score + ' points. Choose a reward for stage ' + (n + 1) + ', then Next stage.' :
