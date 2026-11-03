@@ -13,6 +13,7 @@
 //     --pours S,P,C,M       ...and its pour budget: start, per stack placed, per hexadek, most held
 //     --stones N --bands A,B   ...its stones (the layout with N stone cells, 0 for none) and colours per stack
 //     --bandodds X,Y,Z      ...or the odds of 1, 2 and 3 colours per stack
+//     --holes NAME          ...its board shape: the holes of BOARD_SHAPES[NAME] (none for a full board)
 //     --verbose             one line per game
 //     --json                also a JSON line per level and skill, with every game (for tools/targets.js)
 //     --endless             Endless: play every deck in each tier's pool (tools: --tiers A-B, --pool N),
@@ -47,9 +48,9 @@ const flag = name => args.includes('--' + name);
 const file = opt('file', path.join(__dirname, '..', 'index.html'));
 const html = fs.readFileSync(file, 'utf8');
 eval(html.match(/<script>([\s\S]*)<\/script>/)[1] +
-  ';global.R={CFG,CELLS,neighbours,runLen,topOf,newGame,pourResult,pour,place,roomState,poursLeft,isWon,LEVELS,STONE,starsFor,deckMax,STONE_LAYOUTS,' +
+  ';global.R={CFG,CELLS,neighbours,runLen,topOf,newGame,pourResult,pour,place,roomState,poursLeft,isWon,LEVELS,STONE,starsFor,deckMax,STONE_LAYOUTS,BOARD_SHAPES,cellsOf,' +
   'ENDLESS_TIERS,ENDLESS_SEED,ENDLESS_POOL,ENDLESS_RAMP,endlessTier,endlessSpec,endlessStart,dailyGame,dailyTargets,dailyDay,DAYS,CLASSIC_RAMP,dealtMax}');
-const { CFG, CELLS, neighbours, runLen, topOf, newGame, pourResult, pour, place, roomState, poursLeft, isWon, LEVELS, STONE,
+const { CFG, CELLS: ALL_CELLS, BOARD_SHAPES, cellsOf, neighbours, runLen, topOf, newGame, pourResult, pour, place, roomState, poursLeft, isWon, LEVELS, STONE,
         starsFor, deckMax, STONE_LAYOUTS, ENDLESS_TIERS, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_RAMP, endlessTier, endlessSpec, endlessStart,
         dailyGame, dailyTargets, dailyDay, DAYS, CLASSIC_RAMP } = R;
 
@@ -79,12 +80,18 @@ const W = {        // how the player values a board
   zone: 6, zoneOff: 3,         // a top run at its colour's home area / elsewhere, per tile
   hubFull: 8, hubPlace: 40,    // tiles left in the hub, per tile; placing the new stack in the hub
 };
-const ON = new Set(CELLS), NB = {}; for (const k of CELLS) NB[k] = neighbours(k).filter(n => ON.has(n));   // on the board only
+// The board's cells and their neighbours on it, set for each game's shape by setCells (holes are left out).
+let CELLS = ALL_CELLS, NB = {}, EDGE = new Set(), CORNER = new Set();
+function setCells(board) {
+  CELLS = cellsOf(board); NB = {};
+  const on = new Set(CELLS);
+  for (const k of CELLS) NB[k] = neighbours(k).filter(n => on.has(n));
+  EDGE = new Set(CELLS.filter(k => NB[k].length < 6)); CORNER = new Set(CELLS.filter(k => NB[k].length <= 3));
+}
+setCells(newGame(1));
 
 // ---- the leapfrog and banking strategies (--leapfrog, --bank) ----
 const LEAP = flag('leapfrog'), BANK = flag('bank'), LEAP_HOPS = 3;   // hops after the first pour
-const ring = k => { const [q, r] = k.split(',').map(Number); return Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r)); };
-const EDGE = new Set(CELLS.filter(k => ring(k) === 2)), CORNER = new Set(CELLS.filter(k => NB[k].length === 3));
 const pure = st => st.length && topOf(st) !== STONE && st.every(c => c === st[0]);
 function bankValue(board) {   // savings: single-colour stacks side by side around the edge
   let v = 0;
@@ -109,7 +116,7 @@ function setupHub(g) {
   if (mode === 'point') HUB.add('0,0');
   else {
     const lines = [['-1,0', '0,0', '1,0'], ['0,-1', '0,0', '0,1'], ['1,-1', '0,0', '-1,1']];
-    const stones = l => l.reduce((n, k) => n + g.board[k].filter(c => c === STONE).length, 0);
+    const stones = l => l.reduce((n, k) => n + (g.board[k] ? g.board[k].filter(c => c === STONE).length : 9), 0);   // a hole: avoid
     const line = lines.slice().sort((a, b) => stones(a) - stones(b))[0];
     line.forEach(k => HUB.add(k)); axis = cellAngle(line[2]);
   }
@@ -241,6 +248,7 @@ const roomStateCheap = b => CELLS.some(k => !b[k].length) ? 'ok' : 'over';
 const canPourAny = (b, pours, budget) => (!budget || pours > 0) && CELLS.some(a => b[a].length && NB[a].some(x => pourResult(b, a, x)));
 
 function playGame(g, skill, rnd) {
+  setCells(g.board);
   setupHub(g);
   for (let guard = 0; guard < 2000; guard++) {
     if (isWon(g)) break;
@@ -367,6 +375,7 @@ for (const lv of levels) {
   const L0 = LEVELS[lv - 1];
   LEVELS[lv - 1] = { ...L0, colours: Number(opt('colours', L0.colours)), deck: Number(opt('deck', L0.deck)) };
   if (opt('stones')) LEVELS[lv - 1].stones = Number(opt('stones')) ? STONE_LAYOUTS[Number(opt('stones'))] : null;
+  if (opt('holes')) LEVELS[lv - 1].holes = opt('holes') === 'none' ? null : opt('holes');
   if (opt('bands')) LEVELS[lv - 1].bands = opt('bands').split(',').map(Number);
   if (opt('bandodds')) LEVELS[lv - 1].bandOdds = opt('bandodds').split(',').map(Number);   // odds of 1, 2, 3 bands
   if (opt('pours')) { const [start, perPlace, perClear, max] = opt('pours').split(',').map(Number); LEVELS[lv - 1].pours = { start, perPlace, perClear, max }; }

@@ -353,7 +353,9 @@ dialog li { margin-bottom: 6px; }
       undos per game. It gets harder as you go: a new colour joins every 10 deks, up to 9.</li>
     <li><b>Custom</b>: choose the colours (3 to 13; fewer is easier), limited or free pours (free pours come with
       unlimited undos), and the length: <i>Fill board</i> (play until the board is full), or a deck of 30 or 50
-      stacks to place without running out of room. The bar below the board shows how far through a deck you are.</li>
+      stacks to place without running out of room. The bar below the board shows how far through a deck you are.
+      The board can also take another shape, with holes where cells are missing: fewer cells and fewer
+      neighbours make it harder.</li>
     <li>Choose the mode under New game; it opens on the one you last played.</li>
   </ul>
   <h3>Placing</h3>
@@ -460,14 +462,16 @@ dialog li { margin-bottom: 6px; }
   <div class="modebox" data-mode="classic"><span id="classicabout"></span>
     <div class="row"><button type="button" id="newclassic" class="primary">Play Classic</button></div></div>
   <div class="modebox" data-mode="custom"><span>Your own rules. Fewer colours is easier; 5 is usual. Free pours come
-      with unlimited undos. Each mix keeps its own best score.</span>
+      with unlimited undos. A board with holes is harder. Each mix keeps its own best score.</span>
     <div class="row"><label class="row" for="newcolours">Colours
         <select id="newcolours"><option>3</option><option>5</option><option>7</option><option>9</option><option>11</option><option>13</option></select></label>
       <label class="row" for="newpours">Pours
         <select id="newpours"><option value="limited">Limited</option><option value="free">Free</option></select></label>
       <label class="row" for="newlength">Length
         <select id="newlength"><option value="0">Fill board</option><option value="30">Deck of 30</option>
-          <option value="50">Deck of 50</option></select></label></div>
+          <option value="50">Deck of 50</option></select></label>
+      <label class="row" for="newboard">Board
+        <select id="newboard"><option value="">Full</option></select></label></div>
     <div class="row"><button type="button" id="newcustom" class="primary">Play custom game</button></div></div>
   <div class="row"><span class="spacer"></span><button type="button" id="newcancel">Cancel</button></div>
 </dialog>
@@ -539,6 +543,15 @@ const LEVEL_COUNT = 72, CHAPTER_SIZE = 12, LEVEL_SEED = 1000;
 const POURS_TIGHT = { start: 2, perPlace: 2, perClear: 1, max: 6 };
 const POURS_TIGHTER = { start: 2, perPlace: 2, perClear: 1, max: 5 };
 const S1 = [STONE], S2 = [STONE, STONE];
+// Holes: cells missing from the board, for new board shapes. Fewer cells means less room, and
+// fewer neighbours means fewer pours: chokepoints. A level's `holes` names one of these.
+const BOARD_SHAPES = {
+  ring:    { name: 'Ring', cells: ['0,0'] },                                  // 18 cells: no middle
+  corners: { name: 'Three corners', cells: ['2,-2', '-2,0', '0,2'] },          // 16 cells
+  wheel:   { name: 'Wheel', cells: ['0,0', '1,0', '-1,1', '0,-1'] },           // 15: a rim with three spokes
+  bridge:  { name: 'Bridge', cells: ['-2,0', '-1,0', '1,0', '2,0'] },          // 15: two islands of 7, joined in the middle
+  loop:    { name: 'Loop', cells: ['0,0', '1,0', '1,-1', '0,-1', '-1,0', '-1,1', '0,1'] },   // 12: the rim only
+};
 const STONE_LAYOUTS = {   // by number of stone cells; a stone two high takes two clears
   2: { '-1,0': S1, '1,0': S1 },
   3: { '1,0': S1, '0,-1': S1, '-1,1': S1 },
@@ -567,24 +580,27 @@ function levelSpec(n) {
   if (c === 5) Object.assign(L, { colours: i < 6 ? 6 : 7, deck: 38 + i, bands: i < 8 ? [1, 3] : [2, 3],
                                   pours: i < 4 ? undefined : i < 9 ? POURS_TIGHT : POURS_TIGHTER,
                                   stones: i % 2 ? STONE_LAYOUTS[2 + (i >> 2)] : null });
-  if (COLLECT_STEPS.includes(i)) L.collect = true;   // the colour and count come from the deck (collectGoal)
+  if (COLLECT_STEPS[c].includes(i)) L.collect = true;   // the colour and count come from the deck (collectGoal)
   return Object.assign(L, LEVEL_TWEAKS[n]);
 }
-// Collect levels: ★★ asks for deks of one colour instead of a score. Two in each chapter. The goal is every
+// Collect levels: ★★ asks for deks of one colour instead of a score. Two in each chapter, at steps that bring
+// nothing else new, after a step that brought nothing new either, so a new rule is played once before a
+// collect goal joins it (2026-11-03: level 5 brought the pour budget and the first collect goal at once).
+// The goal is every
 // dek the deck's most common colour allows, less collectSlack where the player bot (which doesn't aim at the
 // colour) almost never made it: tools/bot.js --skill player, ★★ in 40–95% of games, 10% at level 17.
-const COLLECT_STEPS = [4, 10], COLLECT_SLACK = 0;
+const COLLECT_STEPS = [[8, 10], [4, 10], [2, 7], [4, 11], [4, 11], [3, 11]], COLLECT_SLACK = 0;   // by chapter
 // Hand-tuned levels. Play tests (2026-11-01) showed stacks that are all mixed (2-3 colours) under a
 // tight pour budget were far harder for people than for the computer player: level 60 took 25 tries.
 // These levels deal mostly mixed stacks with an occasional single colour (odds of 1, 2, 3 colours),
 // tuned with tools/bot.js --skill player to about level 58's difficulty, which took 3 tries.
 const LEVEL_TWEAKS = {
-  29: { collectSlack: 1 }, 47: { collectSlack: 1 }, 65: { collectSlack: 1 },   // collect goals (COLLECT_SLACK)
-  60: { bandOdds: [1, 4, 4] },
+  9: { collectSlack: 1 }, 32: { collectSlack: 1 },   // collect goals (COLLECT_SLACK); 60 and 72 below too
+  60: { bandOdds: [1, 4, 4], collectSlack: 1 },
   69: { bandOdds: [1, 4, 4] },
   70: { bandOdds: [1, 2, 2] },
   71: { bandOdds: [1, 8, 8] },
-  72: { bandOdds: [1, 5, 5] },
+  72: { bandOdds: [1, 5, 5], collectSlack: 1 },
 };
 const LEVELS = Array.from({ length: LEVEL_COUNT }, (_, i) => levelSpec(i + 1));
 // What a level brings: its chapter's description at the start, otherwise what changed.
@@ -615,6 +631,8 @@ function makeCells(R) {
       if (Math.abs(q + r) <= R) out.push(q + ',' + r);
   return out;
 }
+// A board's cells: holes (BOARD_SHAPES) are cells left out of the board, so the rules skip them.
+const cellsOf = board => CELLS.filter(k => board[k]);
 function neighbours(k) {
   const [q, r] = k.split(',').map(Number);
   return DIRS.map(([dq, dr]) => (q + dq) + ',' + (r + dr));
@@ -661,20 +679,23 @@ function newStack(g) {
 // mode: 'standard' (Classic: limited pours), 'free' (unlimited pours and undos), 'survive' (limited pours and a
 // deck), 'level' or 'endless'. deck: a deck size for a custom game; Survive's default is CFG.deck.
 // spec: settings like a level's, for an Endless stage (endlessGame) or a daily puzzle ('daily', dailyGame).
-function newGame(seed, mode, colours, level, deck, spec) {
+// holes: a board shape (BOARD_SHAPES) for a custom game; a spec brings its own.
+function newGame(seed, mode, colours, level, deck, spec, holes) {
   mode = mode || 'standard';
   const L = spec || (mode === 'level' ? LEVELS[level - 1] : null);
   const g = { seed: seed | 0, start: seed | 0, mode, colours: colours || CFG.colours, stone: STONE,
               pours: CFG.pours.start, undos: CFG.undos, deckSize: mode === 'survive' ? deck || CFG.deck : mode === 'free' ? deck || null : null,
               board: {}, tray: [], next: null, score: 0, turn: 0, clearsThisTurn: 0, history: [] };
   for (const k of CELLS) g.board[k] = [];
-  if (mode === 'standard' && g.colours === CFG.colours) g.ramp = true;   // Classic (CLASSIC_RAMP)
+  holes = (L && L.holes) || holes;
+  if (holes) { g.holes = holes; for (const k of BOARD_SHAPES[holes].cells) delete g.board[k]; }
+  if (mode === 'standard' && g.colours === CFG.colours && !holes) g.ramp = true;   // Classic (CLASSIC_RAMP)
   if (L) {
     if (mode === 'level') Object.assign(g, { level, levels: LEVEL_COUNT });
     Object.assign(g, { colours: L.colours, deckSize: L.deck, bands: L.bands, bandOdds: L.bandOdds,
                        pourRule: L.pours === undefined ? CFG.pours : L.pours });
     if (g.pourRule) g.pours = g.pourRule.start;
-    for (const k in L.stones || {}) g.board[k] = L.stones[k].slice();
+    for (const k in L.stones || {}) if (g.board[k]) g.board[k] = L.stones[k].slice();   // never on a hole
   }
   for (let i = 0; i < CFG.traySize; i++) g.tray.push(newStack(g));
   g.next = newStack(g);
@@ -807,7 +828,7 @@ function dailyGame(date) {   // stage 0 of the "run" `date`: Endless stages star
 }
 // A deck: the game is won once every stack in it has been placed.
 function isWon(g) { return !!g.deckSize && g.turn >= g.deckSize; }
-const stonesLeft = board => CELLS.reduce((n, k) => n + board[k].filter(c => c === STONE).length, 0);
+const stonesLeft = board => cellsOf(board).reduce((n, k) => n + board[k].filter(c => c === STONE).length, 0);
 // Each star's goal and whether it's met; stars count only as far as the goals in a row are met.
 // LEVEL_TARGETS:begin (written by tools/targets.js: edit there, or by hand)
 const LEVEL_TARGETS = [   // [★★ score, ★★★ score] for levels 1 to 72
@@ -863,7 +884,7 @@ function dealtTiles(d) {   // d: a fresh game, dealt to the end of its deck; its
   for (let i = 0; i < d.deckSize; i++) {
     const slot = d.tray.findIndex(t => t); if (slot < 0) break;
     for (const c of d.tray[slot]) per[c] = (per[c] || 0) + 1;
-    const cell = CELLS.find(k => !d.board[k].length);
+    const cell = cellsOf(d.board).find(k => !d.board[k].length);
     place(d, slot, cell); d.board[cell] = [];
   }
   return per;
@@ -899,10 +920,10 @@ function gameName(g) {
   if (g.endless) return 'Endless · Stage ' + g.endless.stage;
   if (g.daily) return 'Daily · ' + dailyName(g.daily.date);
   return [g.deckSize ? 'Deck of ' + g.deckSize : 'Classic', g.mode === 'free' ? 'free pours' : null,
-          g.colours !== CFG.colours ? g.colours + ' colours' : null].filter(Boolean).join(' · ');
+          g.colours !== CFG.colours ? g.colours + ' colours' : null, g.holes ? BOARD_SHAPES[g.holes].name : null].filter(Boolean).join(' · ');
 }
 // The custom settings a game was started with (levels have none).
-const customOf = g => ({ colours: g.colours, free: g.mode === 'free', deck: g.deckSize || 0 });
+const customOf = g => ({ colours: g.colours, free: g.mode === 'free', deck: g.deckSize || 0, holes: g.holes || '' });
 const customMode = c => c.free ? 'free' : c.deck ? 'survive' : 'standard';
 // The game's pour budget, or null when pours (and undos) are unlimited.
 function pourRule(g) { return g.pourRule !== undefined ? g.pourRule : g.mode === 'free' ? null : CFG.pours; }
@@ -980,23 +1001,23 @@ function place(g, slot, cell) {
 // 'ok': an empty cell; 'full': none, but some pours make one; 'over': no way to make one
 // (with at most `pours` pours, in a Standard game).
 function roomState(board, pours) {
-  if (CELLS.some(k => !board[k].length)) return 'ok';
+  if (cellsOf(board).some(k => !board[k].length)) return 'ok';
   return canMakeRoom(board, pours === undefined ? Infinity : pours) ? 'full' : 'over';
 }
 function canMakeRoom(start, maxPours, limit) {
   limit = limit || 3000;
-  const key = b => CELLS.map(k => b[k].join('')).join('|');
+  const cells = cellsOf(start), key = b => cells.map(k => b[k].join('')).join('|');
   const seen = new Set([key(start)]);
   let frontier = [start], nodes = 0;
   for (let depth = 1; frontier.length && depth <= maxPours; depth++) {   // depth: pours used
     const next = [];
     for (const b of frontier)
-      for (const a of CELLS)
+      for (const a of cells)
         for (const c of legalTargets(b, a)) {
           const r = pourResult(b, a, c);
           if (r.emptiesFrom || r.clears) return true;
           const nb = {};
-          for (const k of CELLS) nb[k] = b[k].slice();
+          for (const k of cells) nb[k] = b[k].slice();
           nb[c].push(...nb[a].splice(nb[a].length - r.n));
           const kk = key(nb);
           if (seen.has(kk)) continue;
@@ -1022,7 +1043,7 @@ function tallyGame(g, st, info, ended) {
   const dk = crossed(DEK_MILESTONES, st.deks || 0, n.deks);
   if (dk) notes.push('Your ' + dk.toLocaleString('en') + 'th dek in all!');
   if (ended && info.chapterDone) notes.push('Chapter ' + info.chapterDone + ', every level ★★★!');
-  if (g.mode === 'standard' && !g.level && !g.daily && !g.endless) {
+  if (g.mode === 'standard' && !g.holes && !g.level && !g.daily && !g.endless) {
     if (st.classic && g.turn > st.classic) notes.push('Your longest Classic yet: ' + g.turn + ' turns.');
     n.classic = Math.max(st.classic || 0, g.turn);
   }
@@ -1043,10 +1064,11 @@ function tallyGame(g, st, info, ended) {
 // a pour that builds a long run of one colour; the tray stack and cell that best match their neighbours.
 function hintMove(g) {
   const canPour = poursLeft(g) >= 1, pours = [];
-  if (canPour) for (const a of CELLS) for (const b of legalTargets(g.board, a)) pours.push([a, b, pourResult(g.board, a, b)]);
+  const cells = cellsOf(g.board);
+  if (canPour) for (const a of cells) for (const b of legalTargets(g.board, a)) pours.push([a, b, pourResult(g.board, a, b)]);
   const dek = pours.filter(p => p[2].clears).sort((x, y) => y[2].n - x[2].n)[0];
   if (dek) return { why: 'dek', from: dek[0], to: dek[1] };
-  const empty = CELLS.filter(k => !g.board[k].length);
+  const empty = cells.filter(k => !g.board[k].length);
   if (!empty.length) {
     const first = canPour ? roomFirst(g.board, Math.min(poursLeft(g), 4)) : null;
     return first ? { why: 'room', from: first[0], to: first[1] } : null;
@@ -1079,18 +1101,18 @@ function hintMove(g) {
   return bestPlace ? { why: 'place', slot: bestPlace.slot, to: bestPlace.to } : null;
 }
 function roomFirst(start, maxPours) {   // like canMakeRoom, but keeps the first pour of the way it finds
-  const key = b => CELLS.map(k => b[k].join('')).join('|');
+  const cells = cellsOf(start), key = b => cells.map(k => b[k].join('')).join('|');
   const seen = new Set([key(start)]);
   let frontier = [[start, null]], nodes = 0;
   for (let depth = 1; frontier.length && depth <= maxPours; depth++) {
     const next = [];
     for (const [b, first] of frontier)
-      for (const a of CELLS)
+      for (const a of cells)
         for (const c of legalTargets(b, a)) {
           const r = pourResult(b, a, c), f = first || [a, c];
           if (r.emptiesFrom || r.clears) return f;
           const nb = {};
-          for (const k of CELLS) nb[k] = b[k].slice();
+          for (const k of cells) nb[k] = b[k].slice();
           nb[c].push(...nb[a].splice(nb[a].length - r.n));
           const kk = key(nb);
           if (seen.has(kk) || ++nodes > 3000) continue;
@@ -1162,7 +1184,7 @@ function start() {
   // a best score for each mode and colour count; the old single best was from Free games
   const bestKey = gm => BEST + '.' + (gm.level ? 'lv' + gm.level : gm.endless ? 'endless' : gm.daily ? 'daily.' + gm.daily.date : gm.mode +
     (gm.deckSize && gm.deckSize !== (gm.mode === 'survive' ? CFG.deck : 0) ? '.d' + gm.deckSize : '') +
-    (gm.colours !== CFG.colours ? '.' + gm.colours + 'c' : ''));
+    (gm.colours !== CFG.colours ? '.' + gm.colours + 'c' : '') + (gm.holes ? '.' + gm.holes : ''));
   function readBest(gm) {
     try {
       return Number(localStorage.getItem(bestKey(gm)) || (gm.mode === 'free' && gm.colours === CFG.colours ?
@@ -1199,9 +1221,9 @@ function start() {
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(SAVE) || localStorage.getItem(OLD + '.save.v1'));
-      if (s && s.board && CELLS.every(k => Array.isArray(s.board[k])) && Array.isArray(s.tray) && 'next' in s) {   // next is null at the end of a deck
+      if (s && s.board && CELLS.every(k => !(k in s.board) || Array.isArray(s.board[k])) && Object.keys(s.board).length && Array.isArray(s.tray) && 'next' in s) {   // next is null at the end of a deck
         if (s.level && !s.stone) {   // saved when a stone was 9: now a colour, so convert (and drop the undo steps, which hold old boards)
-          for (const k of CELLS) s.board[k] = s.board[k].map(c => c === 9 ? STONE : c);
+          for (const k of cellsOf(s.board)) s.board[k] = s.board[k].map(c => c === 9 ? STONE : c);
           s.history = [];
         }
         s.stone = STONE;
@@ -1283,7 +1305,7 @@ function start() {
   function stackAt(p) {   // the frontmost stack drawn under p, tall ones included
     for (let i = ORDER.length - 1; i >= 0; i--) {
       const k = ORDER[i], st = g.board[k];
-      if (!st.length) continue;
+      if (!st || !st.length) continue;
       const [x, y] = cellXY(k);
       if (distToColumn(p, x, y, (st.length - 1) * S * TILE) < S * 0.85) return k;
     }
@@ -1292,7 +1314,7 @@ function start() {
   function cellAt(p) {
     // near the middle of a stack's own cell, that stack: a tall stack in front, drawn over the
     // cell's lower part, mustn't steal presses meant for the one behind it (play test, level 57)
-    for (const c of CELLS) {
+    for (const c of cellsOf(g.board)) {
       if (!g.board[c].length) continue;
       const [x, y] = cellXY(c);
       if (Math.hypot(p.x - x, p.y - y) < S * 0.65) return c;
@@ -1300,7 +1322,7 @@ function start() {
     const k = stackAt(p);
     if (k) return k;
     let bestK = null, bestD = S * 0.95;
-    for (const c of CELLS) {
+    for (const c of cellsOf(g.board)) {
       const [x, y] = cellXY(c), d = Math.hypot(p.x - x, p.y - y);
       if (d < bestD) { bestD = d; bestK = c; }
     }
@@ -1321,7 +1343,7 @@ function start() {
   const aim = p => ui.touch ? { x: p.x, y: p.y - S * 0.3 } : p;
   function dropTarget(lp, reach = 1.2) {
     let bestK = null, bestD = S * reach;
-    for (const c of CELLS) {
+    for (const c of cellsOf(g.board)) {
       if (g.board[c].length) continue;
       const [x, y] = cellXY(c), d = Math.hypot(lp.x - x, lp.y - y);
       if (d < bestD) { bestD = d; bestK = c; }
@@ -1444,8 +1466,8 @@ function start() {
     if (!log.length) lines.push('(none yet: the log starts with this version)');
     return lines.join('\n');
   }
-  function startGame(seed, mode, colours, level, intro, deck) {
-    beginGame(newGame(seed, mode, colours, level, deck));
+  function startGame(seed, mode, colours, level, intro, deck, holes) {
+    beginGame(newGame(seed, mode, colours, level, deck, null, holes));
     if (intro) showIntro();
   }
   function beginGame(ng) {
@@ -1514,7 +1536,7 @@ function start() {
       (g.turn > 0 || g.history.length) && state !== 'over' && state !== 'won';
     if (again) {
       const go = g.endless ? () => startEndless(g.endless.run) : g.daily ? () => beginGame(dailyGame(g.daily.date)) :
-        () => startGame(g.start, g.mode, g.colours, g.level, false, g.level ? null : g.deckSize);
+        () => startGame(g.start, g.mode, g.colours, g.level, false, g.level ? null : g.deckSize, g.level ? null : g.holes);
       if (busy) ask(g.endless ? 'Restart this run from stage 1, with the same decks?' :
         'Restart this game from the beginning, with the same stacks?', 'Restart', go); else go();
       return;
@@ -1525,7 +1547,7 @@ function start() {
     const eb = readEndlessStages();
     $('endlessbest').textContent = eb ? 'Your best: ' + eb + (eb === 1 ? ' stage, ' : ' stages, ') + readBest({ endless: true }) + ' points.' : '';
     showDaily();
-    if (!g.level && !g.endless && !g.daily && !tut) { const c = customOf(g); $('newpours').value = c.free ? 'free' : 'limited'; $('newlength').value = String(c.deck); }
+    if (!g.level && !g.endless && !g.daily && !tut) { const c = customOf(g); $('newpours').value = c.free ? 'free' : 'limited'; $('newlength').value = String(c.deck); $('newboard').value = c.holes; }
     $('newcontinue').textContent = 'Continue: Level ' + continueLevel();
     $('newmode').value = tut ? 'journey' : modeOf(g);   // the mode last played
     showMode();
@@ -1533,7 +1555,7 @@ function start() {
   }
   // the New game dialog: one mode at a time, chosen from the list
   const modeOf = gm => gm.level ? 'journey' : gm.endless ? 'endless' : gm.daily ? 'daily' :
-    gm.mode === 'standard' && gm.colours === CFG.colours && !gm.deckSize ? 'classic' : 'custom';
+    gm.mode === 'standard' && gm.colours === CFG.colours && !gm.deckSize && !gm.holes ? 'classic' : 'custom';
   function showMode() {
     for (const b of $('newgame').querySelectorAll('[data-mode]')) b.hidden = b.dataset.mode !== $('newmode').value;
   }
@@ -1552,9 +1574,12 @@ function start() {
   $('newdaily').onclick = () => { $('newgame').close(); if (!todayInPlay()) beginGame(dailyGame(dailyDate())); };
   $('newclassic').onclick = () => { $('newgame').close(); startGame(Date.now(), 'standard'); };   // the usual 5 colours
   $('newcustom').onclick = () => {
-    const c = { colours: Number($('newcolours').value), free: $('newpours').value === 'free', deck: Number($('newlength').value) };
-    $('newgame').close(); startGame(Date.now(), customMode(c), c.colours, null, false, c.deck || null);
+    const c = { colours: Number($('newcolours').value), free: $('newpours').value === 'free', deck: Number($('newlength').value),
+                holes: $('newboard').value || null };
+    $('newgame').close(); startGame(Date.now(), customMode(c), c.colours, null, false, c.deck || null, c.holes);
   };
+  $('newboard').append(...Object.keys(BOARD_SHAPES).map(k => el('option', { value: k },
+    BOARD_SHAPES[k].name + ' (' + (CELLS.length - BOARD_SHAPES[k].cells.length) + ' cells)')));
   const P = CFG.pours;
   $('classicabout').textContent = 'Play until the board fills, for a best score. Start with ' + P.start +
     ' pours, get ' + P.perPlace + ' more for each stack you place and ' + P.perClear + ' for each dek, up to ' + P.max + ' saved. ' +
@@ -2041,7 +2066,7 @@ function start() {
   setInterval(() => {   // the gold dot: the board nearly full, or a while without a move while a dek waits
     const b = $('hint');
     if (!g || tut || state === 'won' || state === 'over') { b.classList.remove('ready'); return; }
-    const empty = CELLS.filter(k => !g.board[k].length).length;
+    const empty = cellsOf(g.board).filter(k => !g.board[k].length).length;
     let ready = empty <= 2;
     if (!ready && Date.now() - (ui.actAt || 0) > 15000 && poursLeft(g) >= 1) {
       if (ui.readyFor !== ui.actAt) { ui.readyFor = ui.actAt; const h = hintMove(g); ui.dekWaits = !!h && h.why === 'dek'; }
@@ -2233,7 +2258,7 @@ function start() {
   }
   function highlights() {
     const out = { targets: new Set(), strong: null, pill: null, ghost: null };
-    const empties = () => CELLS.forEach(k => { if (!g.board[k].length) out.targets.add(k); });
+    const empties = () => cellsOf(g.board).forEach(k => { if (!g.board[k].length) out.targets.add(k); });
     if (ui.drag && ui.drag.kind === 'tray') {
       empties();
       const t = dragTarget();
@@ -2281,18 +2306,19 @@ function start() {
       if (a.type === 'pour' && !a.cleared) hidden[a.b] = (hidden[a.b] || 0) + a.n - arrived(a, now);
       if (a.type === 'place') fadeIn[a.cell] = ease(Math.min(1, (now - a.t0) / a.dur));
     }
-    for (const k of ORDER) {   // the plate under the board: the cells' larger hexes run together
+    const order = ORDER.filter(k => g.board[k]);   // holes: no plate, no floor
+    for (const k of order) {   // the plate under the board: the cells' larger hexes run together
       const [x, y] = cellXY(k);
       hexPath(x, y + S * 0.06, S * 1.12); ctx.fillStyle = theme.plate; ctx.fill();
     }
-    for (const k of ORDER) {   // the floor
+    for (const k of order) {   // the floor
       const [x, y] = cellXY(k);
       hexPath(x, y, S * 0.95);
       ctx.fillStyle = theme.cell; ctx.fill();
       ctx.lineWidth = 1.5; ctx.strokeStyle = theme['cell-edge']; ctx.stroke();
       if (!g.board[k].length && hl.targets.has(k)) ring(x, y, S, k === hl.strong);
     }
-    for (const k of ORDER) {
+    for (const k of order) {
       const st = g.board[k];
       let [x, y] = cellXY(k);
       if (hl.ghost && hl.ghost.cell === k) {

@@ -107,6 +107,34 @@ test('New game: Classic, and a Custom game that Restart keeps', async ({ page })
   expect(errors).toEqual([]);
 });
 
+test('Custom: a board with holes, kept by Restart and a reload', async ({ page, hasTouch }) => {
+  const errors = await openGame(page);
+  await page.locator('#new').click();
+  await page.locator('#newmode').selectOption('custom');
+  await page.locator('#newboard').selectOption('bridge');
+  await page.locator('#newcustom').click();
+  await expect(page.locator('#mode')).toHaveText('Classic · Bridge');
+  const cells = () => game(page, () => Object.keys(window.__t.g.board).length);
+  expect(await cells()).toBe(15);
+  // a tap on a hole places nothing; a tap on a real cell does
+  await tap(page, hasTouch, await slotPoint(page, 0));
+  await tap(page, hasTouch, await cellPoint(page, '1,0'));
+  expect(await game(page, () => window.__t.g.turn)).toBe(0);
+  await tap(page, hasTouch, await slotPoint(page, 0));
+  await tap(page, hasTouch, await cellPoint(page, '0,0'));
+  await expect.poll(() => game(page, () => window.__t.g.turn)).toBe(1);
+  await page.reload();
+  await page.waitForFunction(() => window.__t && window.__t.g);
+  expect(await cells()).toBe(15);
+  await page.locator('#restart').click();
+  await page.locator('#askyes').click();
+  await expect.poll(() => game(page, () => window.__t.g.turn)).toBe(0);
+  expect(await cells()).toBe(15);
+  await page.locator('#new').click();
+  await expect(page.locator('#newboard')).toHaveValue('bridge');
+  expect(errors).toEqual([]);
+});
+
 test('keeps the game after a reload', async ({ page, hasTouch }) => {
   await openGame(page);
   await tap(page, hasTouch, await slotPoint(page, 0));

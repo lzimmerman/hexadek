@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, hintMove, tallyGame, collectGoal};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, hintMove, tallyGame, collectGoal, BOARD_SHAPES, cellsOf, canMakeRoom};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -297,13 +297,56 @@ console.log('daily tests passed');
 
 // collect levels: two per chapter, the goal from the deck, ★★ for the colour
 {
-  assert.deepEqual(R.LEVELS.filter(L => L.collect).map(L => L.n), [5, 11, 17, 23, 29, 35, 41, 47, 53, 59, 65, 71]);
-  const g = R.newGame(1005, 'level', null, 5), C = R.collectGoal(g);
-  assert(C && C.deks >= 1 && C.colour >= 0, 'level 5 has a collect goal');
-  assert.equal(R.collectGoal(R.newGame(1004, 'level', null, 4)), null, 'level 4 does not');
+  assert.deepEqual(R.LEVELS.filter(L => L.collect).map(L => L.n), [9, 11, 17, 23, 27, 32, 41, 48, 53, 60, 64, 72]);
+  const g = R.newGame(1009, 'level', null, 9), C = R.collectGoal(g);
+  assert(C && C.deks >= 1 && C.colour >= 0, 'level 9 has a collect goal');
+  assert.equal(R.collectGoal(R.newGame(1008, 'level', null, 8)), null, 'level 8 does not');
+  // a collect level brings nothing else new, and follows a level that brought nothing new, so each
+  // new rule gets a level of its own first (stones coming and going every other level isn't new)
+  const news = n => R.levelAbout(n).split('. ').filter(t => !/^A collect level|longer deck|Stones are back|No stones/.test(t));
+  for (const L of R.LEVELS.filter(L => L.collect)) {
+    assert(L.step >= 2, 'level ' + L.n + ' is not at a chapter start');
+    assert.deepEqual(news(L.n), [], 'level ' + L.n + ' brings nothing new besides its goal');
+    assert.deepEqual(news(L.n - 1), [], 'level ' + (L.n - 1) + ', before a collect level, brings nothing new');
+  }
   g.turn = g.deckSize; g.score = 99999; g.made = {};
   assert.equal(R.starsFor(g), 1, 'a high score alone is not ★★ on a collect level');
   g.made[C.colour] = C.deks;
   assert.equal(R.starsFor(g), 3, 'the colour, and the score, give ★★★');
   console.log('collect tests passed');
+}
+
+// holes: cells missing from the board (BOARD_SHAPES)
+{
+  for (const name in R.BOARD_SHAPES) {
+    const g = R.newGame(7, 'level', null, null, null, { colours: 5, deck: 20, bands: [1, 3], holes: name, stones: R.STONE_LAYOUTS[5] });
+    const holes = R.BOARD_SHAPES[name].cells;
+    assert.equal(R.cellsOf(g.board).length, 19 - holes.length, name + ': the holes are gone');
+    assert(holes.every(k => !(k in g.board)), name + ': no stone on a hole');
+    for (const h of holes) {
+      assert.equal(R.place(g, 0, h), false, name + ': no placing on a hole');
+      for (const n of neighbours(h)) assert.equal(pourResult(g.board, n, h), null, name + ': no pouring into a hole');
+    }
+    const back = JSON.parse(JSON.stringify(g));   // a save keeps the shape
+    assert.deepEqual(R.cellsOf(back.board), R.cellsOf(g.board));
+  }
+  // the bridge's two islands meet only at the middle cell, which keeps 4 of its 6 neighbours
+  const b = R.newGame(1, 'free', null, null, null, { colours: 5, deck: 20, bands: [1, 3], pours: null, holes: 'bridge' });
+  assert.deepEqual(neighbours('0,0').filter(k => b.board[k]).sort(), ['-1,1', '0,-1', '0,1', '1,-1']);
+  // a full holed board: the room check and the hint only look at real cells
+  const f = R.newGame(4, 'free', null, null, null, { colours: 5, deck: 20, bands: [1, 3], pours: null, holes: 'loop' });
+  R.cellsOf(f.board).forEach(k => f.board[k] = [1, 0]); f.board['2,0'] = [0];
+  assert.equal(roomState(f.board, 0), 'over');
+  assert.equal(roomState(f.board, 1), 'full', 'one pour empties a cell');
+  assert(R.hintMove(f), 'a hint on a holed board');
+  console.log('hole tests passed');
+}
+
+// a custom game on a holed board: its shape, no Classic ramp, and its name
+{
+  const g = newGame(5, 'standard', 5, null, null, null, 'ring');
+  assert.equal(g.holes, 'ring'); assert(!('0,0' in g.board)); assert(!g.ramp, 'a holed board is a custom game, not Classic');
+  assert.equal(R.gameName(g), 'Classic · Ring');
+  assert(newGame(5, 'standard').ramp && !newGame(5, 'standard').holes);
+  console.log('custom board tests passed');
 }
