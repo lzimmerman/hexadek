@@ -262,16 +262,17 @@ if (flag('endless')) {
       if (line.startsWith('ENDLESS ')) { const r = JSON.parse(line.slice(8)); tiers[r.tier] = r; }
   } else {
     for (let t = tspan[0] - 1; t < (tspan[1] || tspan[0]); t++) {
-      const skip = [], wins = []; const t0 = Date.now();
+      const skip = [], wins = [], lostAt = []; const t0 = Date.now();
       for (let i = 0; i < pool; i++) {
         const seed = ENDLESS_SEED + 1000 * t + i;
         if (!flag('quick')) {   // --quick: the player only, on every deck (to compare rewards)
           const e = playGame(stage(t, seed), SKILLS.expert, mulberry(i * 31 + t));
           if (!isWon(e)) { skip.push(i); continue; }
         }
-        wins.push(isWon(playGame(stage(t, seed), SKILLS[sk], mulberry(i * 7919 + t))));
+        const pg = playGame(stage(t, seed), SKILLS[sk], mulberry(i * 7919 + t));
+        wins.push(isWon(pg)); if (!isWon(pg)) lostAt.push(pg.deckSize - pg.turn);   // stacks left when lost
       }
-      tiers[t] = { tier: t, perk, skip, pass: wins.filter(Boolean).length / Math.max(1, wins.length), n: wins.length, s: (Date.now() - t0) / 1000 };
+      tiers[t] = { tier: t, perk, lostAt, skip, pass: wins.filter(Boolean).length / Math.max(1, wins.length), n: wins.length, s: (Date.now() - t0) / 1000 };
       if (flag('json')) console.log('ENDLESS ' + JSON.stringify(tiers[t]));
     }
   }
@@ -334,7 +335,7 @@ for (const lv of levels) {
       const pts = CFG.hexadek * CFG.pointsPerTile, won = isWon(g);
       const stars = !random ? starsFor(g) : !won ? 0 : g.score < (M - 1) * pts ? 1 :
         (LEVELS[lv - 1].stones ? g.score >= (M + 1) * pts && !CELLS.some(k => g.board[k].includes(STONE)) : g.score >= (M + 2) * pts) ? 3 : 2;
-      res.push({ won, hx: g.hexadeks || 0, M, score: g.score, stars, placed: g.turn, ms: Date.now() - t0, hubPlaced: g.hubPlaced || 0,
+      res.push({ won, hx: g.hexadeks || 0, M, score: g.score, stars, placed: g.turn, deck: g.deckSize, ms: Date.now() - t0, hubPlaced: g.hubPlaced || 0,
                  stonesLeft: CELLS.reduce((n, k) => n + g.board[k].filter(c => c === STONE).length, 0) });
       if (flag('show')) console.log(CELLS.filter(k => g.board[k].length).map(k => k + ':' + g.board[k].join('')).join('  '));
       if (verbose) console.log(`  game ${i + 1}: ${isWon(g) ? 'won ' : 'lost'} placed ${g.turn}/${g.deckSize} hexadeks ${g.hexadeks || 0}/${M} score ${g.score} stars ${res[res.length - 1].stars} (${Date.now() - t0} ms)`);

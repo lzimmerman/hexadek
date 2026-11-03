@@ -51,6 +51,8 @@ body { display: flex; flex-direction: column; overscroll-behavior: none; user-se
 #deck { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; }
 .deckbar { flex: 1 0 100%; box-sizing: border-box; height: 8px; border-radius: 5px; background: var(--cell); border: 1px solid var(--cell-edge); overflow: hidden; }
 #deckfill { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+#deck.ending #decktext { color: var(--accent); }   /* the last few stacks of a deck */
+#deckbar.ending { box-shadow: 0 0 0 2px var(--accent); }
 #decktext { color: var(--ink); font-weight: 600; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 button { touch-action: manipulation; }   /* no double-tap zoom */
 @media (pointer: coarse) {   /* thumbs: bigger buttons */
@@ -1431,6 +1433,7 @@ function start() {
       ...stars.map((d, i) => el('i', { class: first + i === n ? 'now' : d ? 'done' : '' }))] : []));
     $('chapdots').title = n ? 'Level ' + (n - first + 1) + ' of ' + CHAPTER_SIZE + ' in chapter ' + (LEVELS[n - 1].chapter + 1) + '; gold dots: levels with stars' : '';
   }
+  const DECK_ENDING = 5;   // the deck bar counts down the last stacks
   function hud() {
     $('score').textContent = g.score;
     $('best').textContent = best;
@@ -1467,6 +1470,8 @@ function start() {
     else if (state === 'full') text = 'Board full: pour to make room.';
     else if (poursLeft(g) < 1 && state !== 'over') text = 'No pours left: place a stack for ' + P.perPlace + ' more.';
     else if (ui.trayPick !== null) text = 'Tap an empty cell to place it.';
+    else if (g.deckSize && g.deckSize - g.turn === 1 && !ui.sel) text = g.endless ? 'Last stack: place it to clear the stage!' : 'Last stack: place it to finish!';
+    else if (g.deckSize && g.deckSize - g.turn <= 3 && !ui.sel) text = (g.deckSize - g.turn) + ' stacks to go.';
     else if (ui.sel) text = 'Tap a glowing neighbour to pour.';
     else if (g.level && g.turn === 0 && !g.history.length) {   // short: it has to fit a phone's status line
       const T = levelTargets(g.level);
@@ -1490,8 +1495,10 @@ function start() {
     if (g.deckSize) {
       const placed = Math.min(g.turn, g.deckSize);
       $('deckfill').style.width = (100 * placed / g.deckSize) + '%';
-      $('decktext').textContent = placed + ' / ' + g.deckSize;
-      $('deck').title = (g.deckSize - placed) + ' stacks left to place';
+      const left = g.deckSize - placed, ending = left > 0 && left <= DECK_ENDING && state !== 'won' && state !== 'over';   // a countdown for the end of the deck
+      $('decktext').textContent = placed + ' / ' + g.deckSize + (ending ? ' · ' + left + ' to go' : '');
+      $('deck').title = left + ' stacks left to place';
+      $('deck').classList.toggle('ending', ending); $('deckbar').classList.toggle('ending', ending);
     }
     const goals = g.level ? starGoals(g) : null;
     $('overstars').style.display = goals ? '' : 'none';
