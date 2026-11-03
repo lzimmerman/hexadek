@@ -1257,8 +1257,9 @@ function start() {
     g.tallied = true; g.note = note;
     try { localStorage.setItem(STATS, JSON.stringify(n)); } catch (e) {}
   }
-  // g.ended: the player ended the game (End game, or Give up on a full board); it's over like a full board
-  const stateOf = () => isWon(g) ? 'won' : g.ended ? 'over' : roomState(g.board, poursLeft(g));
+  // g.ended: the player ended the game (End game, or Give up on a full board); it's over like a full board.
+  // An Endless run can be ended between stages too: over, with the stage just cleared counted (endlessCleared)
+  const stateOf = () => g.ended && g.endless ? 'over' : isWon(g) ? 'won' : g.ended ? 'over' : roomState(g.board, poursLeft(g));
   let state = stateOf();
   const HOLD_MS = 150;   // a touch shorter than this is a tap: no preview while the finger is down
   const ui = { ghostAt: null, sel: null, trayPick: null, press: null, drag: null, hover: null, pos: null, touch: false, peek: null };
@@ -1616,8 +1617,10 @@ function start() {
       return;
     }
     // a game without a deck runs until the board fills, so stopping is a normal end: its score already counts
-    // (best and records are saved as it goes); End game shows its end card (play test: the way to just stop wasn't clear)
-    const open = busy && !g.deckSize && !g.level && !g.endless && !g.daily;
+    // (best and records are saved as it goes); End game shows its end card (play test: the way to just stop wasn't clear).
+    // An Endless run is the same: its score and stages count as it goes, so End run keeps them
+    const open = busy && (g.endless || !g.deckSize && !g.level && !g.daily);   // games whose score counts as they go
+    $('newend').textContent = g.endless ? 'End run' : 'See results';
     $('newwarn').textContent = busy && !open ? 'The game you are playing will be lost.' : '';
     $('newwarn').style.display = busy && !open ? '' : 'none';
     $('newcurtext').textContent = gameName(g) + ' · ' + g.score.toLocaleString('en') + ' points';
@@ -1916,7 +1919,7 @@ function start() {
     let text;
     if (flash) text = flash.text;
     else if (state === 'won') text = g.endless ? 'Stage cleared!' : 'Deck complete!';
-    else if (state === 'over') text = g.ended && cellsOf(g.board).some(k => !g.board[k].length) ? 'Game ended.' : 'No room left.';
+    else if (state === 'over') text = g.ended && g.endless ? 'Run ended.' : g.ended && cellsOf(g.board).some(k => !g.board[k].length) ? 'Game ended.' : 'No room left.';
     else if (state === 'full') text = 'Board full: pour to make room.';
     else if (poursLeft(g) < 1 && state !== 'over') text = 'No pours left: place a stack for ' + P.perPlace + ' more.';
     else if (ui.trayPick !== null) text = 'Tap an empty cell to place it.';
@@ -1985,7 +1988,7 @@ function start() {
       $('overtext').textContent = state === 'won' ? 'Run total: ' + g.score + ' points. ' + (made >= need ?
           '🎁 ' + made + ' deks earned a reward: choose one for stage ' + (n + 1) + ', then Next stage.' :
           'No reward this time: ' + made + ' of ' + need + ' deks.') :
-        'No room left. You cleared ' + stages(n) + ', with ' + g.score + ' points' +
+        (g.ended ? 'You ended the run' : 'No room left') + '. You cleared ' + stages(n) + ', with ' + g.score + ' points' +
         (n && n >= eb ? ': your best run!' : '. Best: ' + stages(eb) + ', ' + best + ' points.');
     }
     $('overundo').style.display = g.history.length && undosLeft(g) > 0 && state !== 'won' && !g.ended ? '' : 'none';

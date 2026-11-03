@@ -69,3 +69,37 @@ test('Endless: Restart asks before starting the run again', async ({ page }) => 
   await page.locator('#askyes').click();
   expect(await game(page, () => [window.__t.g.endless.stage, window.__t.g.endless.run])).toEqual([1, run]);
 });
+
+test('Endless: End run keeps the run, mid-stage or between stages', async ({ page, hasTouch }) => {
+  const errors = await openGame(page);
+  await page.locator('#new').click();
+  await page.locator('#newmode').selectOption('endless');
+  await page.locator('#newendless').click();
+  await page.locator('#new').click();   // nothing played yet: no run to end
+  await expect(page.locator('#newcurrent')).toBeHidden();
+  await page.locator('#newcancel').click();
+  // between stages: stage 1 cleared, then End run from New game counts it
+  await game(page, () => { window.__t.g.score = 480; });
+  await finishStage(page, hasTouch);
+  await expect(page.locator('#overtitle')).toHaveText('Stage 1 cleared!', { timeout: 10000 });
+  await page.locator('#new').click();
+  await expect(page.locator('#newcurtext')).toHaveText('Endless · Stage 1 · 480 points');
+  await expect(page.locator('#newend')).toHaveText('End run');
+  await expect(page.locator('#newwarn')).toBeHidden();
+  await page.locator('#newend').click();
+  await expect(page.locator('#overtitle')).toHaveText('Run over');
+  await expect(page.locator('#overtext')).toContainText('You ended the run. You cleared 1 stage, with 480 points: your best run!');
+  await expect(page.locator('#overperks')).toBeHidden();
+  await expect(page.locator('#overundo')).toBeHidden();
+  // mid-stage: the stage in play doesn't count
+  await page.locator('#overnew').click();
+  await page.locator('#newendless').click();
+  await game(page, () => { const g = window.__t.g; g.endless.stage = 3; g.score = 900; g.turn = 4; window.__t.after(); });
+  await page.locator('#new').click();
+  await page.locator('#newend').click();
+  await expect(page.locator('#msg')).toHaveText('Run ended.');
+  await expect(page.locator('#overtext')).toContainText('You ended the run. You cleared 2 stages, with 900 points: your best run!');
+  await page.locator('#overnew').click();
+  await expect(page.locator('#endlessbest')).toHaveText('Your best: 2 stages, 900 points.');
+  expect(errors).toEqual([]);
+});
