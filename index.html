@@ -158,8 +158,10 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #introfacts { color: var(--muted); font-size: 13px; margin: -6px 0 10px; }
 .card { background: var(--panel); color: var(--ink); padding: 20px 24px; border-radius: 14px; text-align: center; max-width: 340px; margin: 16px;
   border: 1px solid var(--cell-edge); box-shadow: 0 12px 40px rgba(0,0,0,.35); max-height: calc(100% - 32px); overflow: auto; box-sizing: border-box; }
-.swatch { display: inline-block; width: 0.8em; height: 0.92em; margin: 0 0.2em 0 0.05em; vertical-align: -0.1em; background: var(--sw);
+.swatch { display: inline-block; width: 0.8em; height: 0.92em; margin: 0 0.12em 0 0.05em; vertical-align: -0.1em; background: var(--sw);
   clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }   /* a tile, so "star" isn't read as ★ */
+.symb { display: inline-block; width: 0.9em; height: 0.9em; margin-right: 0.15em; vertical-align: -0.12em; background: currentColor;
+  -webkit-mask: var(--sm) center / contain no-repeat; mask: var(--sm) center / contain no-repeat; }   /* the tile's symbol, after its swatch */
 #overnote { margin: -4px 0 12px; font-weight: 700; color: var(--accent); }
 #overnote:empty { display: none; }
 #sharetext { margin: 0 0 12px; padding: 8px 10px; background: var(--bg); border-radius: 10px; font: inherit; font-size: 14px;
@@ -953,7 +955,7 @@ function collectGoal(g) {
 }
 const madeOf = (g, c) => (g.made && g.made[c]) || 0;
 const swatchMark = c => '⟦' + c + '⟧';   // drawn as a small hexagon of the tile's colour (rich() on the page)
-const collectText = C => C.deks + ' ' + swatchMark(C.colour) + COLOURS[C.colour][1] + (C.deks > 1 ? ' deks' : ' dek');
+const collectText = (C, short) => C.deks + ' ' + swatchMark(C.colour) + (short ? '' : COLOURS[C.colour][1] + ' ') + (C.deks > 1 ? 'deks' : 'dek');   // short: swatch and symbol only
 // A daily deck's star targets, from the most hexadeks its tiles allow (M), set from the computer
 // player's daily games (tools/bot.js --daily): its median score is M − 2 hexadeks' worth, so ★★
 // comes in about half of finished games; ★★★ at M (combos score extra) in about one in seven.
@@ -1554,9 +1556,21 @@ function start() {
     s.innerHTML = '<path d="M2.5 6V4a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="0.5" y="6" width="10" height="7" rx="1.5" fill="currentColor"/>';
     return s;
   }
-  function rich(text) {   // text with ⟦c⟧ marks: each one a swatch of tile colour c
-    return String(text).split(/⟦(\d+)⟧/).map((part, i) => i % 2 ?
-      el('span', { class: 'swatch', 'aria-hidden': 'true', style: '--sw:' + COLOURS[+part][0] }) : part).filter(x => x !== '');
+  // text with ⟦c⟧ marks: each one a swatch of tile colour c, then its symbol (play test: "crescent dek" alone
+  // means little without colour vision; the symbol is what's on the tiles)
+  function rich(text) {
+    return String(text).split(/⟦(\d+)⟧/).flatMap((part, i) => i % 2 ?
+      [el('span', { class: 'swatch', 'aria-hidden': 'true', style: '--sw:' + COLOURS[+part][0] }),
+       el('span', { class: 'symb', 'aria-hidden': 'true', style: '--sm:url(' + symbolURL(COLOURS[+part][1]) + ')' })] : [part]).filter(x => x !== '');
+  }
+  const symbolURLs = {};
+  function symbolURL(kind) {   // the tile symbol as an image, used as a mask so it takes the text's colour
+    if (!symbolURLs[kind]) {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+      symbol(kind, 32, 32, 29, cv.getContext('2d'));   // as large as fits with its outline
+      symbolURLs[kind] = cv.toDataURL();
+    }
+    return symbolURLs[kind];
   }
   function showIntro() {   // a card describing the level: what's new in it and the star goals
     const L = LEVELS[g.level - 1], T = levelTargets(g.level), P = pourRule(g);
@@ -1912,7 +1926,7 @@ function start() {
     else if ((g.level || g.daily) && g.turn === 0 && !g.history.length) {   // short: it has to fit a phone's status line
       const T = g.daily ? dailyTargets(g.daily.date) : levelTargets(g.level);
       const C = collectGoal(g);
-      text = '★ place ' + g.deckSize + ' · ★★ ' + (C ? collectText(C) : T.score + ' pts') + ' · ★★★ ' + (C ? '+' : '') + T.top + (T.stones ? ' + stones' : ' pts');   // collect: ★★'s deks plus the score
+      text = '★ place ' + g.deckSize + ' · ★★ ' + (C ? collectText(C, true) : T.score + ' pts') + ' · ★★★ ' + (C ? '+' : '') + T.top + (T.stones ? ' + stones' : ' pts');   // collect: ★★'s deks plus the score
     }
     else if (g.endless && g.turn === 0 && !g.history.length)
       text = 'Stage ' + g.endless.stage + ': place ' + g.deckSize + ' · 🎁 ' + endlessRewardDeks(g) + ' deks' + (g.endless.perk ? ' · ' + ENDLESS_PERKS[g.endless.perk].name : '');
@@ -2214,66 +2228,66 @@ function start() {
     }
     ctx.closePath();
   }
-  function symbol(kind, x, y, r) {
-    ctx.beginPath();
-    if (kind === 'circle') ctx.arc(x, y, r * 0.8, 0, Math.PI * 2);
-    else if (kind === 'diamond') { ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.8, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r * 0.8, y); }
-    else if (kind === 'triangle') { ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.95, y + r * 0.7); ctx.lineTo(x - r * 0.95, y + r * 0.7); }
+  function symbol(kind, x, y, r, c = ctx) {   // c: another canvas's context (symbolURL)
+    c.beginPath();
+    if (kind === 'circle') c.arc(x, y, r * 0.8, 0, Math.PI * 2);
+    else if (kind === 'diamond') { c.moveTo(x, y - r); c.lineTo(x + r * 0.8, y); c.lineTo(x, y + r); c.lineTo(x - r * 0.8, y); }
+    else if (kind === 'triangle') { c.moveTo(x, y - r); c.lineTo(x + r * 0.95, y + r * 0.7); c.lineTo(x - r * 0.95, y + r * 0.7); }
     else if (kind === 'hexagon') for (let i = 0; i < 6; i++) {
       const a = Math.PI / 3 * i;
-      ctx.lineTo(x + r * 0.85 * Math.cos(a), y + r * 0.85 * Math.sin(a));
+      c.lineTo(x + r * 0.85 * Math.cos(a), y + r * 0.85 * Math.sin(a));
     }
     else if (kind === 'heart') {
-      ctx.moveTo(x, y + r * 0.85);
-      ctx.bezierCurveTo(x - r * 1.3, y - r * 0.1, x - r * 0.55, y - r * 1.05, x, y - r * 0.4);
-      ctx.bezierCurveTo(x + r * 0.55, y - r * 1.05, x + r * 1.3, y - r * 0.1, x, y + r * 0.85);
+      c.moveTo(x, y + r * 0.85);
+      c.bezierCurveTo(x - r * 1.3, y - r * 0.1, x - r * 0.55, y - r * 1.05, x, y - r * 0.4);
+      c.bezierCurveTo(x + r * 0.55, y - r * 1.05, x + r * 1.3, y - r * 0.1, x, y + r * 0.85);
     }
     else if (kind === 'leaf') {   // a lens on the diagonal
       const a = r * 0.8;
-      ctx.moveTo(x - a, y + a); ctx.quadraticCurveTo(x + a, y + a, x + a, y - a); ctx.quadraticCurveTo(x - a, y - a, x - a, y + a);
+      c.moveTo(x - a, y + a); c.quadraticCurveTo(x + a, y + a, x + a, y - a); c.quadraticCurveTo(x - a, y - a, x - a, y + a);
     }
     else if (kind === 'drop') {   // a point at the top, a round base
       const cy = y + r * 0.3, p = r * 0.62, f = Math.acos(p / (r * 1.3));
-      ctx.moveTo(x, y - r); ctx.arc(x, cy, p, -Math.PI / 2 + f, Math.PI * 1.5 - f);
+      c.moveTo(x, y - r); c.arc(x, cy, p, -Math.PI / 2 + f, Math.PI * 1.5 - f);
     }
     else if (kind === 'clover') {   // three round leaves and a stem
       for (const [dx, dy] of [[0, -0.42], [-0.42, 0.12], [0.42, 0.12]]) {
-        ctx.moveTo(x + dx * r + r * 0.4, y + dy * r); ctx.arc(x + dx * r, y + dy * r, r * 0.4, 0, Math.PI * 2);
+        c.moveTo(x + dx * r + r * 0.4, y + dy * r); c.arc(x + dx * r, y + dy * r, r * 0.4, 0, Math.PI * 2);
       }
-      ctx.moveTo(x - r * 0.1, y + r * 0.1); ctx.rect(x - r * 0.1, y + r * 0.1, r * 0.2, r * 0.85);
+      c.moveTo(x - r * 0.1, y + r * 0.1); c.rect(x - r * 0.1, y + r * 0.1, r * 0.2, r * 0.85);
     }
     else if (kind === 'flower') {   // five round petals around a centre
       for (let i = 0; i < 5; i++) {
         const a = -Math.PI / 2 + i * Math.PI * 2 / 5, px = x + Math.cos(a) * r * 0.5, py = y + Math.sin(a) * r * 0.5;
-        ctx.moveTo(px + r * 0.36, py); ctx.arc(px, py, r * 0.36, 0, Math.PI * 2);
+        c.moveTo(px + r * 0.36, py); c.arc(px, py, r * 0.36, 0, Math.PI * 2);
       }
     }
     else if (kind === 'sun') {   // a disc with eight short rays
       for (let i = 0; i < 16; i++) {
         const a = i * Math.PI / 8, rr = i % 2 ? r * 0.62 : r * 0.98;
-        ctx.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a));
+        c.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a));
       }
     }
     else if (kind === 'cloud') {   // three puffs on a flat base
       const k = r * 1.2, cy = y + r * 0.12;
-      ctx.moveTo(x - k * 0.85, cy + k * 0.45);
-      ctx.arc(x - k * 0.45, cy + k * 0.1, k * 0.38, Math.PI * 0.75, Math.PI * 1.6);
-      ctx.arc(x + k * 0.05, cy - k * 0.2, k * 0.5, Math.PI * 1.1, Math.PI * 1.95);
-      ctx.arc(x + k * 0.5, cy + k * 0.12, k * 0.38, Math.PI * 1.45, Math.PI * 0.4);
-      ctx.lineTo(x - k * 0.85, cy + k * 0.45);
+      c.moveTo(x - k * 0.85, cy + k * 0.45);
+      c.arc(x - k * 0.45, cy + k * 0.1, k * 0.38, Math.PI * 0.75, Math.PI * 1.6);
+      c.arc(x + k * 0.05, cy - k * 0.2, k * 0.5, Math.PI * 1.1, Math.PI * 1.95);
+      c.arc(x + k * 0.5, cy + k * 0.12, k * 0.38, Math.PI * 1.45, Math.PI * 0.4);
+      c.lineTo(x - k * 0.85, cy + k * 0.45);
     }
     else if (kind === 'crescent') {   // the left part of a circle, with a circle the same size cut out on its right
       const R = r * 0.9, d = r * 0.75, h = Math.sqrt(R * R - d * d / 4), f = Math.atan2(h, d / 2), cx = x + r * 0.26;   // centres the visible shape, which spans cx - R to cx + d / 2
-      ctx.arc(cx, y, R, f, 2 * Math.PI - f);
-      ctx.arc(cx + d, y, R, Math.PI + f, Math.PI - f, true);
+      c.arc(cx, y, R, f, 2 * Math.PI - f);
+      c.arc(cx + d, y, R, Math.PI + f, Math.PI - f, true);
     }
     else for (let i = 0; i < 10; i++) {   // star
       const a = Math.PI / 5 * i - Math.PI / 2, rr = i % 2 ? r * 0.45 : r;
-      ctx.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a));
+      c.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a));
     }
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.fill();
-    ctx.lineWidth = Math.max(1, r * 0.14); ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.stroke();
+    c.closePath();
+    c.fillStyle = 'rgba(255,255,255,.95)'; c.fill();
+    c.lineWidth = Math.max(1, r * 0.14); c.strokeStyle = 'rgba(0,0,0,.45)'; c.stroke();
   }
   function crack(x, y, s) {   // the mark on a stone
     ctx.beginPath();
