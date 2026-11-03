@@ -153,7 +153,8 @@ test('See results: a Classic game ends on request, with its end card, and is log
   await expect.poll(() => game(page, () => window.__t.g.turn)).toBe(1);
   await page.locator('#new').click();
   await expect(page.locator('#newwarn')).toBeHidden();
-  await expect(page.locator('#newcurtext')).toHaveText(/^Classic · \d+ points\. Its score is kept/);
+  await expect(page.locator('#newcurtext')).toHaveText(/^Classic · [\d,]+ points$/);
+  await expect(page.locator('#newcurnote')).toHaveText('Your score is recorded.');
   await page.locator('#newend').click();
   await expect(page.locator('#over')).toBeVisible();
   await expect(page.locator('#overtitle')).toHaveText('Game ended');

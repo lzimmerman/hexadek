@@ -139,6 +139,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 420px) { #status { font-size: 14px; padding: 6px 10px; } }
 #status.tight #msg { font-size: 12.5px; }   /* a message that wouldn't fit steps down rather than touching the edge */
 #status.flash { color: var(--good); font-weight: 700; border-left-color: var(--good); }
+#status.pulse { animation: pulse 900ms ease-out; }
+@keyframes pulse { from { background: color-mix(in srgb, var(--good) 28%, var(--panel)); } to { background: var(--panel); } }
+@media (prefers-reduced-motion: reduce) { #status.pulse { animation: none; } }
 #giveup { display: none; flex: none; padding: 0 10px; min-height: 0; font-size: 14px; }
 #side { display: contents; }
 #wrap { position: relative; flex: 1; min-height: 0; order: 1; }
@@ -206,7 +209,7 @@ button.quiet { color: var(--danger); font-size: 13px; padding: 6px 10px; }
    button above the mode's own Play button looked like the same thing twice). The dialog focuses Mode, not See results. */
 #newcurrent { border: 1px solid var(--cell-edge); border-radius: 8px; padding: 10px 12px; margin: 4px 0 14px; }
 #newcurrent > b, #newcurrent > span { display: block; }
-#newcurrent > span { color: var(--muted); font-size: 14px; }
+#newcurnote { color: var(--muted); font-size: 14px; }
 #newcurrent .row { margin-top: 8px; }
 #newstart { font-weight: 600; margin: 0 0 6px; }
 #newgame .modebox > span { display: block; color: var(--muted); font-size: 14px; }
@@ -459,7 +462,7 @@ dialog li { margin-bottom: 6px; }
 <dialog id="newgame">
   <h2>New game</h2>
   <p id="newwarn"></p>
-  <div id="newcurrent"><b>This game</b><span id="newcurtext"></span>
+  <div id="newcurrent"><b>This game</b><span id="newcurtext"></span><span id="newcurnote">Your score is recorded.</span>
     <div class="row"><button type="button" id="newend">See results</button></div></div>
   <p id="newstart">Start a new game</p>
   <div class="row"><label class="row" for="newmode">Mode
@@ -1307,7 +1310,7 @@ function start() {
     TY = BY + S * (1.5 * R + 1) + S * 2.1;
     SLOT = Math.min(W / 4.3, S * 2.4);
     const css = getComputedStyle(document.documentElement);
-    for (const v of ['cell', 'cell-edge', 'plate', 'accent', 'ink', 'muted', 'panel', 'font', 'bg', 'gold']) theme[v] = css.getPropertyValue('--' + v).trim();
+    for (const v of ['cell', 'cell-edge', 'plate', 'accent', 'ink', 'muted', 'panel', 'font', 'bg', 'gold', 'good']) theme[v] = css.getPropertyValue('--' + v).trim();
     dirty = true;
   }
   function cellXY(k) {
@@ -1564,7 +1567,7 @@ function start() {
     const open = busy && !g.deckSize && !g.level && !g.endless && !g.daily;
     $('newwarn').textContent = busy && !open ? 'The game you are playing will be lost.' : '';
     $('newwarn').style.display = busy && !open ? '' : 'none';
-    $('newcurtext').textContent = gameName(g) + ' · ' + g.score.toLocaleString('en') + ' points. Its score is kept for your best and records.';
+    $('newcurtext').textContent = gameName(g) + ' · ' + g.score.toLocaleString('en') + ' points';
     $('newcurrent').style.display = $('newstart').style.display = open ? '' : 'none';
     $('newcolours').value = String(Math.min(13, g.colours % 2 ? g.colours : g.colours + 1));   // older games had 4 or 6
     const eb = readEndlessStages();
@@ -1807,7 +1810,9 @@ function start() {
     $('coachskip').style.display = st.last ? 'none' : '';
   }
 
-  function setFlash(text) { flash = { text, until: performance.now() + 2500 }; }
+  function setFlash(text, ms) { flash = { text, until: performance.now() + (ms || 2500) }; }
+  // a hint's message is easy to miss up there, so the status line pulses as it appears (play test, 2026-11-03)
+  function pulseStatus() { const st = $('status'); st.classList.remove('pulse'); void st.offsetWidth; st.classList.add('pulse'); }
   function finishAnims() { anims = []; dirty = true; }
 
   let dotsKey = null;
@@ -2087,15 +2092,16 @@ function start() {
     // an empty board (stones aside): every cell is as good as another, so a tip instead of an arbitrary move
     // (play test, 2026-11-03: it pointed at the top corner); not counted as a hint
     if (cellsOf(g.board).every(k => g.board[k].every(c => c === STONE))) {
-      setFlash('Start anywhere; keep the middle free.');   // short: the status line is one line on a phone
-      hud(); return;
+      setFlash('Start anywhere; keep the middle free.', 4000);   // short: the status line is one line on a phone
+      anims.push({ type: 'outline', t0: performance.now(), dur: 1600 });   // the whole board lights up: anywhere
+      pulseStatus(); hud(); return;
     }
     const h = hintMove(g);
     if (!h) { setFlash('No hint: there is no good move here.'); hud(); return; }
     ui.sel = h.from || null; ui.trayPick = h.from ? null : h.slot;
     ui.hint = h;
     if (ui.hintedAt !== (ui.actAt || 0)) { ui.hintedAt = ui.actAt || 0; g.hints = (g.hints || 0) + 1; save(); }   // one per position: pressing again before a move is free
-    setFlash(HINT_TEXT[h.why]); hud(); dirty = true;
+    setFlash(HINT_TEXT[h.why]); pulseStatus(); hud(); dirty = true;
   };
   setInterval(() => {   // the gold dot: the board nearly full, or a while without a move while a dek waits
     const b = $('hint');
@@ -2341,6 +2347,13 @@ function start() {
       if (a.type === 'place') fadeIn[a.cell] = ease(Math.min(1, (now - a.t0) / a.dur));
     }
     const order = ORDER.filter(k => g.board[k]);   // holes: no plate, no floor
+    for (const a of anims) if (a.type === 'outline') {   // Hint on an empty board: the board's outline glows, then fades
+      const t = (now - a.t0) / a.dur;
+      ctx.globalAlpha = still() ? 0.8 : t < 0.15 ? t / 0.15 : Math.max(0, 1 - (t - 0.15) / 0.85);
+      ctx.strokeStyle = theme.good; ctx.lineWidth = S * 0.24; ctx.lineJoin = 'round';   // green, like the hint's message
+      for (const k of order) { const [x, y] = cellXY(k); hexPath(x, y + S * 0.06, S * 1.12); ctx.stroke(); }
+      ctx.globalAlpha = 1; ctx.lineJoin = 'miter';
+    }
     for (const k of order) {   // the plate under the board: the cells' larger hexes run together
       const [x, y] = cellXY(k);
       hexPath(x, y + S * 0.06, S * 1.12); ctx.fillStyle = theme.plate; ctx.fill();
