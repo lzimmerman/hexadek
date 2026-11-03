@@ -77,6 +77,8 @@ button.icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; s
 #mode { order: 3; } #chapdots { order: 4; }
 .setrow { justify-content: space-between; align-items: center; gap: 12px; margin: 8px 0 12px; flex-wrap: nowrap; }
 .setrow > span { flex: 1; } .setrow button { flex: none; min-width: 72px; }
+.setline { border-top: 1px solid var(--line); padding-top: 12px; }
+.setclose { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px; }
 h1 { font-size: 20px; margin: 0; letter-spacing: .08em; font-weight: 700; }
 h1 span { color: var(--accent); }
 .chip { font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--cell);
@@ -99,10 +101,9 @@ h1 span { color: var(--accent); }
 
 .stat { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; font-weight: 600;
   text-transform: uppercase; letter-spacing: .06em; }
-.stat b { color: var(--ink); font-size: 18px; letter-spacing: 0; margin-left: 4px; }
-#scorestat b { font-size: 22px; }
+.stat b { color: var(--ink); font-size: 20px; letter-spacing: 0; margin-left: 4px; }   /* all one size (play test) */
 @media (max-width: 400px) {   /* small phones: keep the numbers on one line */
-  #stats { gap: 4px 12px; } .stat { letter-spacing: .03em; } .stat b { font-size: 16px; } #scorestat b { font-size: 20px; }
+  #stats { gap: 4px 12px; } .stat { letter-spacing: .03em; } .stat b { font-size: 18px; }
 }
 /* numbers that wouldn't fit one line close up (the score keeps its size, so the row keeps its height):
    a row that wrapped as the score grew made the board jump (play test, Classic) */
@@ -333,7 +334,7 @@ dialog li { margin-bottom: 6px; }
       Endless run, different every run.</li>
     <li><b>Classic</b>: play until the board fills, for a best score. Each pour uses one: you start with 3, get 3 more
       for each stack you place and 1 for each dek, and can save up to 9. Undo gives the pour back, and you have 5
-      undos per game.</li>
+      undos per game. It gets harder as you go: a new colour joins every 10 deks, up to 9.</li>
     <li><b>Custom</b>: choose the colours (3 to 13; fewer is easier), limited or free pours (free pours come with
       unlimited undos), and the length: <i>Fill board</i> (play until the board is full), or a deck of 30 or 50
       stacks to place without running out of room. The bar below the board shows how far through a deck you are.</li>
@@ -455,9 +456,9 @@ dialog li { margin-bottom: 6px; }
   <h2>Settings</h2>
   <div class="row setrow"><span><b>Haptics</b><br><span class="hint">Vibrate on pours and deks (Android phones).</span></span>
     <button type="button" id="haptics" aria-pressed="false" aria-label="Haptics">Off</button></div>
-  <div class="row"><span class="spacer"></span><button type="button" id="settingsclose">Close</button></div>
-  <div class="extra row"><span class="hint">Start over: clears every level's stars and all best scores.</span>
+  <div class="row setrow setline"><span><b>Start over</b><br><span class="hint">Clears every level's stars and all best scores.</span></span>
     <button type="button" id="resetall" class="quiet">Reset all progress</button></div>
+  <div class="row setclose"><span class="spacer"></span><button type="button" id="settingsclose">Close</button></div>   <!-- for the whole box: at the bottom, on its own -->
 </dialog>
 <dialog id="levels">
   <h2>Journey</h2>
@@ -498,6 +499,9 @@ const COLOURS = [
   ['#f97316', 'sun'], ['#8b5e3c', 'triangle'],
   ['#84cc16', 'leaf'], ['#1e3a8a', 'crescent'], ['#9f1239', 'circle'], ['#38bdf8', 'cloud'],
 ];
+// Classic gets harder as it goes: a new colour every `every` deks, from the usual 5 up to `max`
+// (play test: 233 turns and 75 deks with no change in difficulty, and the game got boring).
+const CLASSIC_RAMP = { every: 10, max: 9 };
 const STONE = 99;   // a grey stone tile: it can't be poured, and breaks when a neighbouring stack clears
                     // (it was 9 until there were more than 9 colours; load() converts older saves)
 const STONE_COLOUR = '#6b7280';
@@ -636,6 +640,7 @@ function newGame(seed, mode, colours, level, deck, spec) {
               pours: CFG.pours.start, undos: CFG.undos, deckSize: mode === 'survive' ? deck || CFG.deck : mode === 'free' ? deck || null : null,
               board: {}, tray: [], next: null, score: 0, turn: 0, clearsThisTurn: 0, history: [] };
   for (const k of CELLS) g.board[k] = [];
+  if (mode === 'standard' && g.colours === CFG.colours) g.ramp = true;   // Classic (CLASSIC_RAMP)
   if (L) {
     if (mode === 'level') Object.assign(g, { level, levels: LEVEL_COUNT });
     Object.assign(g, { colours: L.colours, deckSize: L.deck, bands: L.bands, bandOdds: L.bandOdds,
@@ -857,7 +862,7 @@ function pour(g, a, b) {
   const res = pourResult(g.board, a, b);
   if (!res || poursLeft(g) < 1) return null;
   g.history.push(JSON.stringify({ board: g.board, score: g.score, clearsThisTurn: g.clearsThisTurn, pours: g.pours,
-                                 hexadeks: g.hexadeks || 0 }));
+                                 hexadeks: g.hexadeks || 0, colours: g.colours }));
   if (pourRule(g)) g.pours--;
   const A = g.board[a], B = g.board[b];
   res.colour = topOf(A); res.baseTo = B.length;
@@ -867,6 +872,11 @@ function pour(g, a, b) {
     g.board[b] = [];
     g.clearsThisTurn++;
     g.hexadeks = (g.hexadeks || 0) + 1;
+    if (g.ramp) {   // new stacks bring it in
+      const was = g.colours;
+      g.colours = Math.min(CLASSIC_RAMP.max, CFG.colours + Math.floor(g.hexadeks / CLASSIC_RAMP.every));
+      if (g.colours > was) res.newColour = g.colours - 1;
+    }
     res.mult = g.clearsThisTurn;
     res.points = CFG.hexadek * CFG.pointsPerTile * res.mult;
     g.score += res.points;
@@ -884,6 +894,7 @@ function undo(g) {
   g.board = s.board; g.score = s.score; g.clearsThisTurn = s.clearsThisTurn;
   if ('pours' in s) g.pours = s.pours;
   if ('hexadeks' in s) g.hexadeks = s.hexadeks;
+  if ('colours' in s) g.colours = s.colours;
   return true;
 }
 function place(g, slot, cell) {
@@ -1185,7 +1196,8 @@ function start() {
       if (!still()) for (const k of res.broke)
         anims.push({ type: 'break', cell: k, at: g.board[k].length, t0: now, wait: pa.dur + stagger * (res.n - 1), dur: 340 });
       setFlash('Dek! +' + res.points + (res.mult > 1 ? ' (×' + res.mult + ')' : '') +
-               (res.broke.length ? ' · ' + (res.broke.length > 1 ? res.broke.length + ' stones' : 'a stone') + ' broken' : ''));
+               (res.broke.length ? ' · ' + (res.broke.length > 1 ? res.broke.length + ' stones' : 'a stone') + ' broken' : '') +
+               (res.newColour !== undefined ? ' · new colour: ' + tileName(res.newColour, 1) + '!' : ''));
     }
     ui.sel = null;
     after();
@@ -1357,7 +1369,8 @@ function start() {
   };
   const P = CFG.pours;
   $('classicabout').textContent = 'Play until the board fills, for a best score. Start with ' + P.start +
-    ' pours, get ' + P.perPlace + ' more for each stack you place and ' + P.perClear + ' for each dek, up to ' + P.max + ' saved.';
+    ' pours, get ' + P.perPlace + ' more for each stack you place and ' + P.perClear + ' for each dek, up to ' + P.max + ' saved. ' +
+    'A new colour joins every ' + CLASSIC_RAMP.every + ' deks, up to ' + CLASSIC_RAMP.max + '.';
   $('levelstable').replaceChildren(el('tr', null, el('th', null, 'Chapter'), el('th', null, 'Levels'), el('th', null, 'Brings')),
     ...CHAPTERS.map((C, c) => el('tr', null, el('td', null, (c + 1) + ' · ' + C.name),
       el('td', null, (c * CHAPTER_SIZE + 1) + '–' + (c + 1) * CHAPTER_SIZE), el('td', null, C.about))));

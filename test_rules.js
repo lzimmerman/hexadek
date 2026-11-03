@@ -245,3 +245,16 @@ for (let i = 0; i < dw.deckSize; i++) { assert(place(dw, dw.tray.findIndex(t => 
 assert.equal(R.starsFor(dw), 1, 'finishing is a star'); dw.score = DT.top; assert.equal(R.starsFor(dw), 3);
 console.log('daily tests passed');
 
+
+// Classic ramps up: a new colour every CLASSIC_RAMP.every deks, and undo takes it back
+{
+  const g = R.newGame(1, 'standard'); g.hexadeks = 9; g.history = [];
+  for (const k of R.CELLS) g.board[k] = [];
+  g.board['0,0'] = Array(9).fill(0); g.board['1,0'] = [0, 0, 0];
+  assert(g.ramp && g.colours === 5, 'Classic starts at 5 colours');
+  const r = pour(g, '1,0', '0,0');
+  assert(r.clears && g.colours === 6 && r.newColour === 5, 'the tenth dek brings a sixth colour');
+  undo(g); assert.equal(g.colours, 5, 'undo takes the colour back');
+  assert(!R.newGame(1, 'standard', 7).ramp && !R.newGame(1, 'free').ramp, 'custom games keep their colours');
+  console.log('classic ramp tests passed');
+}

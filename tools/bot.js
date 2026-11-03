@@ -27,6 +27,7 @@
 //                           pour (searched as one move of up to 4 pours, each paid for as usual)
 //     --bank                plays the banking strategy seen in play tests: single-colour stacks kept side
 //                           by side around the edge, corners most, as savings for later hexadeks
+//     --classic             Classic games to the end, with the colour ramp (--ramp EVERY,MAX to try others)
 //     --daily A-B           daily puzzles from date A to B (YYYYMMDD): finish, ★★ and ★★★ rates by weekday
 //     --hub auto|point|line plays the hub strategy seen in play tests: keep a hub free (the centre, or a
 //                           line through it with more colours), place each new stack there, and pour
@@ -47,10 +48,10 @@ const file = opt('file', path.join(__dirname, '..', 'index.html'));
 const html = fs.readFileSync(file, 'utf8');
 eval(html.match(/<script>([\s\S]*)<\/script>/)[1] +
   ';global.R={CFG,CELLS,neighbours,runLen,topOf,newGame,pourResult,pour,place,roomState,poursLeft,isWon,LEVELS,STONE,starsFor,deckMax,STONE_LAYOUTS,' +
-  'ENDLESS_TIERS,ENDLESS_SEED,ENDLESS_POOL,ENDLESS_RAMP,endlessTier,endlessSpec,endlessStart,dailyGame,dailyTargets,dailyDay,DAYS}');
+  'ENDLESS_TIERS,ENDLESS_SEED,ENDLESS_POOL,ENDLESS_RAMP,endlessTier,endlessSpec,endlessStart,dailyGame,dailyTargets,dailyDay,DAYS,CLASSIC_RAMP}');
 const { CFG, CELLS, neighbours, runLen, topOf, newGame, pourResult, pour, place, roomState, poursLeft, isWon, LEVELS, STONE,
         starsFor, deckMax, STONE_LAYOUTS, ENDLESS_TIERS, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_RAMP, endlessTier, endlessSpec, endlessStart,
-        dailyGame, dailyTargets, dailyDay, DAYS } = R;
+        dailyGame, dailyTargets, dailyDay, DAYS, CLASSIC_RAMP } = R;
 
 const SKILLS = {   // beam: boards kept per depth; depth: pours searched per turn; noise: randomness in judging
   // player: matched to the play tests through level 60 (2026-11-01): it finishes about as often as a
@@ -251,6 +252,22 @@ function playGame(g, skill, rnd) {
     if (!place(g, p.slot, p.cell)) break;
   }
   return g;
+}
+
+// ---- Classic: how long games last with the colour ramp ----
+//   --classic [--games 12 --skill player --ramp EVERY,MAX]
+if (flag('classic')) {
+  if (opt('ramp')) { const [e, m] = opt('ramp').split(',').map(Number); CLASSIC_RAMP.every = e; CLASSIC_RAMP.max = m; }
+  const sk = opt('skill', 'player'), n = Number(opt('games', 12)), res = [];
+  for (let i = 0; i < n; i++) {
+    const t0 = Date.now(), g = playGame(newGame(5000 + i, 'standard'), SKILLS[sk], mulberry(i * 13 + 1));
+    res.push({ turns: g.turn, deks: g.hexadeks || 0, score: g.score, colours: g.colours, s: Math.round((Date.now() - t0) / 1000) });
+  }
+  const q = (k, f) => { const a = res.map(r => r[k]).sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(f * a.length))]; };
+  console.log(sk + ', Classic, ramp every ' + CLASSIC_RAMP.every + ' deks to ' + CLASSIC_RAMP.max + ' colours, ' + n + ' games');
+  for (const k of ['turns', 'deks', 'score', 'colours']) console.log('  ' + k.padEnd(8) + ' 25% ' + q(k, .25) + '  median ' + q(k, .5) + '  75% ' + q(k, .75));
+  if (flag('json')) console.log('CLASSIC ' + JSON.stringify(res));
+  process.exit(0);
 }
 
 // ---- Daily puzzle: how often each star comes, by weekday, over a span of dates ----
