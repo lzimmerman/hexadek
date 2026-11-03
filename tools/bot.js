@@ -48,7 +48,7 @@ const file = opt('file', path.join(__dirname, '..', 'index.html'));
 const html = fs.readFileSync(file, 'utf8');
 eval(html.match(/<script>([\s\S]*)<\/script>/)[1] +
   ';global.R={CFG,CELLS,neighbours,runLen,topOf,newGame,pourResult,pour,place,roomState,poursLeft,isWon,LEVELS,STONE,starsFor,deckMax,STONE_LAYOUTS,' +
-  'ENDLESS_TIERS,ENDLESS_SEED,ENDLESS_POOL,ENDLESS_RAMP,endlessTier,endlessSpec,endlessStart,dailyGame,dailyTargets,dailyDay,DAYS,CLASSIC_RAMP}');
+  'ENDLESS_TIERS,ENDLESS_SEED,ENDLESS_POOL,ENDLESS_RAMP,endlessTier,endlessSpec,endlessStart,dailyGame,dailyTargets,dailyDay,DAYS,CLASSIC_RAMP,dealtMax}');
 const { CFG, CELLS, neighbours, runLen, topOf, newGame, pourResult, pour, place, roomState, poursLeft, isWon, LEVELS, STONE,
         starsFor, deckMax, STONE_LAYOUTS, ENDLESS_TIERS, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_RAMP, endlessTier, endlessSpec, endlessStart,
         dailyGame, dailyTargets, dailyDay, DAYS, CLASSIC_RAMP } = R;
@@ -307,7 +307,7 @@ if (flag('endless')) {
       if (line.startsWith('ENDLESS ')) { const r = JSON.parse(line.slice(8)); tiers[r.tier] = r; }
   } else {
     for (let t = tspan[0] - 1; t < (tspan[1] || tspan[0]); t++) {
-      const skip = [], wins = [], lostAt = []; const t0 = Date.now();
+      const skip = [], wins = [], lostAt = [], short = []; const t0 = Date.now();   // short: deks below the most possible, in cleared stages
       for (let i = 0; i < pool; i++) {
         const seed = ENDLESS_SEED + 1000 * t + i;
         if (!flag('quick')) {   // --quick: the player only, on every deck (to compare rewards)
@@ -316,8 +316,9 @@ if (flag('endless')) {
         }
         const pg = playGame(stage(t, seed), SKILLS[sk], mulberry(i * 7919 + t));
         wins.push(isWon(pg)); if (!isWon(pg)) lostAt.push(pg.deckSize - pg.turn);   // stacks left when lost
+        else short.push(R.dealtMax(stage(t, seed)) - (pg.hexadeks || 0));
       }
-      tiers[t] = { tier: t, perk, lostAt, skip, pass: wins.filter(Boolean).length / Math.max(1, wins.length), n: wins.length, s: (Date.now() - t0) / 1000 };
+      tiers[t] = { tier: t, perk, lostAt, short, skip, pass: wins.filter(Boolean).length / Math.max(1, wins.length), n: wins.length, s: (Date.now() - t0) / 1000 };
       if (flag('json')) console.log('ENDLESS ' + JSON.stringify(tiers[t]));
     }
   }
@@ -326,7 +327,8 @@ if (flag('endless')) {
     const T = ENDLESS_TIERS[t], r = tiers[t];
     console.log(`  tier ${String(t + 1).padStart(2)} ${(T.top || 'stage ' + (t + 1)).padEnd(8)} ${T.colours} colours, deck ${T.deck}` +
       `${T.stones ? ', ' + Object.keys(T.stones).length + ' stones' : ''}${T.pours ? ', pours max ' + T.pours.max : ''}${T.bandOdds ? ', mixed' : ''}`.padEnd(46) +
-      `skip ${String(r.skip.length).padStart(2)}/${pool}   clears ${(100 * r.pass).toFixed(0).padStart(3)}%`);
+      `skip ${String(r.skip.length).padStart(2)}/${pool}   clears ${(100 * r.pass).toFixed(0).padStart(3)}%` +
+      (r.short ? '   of those, within 1/2/3 deks of the most: ' + [1, 2, 3].map(k => (100 * r.short.filter(x => x <= k).length / Math.max(1, r.short.length)).toFixed(0) + '%').join(' / ') : ''));
   }
   if (Object.keys(tiers).length === ENDLESS_TIERS.length) {   // runs: each stage cleared with its tier's rate
     const rnd = mulberry(12345), cleared = [];

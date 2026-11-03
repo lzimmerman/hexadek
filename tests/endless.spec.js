@@ -16,8 +16,8 @@ test('Endless: stages, rewards and the best run', async ({ page, hasTouch }) => 
   await expect(page.locator('#endlessbest')).toHaveText('');
   await page.locator('#newendless').click();
   await expect(page.locator('#mode')).toHaveText('Endless · Stage 1');
-  await expect(page.locator('#msg')).toHaveText(/^Stage 1: place 30 stacks\.$/);
-  await game(page, () => { window.__t.g.score = 600; });
+  await expect(page.locator('#msg')).toHaveText(/^Stage 1: place 30 stacks · 🎁 \d+ deks$/u);
+  await game(page, () => { window.__t.g.score = 600; window.__t.g.hexadeks = 99; });   // enough deks to earn a reward
   await finishStage(page, hasTouch);
   await expect(page.locator('#over')).toHaveClass(/show/, { timeout: 10000 });
   await expect(page.locator('#overtitle')).toHaveText('Stage 1 cleared!');
@@ -33,19 +33,27 @@ test('Endless: stages, rewards and the best run', async ({ page, hasTouch }) => 
   await expect(page.locator('#mode')).toHaveText('Endless · Stage 1');   // picking doesn't start the stage
   await page.locator('#overstage').click();
   await expect(page.locator('#mode')).toHaveText('Endless · Stage 2');
-  await expect(page.locator('#msg')).toContainText('Stage 2: place ' + (perk === 'short' ? 25 : 30) + ' stacks · ' + name.replace(/^✓ /, ''));
+  await expect(page.locator('#msg')).toHaveText(new RegExp('^Stage 2: place ' + (perk === 'short' ? 25 : 30) + ' stacks · 🎁 \\d+ deks · ' + name.replace(/^✓ /, '') + '$', 'u'));
   expect(await game(page, () => [window.__t.g.score, window.__t.g.endless.perk])).toEqual([600, perk]);
+  // too few deks: no reward, straight on to the next stage
+  await finishStage(page, hasTouch);
+  await expect(page.locator('#overtitle')).toHaveText('Stage 2 cleared!', { timeout: 10000 });
+  await expect(page.locator('#overtext')).toContainText('No reward this time');
+  await expect(page.locator('#overperks')).toBeHidden();
+  await page.locator('#overstage').click();
+  await expect(page.locator('#mode')).toHaveText('Endless · Stage 3');
+  expect(await game(page, () => window.__t.g.endless.perk)).toBe(null);
   // a full board with nothing to pour: the run is over, and its stage count is the best
   const full = {}; ['0,0', '1,0', '-1,0', '0,1', '0,-1', '1,-1', '-1,1', '2,0', '-2,0', '0,2', '0,-2', '2,-2', '-2,2', '2,-1', '-2,1', '1,1', '-1,-1', '1,-2', '-1,2']
     .forEach((k, i) => { full[k] = [i % 2 ? 0 : 1, i % 2 ? 1 : 0]; });
   await game(page, () => { window.__t.g.pours = 0; });
   await setBoard(page, full);
   await expect(page.locator('#overtitle')).toHaveText('Run over', { timeout: 10000 });
-  await expect(page.locator('#overtext')).toContainText('You cleared 1 stage, with 600 points: your best run!');
+  await expect(page.locator('#overtext')).toContainText('You cleared 2 stages, with 600 points: your best run!');
   await expect(page.locator('#overperks')).toBeHidden();
   await page.locator('#overnew').click();
   await expect(page.locator('#newmode')).toHaveValue('endless');
-  await expect(page.locator('#endlessbest')).toHaveText('Your best: 1 stage, 600 points.');
+  await expect(page.locator('#endlessbest')).toHaveText('Your best: 2 stages, 600 points.');
   expect(errors).toEqual([]);
 });
 

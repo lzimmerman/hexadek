@@ -151,6 +151,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #introfacts { color: var(--muted); font-size: 13px; margin: -6px 0 10px; }
 .card { background: var(--panel); color: var(--ink); padding: 20px 24px; border-radius: 14px; text-align: center; max-width: 340px; margin: 16px;
   border: 1px solid var(--cell-edge); box-shadow: 0 12px 40px rgba(0,0,0,.35); max-height: calc(100% - 32px); overflow: auto; box-sizing: border-box; }
+.swatch { display: inline-block; width: 0.8em; height: 0.92em; margin: 0 0.2em 0 0.05em; vertical-align: -0.1em; background: var(--sw);
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }   /* a tile, so "star" isn't read as ★ */
 #overnote { margin: -4px 0 12px; font-weight: 700; color: var(--accent); }
 #overnote:empty { display: none; }
 #sharetext { margin: 0 0 12px; padding: 8px 10px; background: var(--bg); border-radius: 10px; font: inherit; font-size: 14px;
@@ -340,8 +342,9 @@ dialog li { margin-bottom: 6px; }
       Monday's is the gentlest and the week climbs to Sunday. Finish it on days in a row for a streak, and
       Copy result for two lines to paste in a message: your stars and score, and the deks you made.</li>
     <li><b>Endless</b>: a run of stages. Each <b>stage</b> is one deck on a fresh board, and they get harder, up
-      to about the difficulty of Journey's last chapter. After each stage, pick one of two rewards for the next: a
-      bigger pour budget, a shorter deck, lighter stacks (more of a single colour) or a stone gone. Losing a stage
+      to about the difficulty of Journey's last chapter. Clear a stage with enough deks (🎁, shown as it starts)
+      and you earn a reward for the next, one of two: a bigger pour budget, a shorter deck, lighter stacks (more of
+      a single colour) or a stone gone. Losing a stage
       ends the run; your best is the most stages cleared. Every deck has been checked: it can be finished.</li>
     <li>So a <b>level</b> is one of Journey's 72, always the same, with stars; a <b>stage</b> is one deck in an
       Endless run, different every run.</li>
@@ -564,13 +567,19 @@ function levelSpec(n) {
   if (c === 5) Object.assign(L, { colours: i < 6 ? 6 : 7, deck: 38 + i, bands: i < 8 ? [1, 3] : [2, 3],
                                   pours: i < 4 ? undefined : i < 9 ? POURS_TIGHT : POURS_TIGHTER,
                                   stones: i % 2 ? STONE_LAYOUTS[2 + (i >> 2)] : null });
+  if (COLLECT_STEPS.includes(i)) L.collect = true;   // the colour and count come from the deck (collectGoal)
   return Object.assign(L, LEVEL_TWEAKS[n]);
 }
+// Collect levels: ★★ asks for deks of one colour instead of a score. Two in each chapter. The goal is every
+// dek the deck's most common colour allows, less collectSlack where the player bot (which doesn't aim at the
+// colour) almost never made it: tools/bot.js --skill player, ★★ in 40–95% of games, 10% at level 17.
+const COLLECT_STEPS = [4, 10], COLLECT_SLACK = 0;
 // Hand-tuned levels. Play tests (2026-11-01) showed stacks that are all mixed (2-3 colours) under a
 // tight pour budget were far harder for people than for the computer player: level 60 took 25 tries.
 // These levels deal mostly mixed stacks with an occasional single colour (odds of 1, 2, 3 colours),
 // tuned with tools/bot.js --skill player to about level 58's difficulty, which took 3 tries.
 const LEVEL_TWEAKS = {
+  29: { collectSlack: 1 }, 47: { collectSlack: 1 }, 65: { collectSlack: 1 },   // collect goals (COLLECT_SLACK)
   60: { bandOdds: [1, 4, 4] },
   69: { bandOdds: [1, 4, 4] },
   70: { bandOdds: [1, 2, 2] },
@@ -591,6 +600,7 @@ function levelAbout(n) {
   if (stoneCells(L) > stoneCells(P)) news.push(stoneCells(P) ? 'More stones.' : 'Stones are back.');
   else if (!stoneCells(L) && stoneCells(P)) news.push('No stones this time.');
   if (L.deck > P.deck && !news.length) news.push('A slightly longer deck.');
+  if (L.collect) news.unshift('A collect level: ★★ is for deks of one colour, not a score.');
   return news.join(' ') || 'Same rules, a new deck.';
 }
 
@@ -760,6 +770,18 @@ function endlessGame(run, stage, perk, total) {
   g.score = total || 0;
   return endlessStart(g, perk);
 }
+// A reward is earned, not given (play test: on the easy first stages it didn't feel special): clear the
+// stage with at least this many deks, the most its deck allows less a slack that grows with the tier.
+// Set with tools/bot.js --endless (the player earns it in about half of cleared stages at every tier).
+const rewardCache = {};
+function endlessRewardDeks(g) {
+  const e = g.endless, key = e.run + '.' + e.stage + '.' + (e.perk || '');
+  if (!(key in rewardCache)) {
+    const slack = e.tier < 3 ? 1 : e.tier < 7 ? 2 : 3;
+    rewardCache[key] = Math.max(1, dealtMax(endlessGame(e.run, e.stage, e.perk, 0)) - slack);
+  }
+  return rewardCache[key];
+}
 // ---- Daily puzzle: one deck a day, the same for everyone on the same date ----
 // The player's own date (YYYYMMDD, like a newspaper puzzle) picks a deck from the Endless pools, so
 // every daily deck has been checked winnable, and it needs no network. The week climbs: Monday is
@@ -811,6 +833,15 @@ function levelTargets(n) {
 }
 function starGoals(g) {
   const T = g.daily ? dailyTargets(g.daily.date) : levelTargets(g.level), won = isWon(g), hit = won && g.score >= T.score;
+  const C = collectGoal(g);
+  if (C) {
+    const got = won && madeOf(g, C.colour) >= C.deks, what = collectText(C);
+    return [
+      { text: 'Finish the deck', met: won },
+      { text: 'Make ' + what, met: got, collect: C },
+      { text: 'Score ' + T.top + ' and make ' + what, met: got && g.score >= T.top },
+    ];
+  }
   return [
     { text: 'Finish the deck', met: won },
     { text: 'Score ' + T.score, met: hit },
@@ -826,7 +857,8 @@ function deckMax(g) {
   if (key in deckMaxCache) return deckMaxCache[key];
   return deckMaxCache[key] = dealtMax(newGame(g.start, 'level', null, g.level));
 }
-function dealtMax(d) {   // d: a fresh game, dealt to the end of its deck
+function dealtMax(d) { return Object.values(dealtTiles(d)).reduce((a, n) => a + Math.floor(n / CFG.hexadek), 0); }
+function dealtTiles(d) {   // d: a fresh game, dealt to the end of its deck; its tiles of each colour
   const per = {};
   for (let i = 0; i < d.deckSize; i++) {
     const slot = d.tray.findIndex(t => t); if (slot < 0) break;
@@ -834,8 +866,24 @@ function dealtMax(d) {   // d: a fresh game, dealt to the end of its deck
     const cell = CELLS.find(k => !d.board[k].length);
     place(d, slot, cell); d.board[cell] = [];
   }
-  return Object.values(per).reduce((a, n) => a + Math.floor(n / CFG.hexadek), 0);
+  return per;
 }
+// A collect level's goal: the deck's most common colour, and its possible deks less COLLECT_SLACK.
+const collectCache = {};
+function collectGoal(g) {
+  if (!g.level || !LEVELS[g.level - 1].collect) return null;
+  const key = g.start + '.' + g.level;
+  if (!(key in collectCache)) {
+    const per = dealtTiles(newGame(g.start, 'level', null, g.level));
+    const c = Object.keys(per).map(Number).filter(k => k !== STONE).sort((a, b) => per[b] - per[a] || a - b)[0];
+    const slack = LEVELS[g.level - 1].collectSlack !== undefined ? LEVELS[g.level - 1].collectSlack : COLLECT_SLACK;
+    collectCache[key] = { colour: c, deks: Math.max(1, Math.floor(per[c] / CFG.hexadek) - slack) };
+  }
+  return collectCache[key];
+}
+const madeOf = (g, c) => (g.made && g.made[c]) || 0;
+const swatchMark = c => '⟦' + c + '⟧';   // drawn as a small hexagon of the tile's colour (rich() on the page)
+const collectText = C => C.deks + ' ' + swatchMark(C.colour) + COLOURS[C.colour][1] + (C.deks > 1 ? ' deks' : ' dek');
 // A daily deck's star targets, from the most hexadeks its tiles allow (M), set from the computer
 // player's daily games (tools/bot.js --daily): its median score is M − 2 hexadeks' worth, so ★★
 // comes in about half of finished games; ★★★ at M (combos score extra) in about one in seven.
@@ -880,7 +928,7 @@ function pour(g, a, b) {
   const res = pourResult(g.board, a, b);
   if (!res || poursLeft(g) < 1) return null;
   g.history.push(JSON.stringify({ board: g.board, score: g.score, clearsThisTurn: g.clearsThisTurn, pours: g.pours,
-                                 hexadeks: g.hexadeks || 0, colours: g.colours }));
+                                 hexadeks: g.hexadeks || 0, colours: g.colours, made: g.made || {} }));
   if (pourRule(g)) g.pours--;
   const A = g.board[a], B = g.board[b];
   res.colour = topOf(A); res.baseTo = B.length;
@@ -890,6 +938,7 @@ function pour(g, a, b) {
     g.board[b] = [];
     g.clearsThisTurn++;
     g.hexadeks = (g.hexadeks || 0) + 1;
+    g.made = Object.assign({}, g.made); g.made[res.colour] = (g.made[res.colour] || 0) + 1;   // by colour, for collect goals
     if (g.ramp) {   // new stacks bring it in
       const was = g.colours;
       g.colours = Math.min(CLASSIC_RAMP.max, CFG.colours + Math.floor(g.hexadeks / CLASSIC_RAMP.every));
@@ -913,6 +962,7 @@ function undo(g) {
   if ('pours' in s) g.pours = s.pours;
   if ('hexadeks' in s) g.hexadeks = s.hexadeks;
   if ('colours' in s) g.colours = s.colours;
+  if ('made' in s) g.made = s.made;
   return true;
 }
 function place(g, slot, cell) {
@@ -1318,6 +1368,9 @@ function start() {
       setFlash('Dek! +' + res.points + (res.mult > 1 ? ' (×' + res.mult + ')' : '') +
                (res.broke.length ? ' · ' + (res.broke.length > 1 ? res.broke.length + ' stones' : 'a stone') + ' broken' : '') +
                (res.newColour !== undefined ? ' · new colour: ' + tileName(res.newColour, 1) + '!' : ''));
+      const C = collectGoal(g);
+      if (C && res.colour === C.colour) flash.text += ' · ' + swatchMark(C.colour) + COLOURS[C.colour][1] + ' ' + Math.min(madeOf(g, C.colour), C.deks) + '/' + C.deks +
+        (madeOf(g, C.colour) === C.deks ? ' ✓' : '');
       if (res.mult >= 2 && !tut) {   // a lifetime record for combos
         const st = readStats();
         if (res.mult > (st.combo || 0)) {
@@ -1419,6 +1472,10 @@ function start() {
     s.innerHTML = '<path d="M2.5 6V4a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="0.5" y="6" width="10" height="7" rx="1.5" fill="currentColor"/>';
     return s;
   }
+  function rich(text) {   // text with ⟦c⟧ marks: each one a swatch of tile colour c
+    return String(text).split(/⟦(\d+)⟧/).map((part, i) => i % 2 ?
+      el('span', { class: 'swatch', 'aria-hidden': 'true', style: '--sw:' + COLOURS[+part][0] }) : part).filter(x => x !== '');
+  }
   function showIntro() {   // a card describing the level: what's new in it and the star goals
     const L = LEVELS[g.level - 1], T = levelTargets(g.level), P = pourRule(g);
     $('introlevel').textContent = 'Level ' + g.level + ' of ' + LEVELS.length + ' · Chapter ' + (L.chapter + 1) + ' (' + (L.step + 1) + '/' + CHAPTER_SIZE + ')';
@@ -1426,12 +1483,14 @@ function start() {
     $('introabout').textContent = levelAbout(g.level);
     $('introfacts').textContent = L.deck + ' stacks · ' + L.colours + ' colours · ' +
       (P ? 'pours: start ' + P.start + ', up to ' + P.max : 'unlimited pours');
-    const goals = [['★', 'Place all ' + L.deck + ' stacks'], ['★★', 'Score ' + T.score],
+    const C = collectGoal(g), what = C && collectText(C);
+    const goals = C ? [['★', 'Place all ' + L.deck + ' stacks'], ['★★', 'Make ' + what + ' (collect)'], ['★★★', 'Score ' + T.top + ' and make ' + what]] :
+                  [['★', 'Place all ' + L.deck + ' stacks'], ['★★', 'Score ' + T.score],
                    ['★★★', 'Score ' + T.top + (T.stones ? ' and break every stone' : ' (combos: several deks in one turn)')]];
     let done = 0, stars = 0;
     for (let n = 1; n <= LEVEL_COUNT; n++) { const s = readStars(n); if (s) done++; stars += s; }
     $('introjourney').textContent = 'Journey so far: ' + done + ' of ' + LEVEL_COUNT + ' levels, ' + stars + ' of ' + LEVEL_COUNT * 3 + ' ★';
-    $('introgoals').replaceChildren(...goals.map(([s, t]) => el('li', null, el('b', null, s), t)));
+    $('introgoals').replaceChildren(...goals.map(([s, t]) => el('li', null, el('b', null, s), el('span', null, ...rich(t)))));
     $('introgo').textContent = g.turn || g.score ? 'Back to the game' : 'Start';
     $('intro').classList.add('show');
     $('introgo').focus({ preventScroll: true });
@@ -1737,12 +1796,14 @@ function start() {
     $('restart').disabled = !!tut || g.start === undefined;
     $('overrestart').style.display = g.start === undefined ? 'none' : '';
     // the end card's main button: the next level after a win, otherwise a new game
-    const next = state === 'won' && g.level && g.level < LEVELS.length, perks = state === 'won' && !!g.endless && !tut;
+    const next = state === 'won' && g.level && g.level < LEVELS.length, cleared = state === 'won' && !!g.endless && !tut;
+    const perks = cleared && (g.hexadeks || 0) >= endlessRewardDeks(g);   // earned with enough deks
     $('overnext').style.display = next ? '' : 'none';
-    $('overnew').classList.toggle('primary', !next && !perks);
+    $('overnew').classList.toggle('primary', !next && !cleared);
     $('overperks').style.display = perks ? '' : 'none';
-    $('overstagerow').style.display = perks ? '' : 'none';
+    $('overstagerow').style.display = cleared ? '' : 'none';
     showPerks(perks);
+    if (cleared && !perks) $('overstage').disabled = false;   // no reward: straight on
     const st = $('status');
     st.classList.toggle('flash', !!flash);
     let text;
@@ -1757,15 +1818,16 @@ function start() {
     else if (ui.sel) text = 'Tap a glowing neighbour to pour.';
     else if ((g.level || g.daily) && g.turn === 0 && !g.history.length) {   // short: it has to fit a phone's status line
       const T = g.daily ? dailyTargets(g.daily.date) : levelTargets(g.level);
-      text = '★ place ' + g.deckSize + ' · ★★ ' + T.score + ' pts · ★★★ ' + T.top + (T.stones ? ' + stones' : ' pts');
+      const C = collectGoal(g);
+      text = '★ place ' + g.deckSize + ' · ★★ ' + (C ? collectText(C) : T.score + ' pts') + ' · ★★★ ' + T.top + (T.stones ? ' + stones' : C ? ' + collect' : ' pts');
     }
     else if (g.endless && g.turn === 0 && !g.history.length)
-      text = 'Stage ' + g.endless.stage + ': place ' + g.deckSize + ' stacks' + (g.endless.perk ? ' · ' + ENDLESS_PERKS[g.endless.perk].name : '') + '.';
+      text = 'Stage ' + g.endless.stage + ': place ' + g.deckSize + ' stacks · 🎁 ' + endlessRewardDeks(g) + ' deks' + (g.endless.perk ? ' · ' + ENDLESS_PERKS[g.endless.perk].name : '');
     else if (g.deckSize && g.turn === 0 && !g.history.length) text = 'Place all ' + g.deckSize + ' stacks in the deck to win.';
     else if (g.turn === 0 && !g.history.length) text = 'Drag a tray stack onto the board to start.';
     else if (P) text = 'Pour, then place a stack (+' + P.perPlace + ' pours).';
     else text = 'Pour freely, then place a stack.';
-    $('msg').textContent = text;
+    $('msg').replaceChildren(...rich(text));
     st.classList.remove('tight');
     if ($('msg').scrollWidth > $('msg').clientWidth) st.classList.add('tight');
     $('giveup').style.display = state === 'full' ? 'inline-block' : 'none';
@@ -1794,7 +1856,7 @@ function start() {
       const n = starsFor(g);
       $('overstarbig').textContent = starText(n);
       $('overstarbig').setAttribute('aria-label', n + ' of 3 stars');
-      $('overgoals').replaceChildren(...goals.map(s => el('li', { class: s.met ? 'met' : '' }, (s.met ? '✓ ' : '· ') + s.text)));
+      $('overgoals').replaceChildren(...goals.map(s => el('li', { class: s.met ? 'met' : '' }, (s.met ? '✓ ' : '· '), ...rich(s.text))));
     }
     const made = g.hexadeks || 0;
     $('overtext').textContent = gameName(g) + '. Score ' + g.score + (g.score && g.score >= best ? ', a new best!' : ' (best ' + best + ').') +
@@ -1806,7 +1868,10 @@ function start() {
     if (sharing) $('sharetext').textContent = dailyShare();
     if (g.endless) {
       const n = endlessCleared(g), eb = readEndlessStages(), stages = k => k + (k === 1 ? ' stage' : ' stages');
-      $('overtext').textContent = state === 'won' ? 'Run total: ' + g.score + ' points. Choose a reward for stage ' + (n + 1) + ', then Next stage.' :
+      const need = endlessRewardDeks(g), made = g.hexadeks || 0;
+      $('overtext').textContent = state === 'won' ? 'Run total: ' + g.score + ' points. ' + (made >= need ?
+          '🎁 ' + made + ' deks earned a reward: choose one for stage ' + (n + 1) + ', then Next stage.' :
+          'No reward this time: ' + made + ' of ' + need + ' deks.') :
         'No room left. You cleared ' + stages(n) + ', with ' + g.score + ' points' +
         (n && n >= eb ? ': your best run!' : '. Best: ' + stages(eb) + ', ' + best + ' points.');
     }
@@ -1829,7 +1894,7 @@ function start() {
     for (const o of $('overperks').children) o.setAttribute('aria-checked', String(o === b));
     $('overstage').disabled = false;
   });
-  $('overstage').onclick = () => { if (perkPick) nextStage(perkPick); };
+  $('overstage').onclick = () => { if (perkPick || $('overperks').style.display === 'none') nextStage(perkPick); };
 
   // ---- input ----
   function pt(e) {

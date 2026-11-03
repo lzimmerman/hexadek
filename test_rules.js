@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, hintMove, tallyGame};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, hintMove, tallyGame, collectGoal};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -293,4 +293,17 @@ console.log('daily tests passed');
   const lv = R.newGame(1001, 'level', null, 1);
   assert.equal(T(lv, { deks: 0, games: 3 }, { chapterDone: 2 }, true)[1], 'Chapter 2, every level ★★★!');
   console.log('record tests passed');
+}
+
+// collect levels: two per chapter, the goal from the deck, ★★ for the colour
+{
+  assert.deepEqual(R.LEVELS.filter(L => L.collect).map(L => L.n), [5, 11, 17, 23, 29, 35, 41, 47, 53, 59, 65, 71]);
+  const g = R.newGame(1005, 'level', null, 5), C = R.collectGoal(g);
+  assert(C && C.deks >= 1 && C.colour >= 0, 'level 5 has a collect goal');
+  assert.equal(R.collectGoal(R.newGame(1004, 'level', null, 4)), null, 'level 4 does not');
+  g.turn = g.deckSize; g.score = 99999; g.made = {};
+  assert.equal(R.starsFor(g), 1, 'a high score alone is not ★★ on a collect level');
+  g.made[C.colour] = C.deks;
+  assert.equal(R.starsFor(g), 3, 'the colour, and the score, give ★★★');
+  console.log('collect tests passed');
 }
