@@ -44,6 +44,7 @@ npm install && npx playwright install    # once
 npm run test:browsers    # loading, a level to its end card, pours, peek, dialogs, reload, random play
 npm run test:live        # the same, against the live site
 npm run test:screens     # screenshots of the main screens, side by side in screens/index.html
+npm run test:audit       # a UX audit at five screen sizes: screenshots and screens/audit/report.json
 ```
 
 GitHub Actions runs the rules and browser tests on every push.

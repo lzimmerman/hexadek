@@ -24,7 +24,7 @@ jobs:
       - name: Install browsers
         run: npx playwright install --with-deps chromium firefox webkit
       - name: Browser tests
-        run: npx playwright test --grep-invert @screens
+        run: npx playwright test --grep-invert "@screens|@audit"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

@@ -5,9 +5,10 @@
   "license": "MIT",
   "scripts": {
     "test": "node test_rules.js index.html",
-    "test:browsers": "playwright test",
+    "test:browsers": "playwright test --grep-invert \"@screens|@audit\"",
+    "test:audit": "playwright test --grep @audit --project android-chrome",
     "test:screens": "playwright test --grep @screens && node tests/screens-page.js",
-    "test:live": "BASE_URL=https://lzimmerman.github.io/hexadek/ playwright test --grep-invert @screens"
+    "test:live": "BASE_URL=https://lzimmerman.github.io/hexadek/ playwright test --grep-invert \"@screens|@audit\""
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1"
