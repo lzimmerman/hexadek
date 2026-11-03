@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, hintMove};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -257,4 +257,21 @@ console.log('daily tests passed');
   undo(g); assert.equal(g.colours, 5, 'undo takes the colour back');
   assert(!R.newGame(1, 'standard', 7).ramp && !R.newGame(1, 'free').ramp, 'custom games keep their colours');
   console.log('classic ramp tests passed');
+}
+
+// hints: a dek first, room on a full board, and a placement beside a match
+{
+  const g = R.newGame(1, 'standard'); g.history = [];
+  for (const k of R.CELLS) g.board[k] = [];
+  g.board['0,0'] = Array(9).fill(1); g.board['1,0'] = [2, 1, 1, 1]; g.board['-1,0'] = [3, 3];
+  let h = R.hintMove(g);
+  assert(h.why === 'dek' && h.from === '1,0' && h.to === '0,0', 'a hint finishes a dek first: ' + JSON.stringify(h));
+  g.board['1,0'] = [2]; g.tray = [[4, 4], [3, 3, 3], [0]];
+  h = R.hintMove(g);
+  assert(h.why === 'place' && h.slot === 1 && R.neighbours(h.to).includes('-1,0'), 'a stack goes beside its colour: ' + JSON.stringify(h));
+  for (const k of R.CELLS) g.board[k] = [k === '0,0' ? 1 : 5, k === '0,0' ? 2 : 6];
+  g.board['1,0'] = [6];   // one tile: pouring it onto a neighbouring 6 empties the cell
+  h = R.hintMove(g);
+  assert(h.why === 'room' && R.pourResult(g.board, h.from, h.to).emptiesFrom, 'a full board: a pour that makes room: ' + JSON.stringify(h));
+  console.log('hint tests passed');
 }
