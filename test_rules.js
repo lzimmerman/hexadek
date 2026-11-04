@@ -318,6 +318,7 @@ console.log('daily tests passed');
   const g = R.newGame(1009, 'level', null, 9), C = R.collectGoal(g);
   assert(C && C.deks >= 1 && C.colour >= 0, 'level 9 has a collect goal');
   assert.equal(R.collectGoal(R.newGame(1008, 'level', null, 8)), null, 'level 8 does not');
+  assert.equal(R.collectGoal(R.newGame(1017, 'level', null, 17)).deks, 2, 'level 17: a dek to spare (its deck has 3 deks of stars, exactly)');
   // a collect level brings nothing else new, and follows a level that brought nothing new, so each
   // new rule gets a level of its own first (stones coming and going every other level isn't new)
   const news = n => R.levelAbout(n).split('. ').filter(t => !/^A collect level|longer deck|Stones are back|No stones/.test(t));
