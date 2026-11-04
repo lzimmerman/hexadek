@@ -1905,6 +1905,7 @@ function start() {
     $('hint').style.display = tut ? 'none' : '';
     $('restart').disabled = !!tut || g.start === undefined;
     $('overrestart').style.display = g.start === undefined ? 'none' : '';
+    $('overrestart').textContent = g.daily ? 'Play again' : 'Restart';   // a Daily keeps its best: nothing is lost (the New game panel's word too)
     // the end card's main button: the next level after a win, otherwise a new game
     const next = state === 'won' && g.level && g.level < LEVELS.length, cleared = state === 'won' && !!g.endless && !tut;
     const perks = cleared && (g.hexadeks || 0) >= endlessRewardDeks(g);   // earned with enough deks

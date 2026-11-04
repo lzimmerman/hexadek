@@ -33,6 +33,7 @@ test('Daily puzzle: today\'s deck, stars, Copy result and the streak', async ({ 
     const text = await page.evaluate(() => navigator.clipboard.readText());
     expect(text).toMatch(/^Hexadek \| 2 Nov · ⭐⭐⭐ [\d,]+\n(?:🟩){5}(?:⬜)+ 5\/\d+ deks$/u);
   }
+  await expect(page.locator('#overrestart')).toHaveText('Play again');
   await page.locator('#overrestart').click();   // the same deck again
   expect(await game(page, () => [window.__t.g.start, window.__t.g.daily.date, window.__t.g.turn])).toEqual([start, 20261102, 0]);
   await page.locator('#new').click();
