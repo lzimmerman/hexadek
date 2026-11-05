@@ -326,7 +326,8 @@ console.log('daily tests passed');
   const g = R.newGame(1009, 'level', null, 9), C = R.collectGoal(g);
   assert(C && C.deks >= 1 && C.colour >= 0, 'level 9 has a collect goal');
   assert.equal(R.collectGoal(R.newGame(1008, 'level', null, 8)), null, 'level 8 does not');
-  assert.equal(R.collectGoal(R.newGame(1017, 'level', null, 17)).deks, 2, 'level 17: a dek to spare (its deck has 3 deks of stars, exactly)');
+  assert.deepEqual(R.collectGoal(R.newGame(1017, 'level', null, 17)), { colour: R.collectGoal(R.newGame(1017, 'level', null, 17)).colour, deks: 2, all: 3 },
+    'level 17: a dek to spare for ★★ (its deck has 3 deks of stars, exactly); ★★★ wants all 3');
   // a collect level brings nothing else new, and follows a level that brought nothing new, so each
   // new rule gets a level of its own first (stones coming and going every other level isn't new)
   const news = n => R.levelAbout(n).split('. ').filter(t => !/^A collect level|longer deck|Stones are back|No stones/.test(t));
@@ -338,7 +339,11 @@ console.log('daily tests passed');
   g.turn = g.deckSize; g.score = 99999; g.made = {};
   assert.equal(R.starsFor(g), 1, 'a high score alone is not ★★ on a collect level');
   g.made[C.colour] = C.deks;
-  assert.equal(R.starsFor(g), 3, 'the colour, and the score, give ★★★');
+  assert.equal(R.starsFor(g), 2, 'level 9 has a dek to spare: its goal gives ★★, not ★★★');
+  g.made[C.colour] = C.all;
+  assert.equal(R.starsFor(g), 3, 'every dek of the colour, and the score, give ★★★');
+  assert.deepEqual(R.LEVELS.filter(L => L.collect).filter(L => { const G = R.collectGoal(R.newGame(1000 + L.n, 'level', null, L.n)); return G.all > G.deks; }).map(L => L.n),
+    [9, 17, 32, 60, 72, 81], 'the levels with a dek to spare for ★★');
   console.log('collect tests passed');
 }
 

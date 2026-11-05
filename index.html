@@ -410,7 +410,8 @@ dialog li { margin-bottom: 6px; }
     <li>★ Finish the deck.</li>
     <li>★★ Finish, and reach the level's score target.</li>
     <li>★★★ Finish with a higher score: it takes nearly every dek the deck allows, plus a few double or
-      triple clears in one turn. On levels with stones, ★★★ also needs every stone broken, with a slightly lower score.</li>
+      triple clears in one turn. On levels with stones, ★★★ also needs every stone broken, with a slightly lower score. On collect levels, it
+      needs the score and every dek of the colour the deck allows, which can be one more than ★★ asks for.</li>
   </ul>
   <p>Each level's goals show at the start of the game, and the end screen ticks off the ones you met. Your best
     result for each level is kept, and shown in the level list. A worse game never takes stars away.</p>
@@ -911,10 +912,11 @@ function starGoals(g) {
   const C = collectGoal(g);
   if (C) {
     const got = won && madeOf(g, C.colour) >= C.deks, what = collectText(C);
+    const all = Object.assign({}, C, { deks: C.all }), gotAll = won && madeOf(g, C.colour) >= C.all;
     return [
       { text: 'Finish the deck', met: won },
       { text: 'Make ' + what, met: got, collect: C },
-      { text: 'Score ' + T.top + ' and make ' + what, met: got && g.score >= T.top },
+      { text: 'Score ' + T.top + ' and make ' + collectText(all), met: gotAll && g.score >= T.top },
     ];
   }
   return [
@@ -943,7 +945,8 @@ function dealtTiles(d) {   // d: a fresh game, dealt to the end of its deck; its
   }
   return per;
 }
-// A collect level's goal: the deck's most common colour, and its possible deks less COLLECT_SLACK.
+// A collect level's goal: the deck's most common colour, and its possible deks less COLLECT_SLACK for ★★;
+// ★★★ asks for all of them (all: the deks with no slack).
 const collectCache = {};
 function collectGoal(g) {
   if (!g.level || !LEVELS[g.level - 1].collect) return null;
@@ -952,7 +955,8 @@ function collectGoal(g) {
     const per = dealtTiles(newGame(g.start, 'level', null, g.level));
     const c = Object.keys(per).map(Number).filter(k => k !== STONE).sort((a, b) => per[b] - per[a] || a - b)[0];
     const slack = LEVELS[g.level - 1].collectSlack !== undefined ? LEVELS[g.level - 1].collectSlack : COLLECT_SLACK;
-    collectCache[key] = { colour: c, deks: Math.max(1, Math.floor(per[c] / CFG.hexadek) - slack) };
+    const all = Math.floor(per[c] / CFG.hexadek);
+    collectCache[key] = { colour: c, deks: Math.max(1, all - slack), all: Math.max(1, all) };
   }
   return collectCache[key];
 }
@@ -1240,10 +1244,12 @@ function start() {
   if (g.level && !g.levels) { g.mode = 'survive'; delete g.level; }   // a level of the old five: carry on as a deck game
   let firstVisit = false;
   try { firstVisit = !saved && !localStorage.getItem('hexadek.seen'); localStorage.setItem('hexadek.seen', '1'); } catch (e) {}
-  // a best score for each mode and colour count; the old single best was from Free games
+  // a best score for each mode and colour count; the old single best was from Free games. Classic's colours
+  // rise as it goes, so its key has the ramp's cap instead (2026-11-04: it had filed bests under Custom's
+  // colour counts, and bests from the cap of 9 don't compare with 11)
   const bestKey = gm => BEST + '.' + (gm.level ? 'lv' + gm.level : gm.endless ? 'endless' : gm.daily ? 'daily.' + gm.daily.date : gm.mode +
     (gm.deckSize && gm.deckSize !== (gm.mode === 'survive' ? CFG.deck : 0) ? '.d' + gm.deckSize : '') +
-    (gm.colours !== CFG.colours ? '.' + gm.colours + 'c' : '') + (gm.holes ? '.' + gm.holes : ''));
+    (gm.ramp ? '.ramp' + CLASSIC_RAMP.max : gm.colours !== CFG.colours ? '.' + gm.colours + 'c' : '') + (gm.holes ? '.' + gm.holes : ''));
   function readBest(gm) {
     try {
       return Number(localStorage.getItem(bestKey(gm)) || (gm.mode === 'free' && gm.colours === CFG.colours ?
@@ -1457,8 +1463,9 @@ function start() {
                (res.broke.length ? ' · ' + (res.broke.length > 1 ? res.broke.length + ' stones' : 'a stone') + ' broken' : '') +
                (res.newColour !== undefined ? ' · new colour: ' + tileName(res.newColour, 1) + '!' : ''));
       const C = collectGoal(g);
-      if (C && res.colour === C.colour) flash.text += ' · ' + swatchMark(C.colour) + COLOURS[C.colour][1] + ' ' + Math.min(madeOf(g, C.colour), C.deks) + '/' + C.deks +
-        (madeOf(g, C.colour) === C.deks ? ' ✓' : '');
+      const aim = C && (madeOf(g, C.colour) <= C.deks ? C.deks : C.all);   // ★★'s deks, then ★★★'s
+      if (C && res.colour === C.colour) flash.text += ' · ' + swatchMark(C.colour) + COLOURS[C.colour][1] + ' ' + Math.min(madeOf(g, C.colour), aim) + '/' + aim +
+        (madeOf(g, C.colour) === aim ? ' ✓' : '');
       if (res.mult >= 2 && !tut) {   // a lifetime record for combos
         const st = readStats();
         if (res.mult > (st.combo || 0)) {
@@ -1934,7 +1941,7 @@ function start() {
     else if ((g.level || g.daily) && g.turn === 0 && !g.history.length) {   // short: it has to fit a phone's status line
       const T = g.daily ? dailyTargets(g.daily.date) : levelTargets(g.level);
       const C = collectGoal(g);
-      text = '★ place ' + g.deckSize + ' · ★★ ' + (C ? collectText(C, true) : T.score + ' pts') + ' · ★★★ ' + (C ? '+' : '') + T.top + (T.stones ? ' + stones' : ' pts');   // collect: ★★'s deks plus the score
+      text = '★ place ' + g.deckSize + ' · ★★ ' + (C ? collectText(C, true) : T.score + ' pts') + ' · ★★★ ' + (C ? (C.all > C.deks ? C.all + swatchMark(C.colour) : '') + '+' : '') + T.top + (T.stones ? ' + stones' : ' pts');   // collect: ★★'s deks (or all of them) plus the score
     }
     else if (g.endless && g.turn === 0 && !g.history.length)
       text = 'Stage ' + g.endless.stage + ': place ' + g.deckSize + ' · 🎁 ' + endlessRewardDeks(g) + ' deks' + (g.endless.perk ? ' · ' + ENDLESS_PERKS[g.endless.perk].name : '');

@@ -29,3 +29,25 @@ test('a new best mid-game, and a dek milestone on the end card', async ({ page }
   expect(st.games).toBe(4);
   expect(errors).toEqual([]);
 });
+
+test('Classic keeps its best under its own key as its colours rise', async ({ page }) => {
+  const errors = await openGame(page);
+  await page.evaluate(() => localStorage.setItem('hexadek.best.standard.6c', '5'));   // a Custom game's best, 6 colours
+  await page.locator('#new').click();
+  await page.locator('#newmode').selectOption('classic');
+  await page.locator('#newclassic').click();
+  await expect(page.locator('#mode')).toHaveText('Classic');
+  const r = await page.evaluate(() => {
+    const g = window.__t.g;
+    for (const k of Object.keys(g.board)) g.board[k] = [];
+    g.hexadeks = 9; g.board['0,0'] = Array(9).fill(0); g.board['1,0'] = [0, 0, 0];
+    window.__t.doPour('1,0', '0,0');   // the tenth dek: a sixth colour
+    return { colours: g.colours, classic: localStorage.getItem('hexadek.best.standard.ramp' + CLASSIC_RAMP.max),
+             custom: localStorage.getItem('hexadek.best.standard.6c'), shown: document.getElementById('best').textContent };
+  });
+  expect(r.colours).toBe(6);
+  expect(Number(r.classic)).toBeGreaterThan(0);
+  expect(r.custom).toBe('5');   // untouched
+  await expect(page.locator('#best')).toHaveText(r.classic);
+  expect(errors).toEqual([]);
+});
