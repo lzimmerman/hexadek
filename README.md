@@ -6,7 +6,7 @@ A hex-grid stacking puzzle. Stacks of coloured tiles arrive three at a time; pla
 small hex board, pour matching colours from stack to stack, and complete a **hexadek** (a **dek**
 for short), 12 tiles of one colour, to clear it and score. Several hexadeks in one turn make a combo.
 
-- **Journey:** 72 levels in 6 chapters, each bringing something new (pour budgets, stones,
+- **Journey:** 84 levels in 7 chapters, each bringing something new (pour budgets, stones,
   more colours, longer decks), with one to three stars per level.
 - **Daily puzzle:** one deck a day, the same for everyone with the same date (no server: the
   date picks it), gentle on Monday and hardest on Sunday, with stars, a streak and a two-line result to share.
