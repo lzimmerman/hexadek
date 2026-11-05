@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, dailyShape, hintMove, tallyGame, collectGoal, BOARD_SHAPES, cellsOf, canMakeRoom};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, dailyShape, hintMove, tallyGame, collectGoal, BOARD_SHAPES, cellsOf, canMakeRoom, CLASSIC_RAMP};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -272,6 +272,14 @@ console.log('daily tests passed');
   const r = pour(g, '1,0', '0,0');
   assert(r.clears && g.colours === 6 && r.newColour === 5, 'the tenth dek brings a sixth colour');
   undo(g); assert.equal(g.colours, 5, 'undo takes the colour back');
+  const cap = (hexadeks, colours) => {
+    g.hexadeks = hexadeks; g.colours = colours; g.board['0,0'] = Array(9).fill(0); g.board['1,0'] = [0, 0, 0];
+    return pour(g, '1,0', '0,0');
+  };
+  cap(59, 10); assert.equal(g.colours, R.CLASSIC_RAMP.max, 'the sixtieth dek brings the last colour');
+  assert(R.CLASSIC_RAMP.max <= R.COLOURS.length, 'the cap has a colour for each step');
+  cap(69, 11); assert.equal(g.colours, R.CLASSIC_RAMP.max, 'no colour past the cap');
+  const r2 = cap(75, 9); assert(g.colours === 10 && r2.newColour === 9, 'a save from the old cap of 9 gains one colour at a time');
   assert(!R.newGame(1, 'standard', 7).ramp && !R.newGame(1, 'free').ramp, 'custom games keep their colours');
   console.log('classic ramp tests passed');
 }

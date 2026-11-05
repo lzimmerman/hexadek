@@ -370,7 +370,7 @@ dialog li { margin-bottom: 6px; }
       Endless run, different every run.</li>
     <li><b>Classic</b>: play until the board fills, for a best score. Each pour uses one: you start with 3, get 3 more
       for each stack you place and 1 for each dek, and can save up to 9. Undo gives the pour back, and you have 5
-      undos per game. It gets harder as you go: a new colour joins every 10 deks, up to 11. To stop before the
+      undos per game. It gets harder as you go: a new colour joins <span id="helpramp">every 10 deks, up to 11</span>. To stop before the
       board fills, open New game and choose <i>See results</i>: the score still counts.</li>
     <li><b>Custom</b>: choose the colours (3 to 13; fewer is easier), limited or free pours (free pours come with
       unlimited undos), and the length: <i>Fill board</i> (play until the board is full), or a deck of 30 or 50
@@ -623,6 +623,7 @@ function levelSpec(n) {
 // dek the deck's most common colour allows, less collectSlack where the player bot (which doesn't aim at the
 // colour) almost never made it: tools/bot.js --skill player, ★★ in 40–95% of games. Level 17 (2026-11-03): its
 // deck deals exactly 3 deks of stars, so all 3 left no tile to spare (bot ★★ 7%; a play test scored past ★★ but missed it).
+// Level 64 deals the same 3 deks with 3 to spare as level 60, but needs no slack (bot ★★ 65%).
 const COLLECT_STEPS = [[8, 10], [4, 10], [2, 7], [4, 11], [4, 11], [3, 11], [2, 8]], COLLECT_SLACK = 0;   // by chapter
 // Hand-tuned levels. Play tests (2026-11-01) showed stacks that are all mixed (2-3 colours) under a
 // tight pour budget were far harder for people than for the computer player: level 60 took 25 tries.
@@ -1015,7 +1016,7 @@ function pour(g, a, b) {
     g.made = Object.assign({}, g.made); g.made[res.colour] = (g.made[res.colour] || 0) + 1;   // by colour, for collect goals
     if (g.ramp) {   // new stacks bring it in
       const was = g.colours;
-      g.colours = Math.min(CLASSIC_RAMP.max, CFG.colours + Math.floor(g.hexadeks / CLASSIC_RAMP.every));
+      g.colours = Math.min(was + 1, CLASSIC_RAMP.max, CFG.colours + Math.floor(g.hexadeks / CLASSIC_RAMP.every));   // one at a time, so a save from a lower cap catches up a dek at a time
       if (g.colours > was) res.newColour = g.colours - 1;
     }
     res.mult = g.clearsThisTurn;
@@ -1666,6 +1667,7 @@ function start() {
   };
   $('newboard').append(...Object.keys(BOARD_SHAPES).map(k => el('option', { value: k }, BOARD_SHAPES[k].name)));
   const P = CFG.pours;
+  $('helpramp').textContent = 'every ' + CLASSIC_RAMP.every + ' deks, up to ' + CLASSIC_RAMP.max;
   $('classicabout').textContent = 'Play until the board fills, for a best score. Start with ' + P.start +
     ' pours, get ' + P.perPlace + ' more for each stack you place and ' + P.perClear + ' for each dek, up to ' + P.max + ' saved. ' +
     'A new colour joins every ' + CLASSIC_RAMP.every + ' deks, up to ' + CLASSIC_RAMP.max + '.';
