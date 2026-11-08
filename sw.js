@@ -14,7 +14,10 @@ self.addEventListener('activate', e => {   // drop caches from older versions of
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
-  e.respondWith(fetch(req).then(res => {
+  // The page and scripts are checked with the server every time: GitHub Pages lets browsers reuse a file for
+  // 10 minutes (max-age=600), which kept an old version after a release. Unchanged files cost a small 304.
+  const fresh = req.mode === 'navigate' || /\.(html|js|webmanifest)$/.test(new URL(req.url).pathname);
+  e.respondWith(fetch(req, fresh ? { cache: 'no-cache' } : undefined).then(res => {
     if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
     return res;
   }).catch(() => caches.match(req, { ignoreSearch: true })

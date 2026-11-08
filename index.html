@@ -100,6 +100,10 @@ h1 { font-size: 20px; margin: 0; letter-spacing: .08em; font-weight: 700; }
 h1 span { color: var(--accent); }
 .title { display: flex; flex-direction: column; }   /* the title, and the release in small text under it */
 #version { font-size: 11px; line-height: 1.2; font-weight: 500; color: var(--muted); letter-spacing: .04em; }
+/* a newer release is out: in the version's place, a link-sized button with a bigger target than it looks */
+#update { position: relative; font: 600 11px/1.2 var(--font); color: var(--accent); background: none; border: 0; box-shadow: none;
+  padding: 0; min-height: 0; text-align: left; text-decoration: underline; }
+#update::before { content: ''; position: absolute; inset: -10px -6px; }
 .chip { font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--cell);
   border: 1px solid var(--cell-edge); white-space: nowrap; }
 .chip.tap { cursor: pointer; } .chip.tap::after { content: 'ⓘ'; margin-left: 5px; color: var(--accent); }
@@ -292,7 +296,7 @@ dialog li { margin-bottom: 6px; }
 <body>
 <div id="side">   <!-- a column beside the board on short landscape screens; invisible to layout otherwise -->
 <header>
-  <div class="title"><h1>HEXA<span>DEK</span></h1><span id="version">v1.1.0</span></div>   <!-- the release; package.json says the same (test_rules.js checks) -->
+  <div class="title"><h1>HEXA<span>DEK</span></h1><span id="version">v1.1.1</span><button id="update" hidden></button></div>   <!-- the release; package.json says the same (test_rules.js checks) -->
   <nav id="buttons" aria-label="Game">   <!-- icons on the title line, as in most phone games -->
     <button id="new" class="icon" aria-label="New game" title="New game: modes and levels"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.0 2.5 L20.2 7.3 L20.2 16.8 L12.0 21.5 L3.8 16.8 L3.8 7.2 Z"/><path d="M12 8.5v7M8.5 12h7"/></svg></button>
     <button id="restart" class="icon" aria-label="Restart" title="Restart: this game again from the start, with the same stacks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v5h5"/></svg></button>
@@ -467,7 +471,8 @@ dialog li { margin-bottom: 6px; }
       <b>New game</b> deals new stacks.</li>
     <li><b>As an app:</b> on Android, open the browser menu and choose <i>Install app</i> or <i>Add to Home
       screen</i>; on an iPhone, tap Share, then <i>Add to Home Screen</i>. It opens full screen and plays offline.
-      Your progress stays with the browser you install it from.</li>
+      Your progress stays with the browser you install it from. When a new version is out, <i>Update to …</i>
+      shows under the title; tap it to load the new version (your game carries on).</li>
   </ul>
   <div class="row"><button type="button" id="tutor">Play the tutorial</button><span class="spacer"></span><button type="button" id="rulesclose">Close</button></div>
   <div class="extra">   <!-- for testing: below the buttons, out of the way -->
@@ -580,6 +585,13 @@ const COLOURS = [
 // Every 6 to 13 since 2026-11-07: play tests ran to 568 turns with all 11 and were ended by hand, not by the board
 // (expert bot: median 268 turns with every 10 to 11, 182 with every 6 to 13, 151 with that and pours of 2 a stack, 6 saved).
 const CLASSIC_RAMP = { every: 6, max: 13 };
+// Releases: is version a ('1.10.0') newer than b ('1.9.2')? For the update check (start: checkUpdate).
+function newerVersion(a, b) {
+  const x = a.split('.').map(Number), y = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i];
+  return false;
+}
+const UPDATE_EVERY = 30 * 60 * 1000;   // ms between update checks, at most
 const STONE = 99;   // a grey stone tile: it can't be poured, and breaks when a neighbouring stack clears
                     // (it was 9 until there were more than 9 colours; load() converts older saves)
 const STONE_COLOUR = '#6b7280';
@@ -2777,6 +2789,24 @@ function start() {
     ul.replaceChildren(...[...$('buttons').querySelectorAll('button')].map(b =>
       el('li', null, b.querySelector('svg').cloneNode(true), b.getAttribute('aria-label'))));
   if (firstVisit) $('welcome').showModal();
+  // A newer release? An app on the home screen can keep this page in memory for days, so when it comes back to
+  // the screen (at most every UPDATE_EVERY) it fetches index.html and compares versions. Tapping the offer
+  // reloads; progress is saved after every move, so nothing is lost.
+  let checkedAt = Date.now();
+  async function checkUpdate() {
+    if (Date.now() - checkedAt < UPDATE_EVERY || !navigator.onLine) return;
+    checkedAt = Date.now();
+    try {
+      const res = await fetch('index.html', { cache: 'no-cache' });
+      if (!res.ok) return;
+      const v = ((await res.text()).match(/id="version">v(\d+\.\d+\.\d+)</) || [])[1];
+      if (v && newerVersion(v, $('version').textContent.slice(1))) {
+        $('update').textContent = 'Update to v' + v; $('update').hidden = false; $('version').hidden = true;
+      }
+    } catch (e) {}   // offline, or a host without the file: try again next time
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
+  $('update').onclick = () => { save(); location.reload(); };
 }
 
 if (typeof document !== 'undefined') start();
