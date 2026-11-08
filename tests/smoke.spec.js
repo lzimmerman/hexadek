@@ -63,7 +63,7 @@ test('dialogs: How to play, play data, New game and All levels', async ({ page }
   await expect(page.locator('#rules')).toBeVisible();
   await page.locator('#copylog').click();
   await expect(page.locator('#logtext')).toBeVisible();
-  await expect(page.locator('#logtext')).toHaveValue(/Hexadek play data/);
+  await expect(page.locator('#logtext')).toHaveValue(/Hexadek v\d+\.\d+\.\d+ play data/);
   await page.locator('#rulesclose').click();
   await expect(page.locator('#rules')).toBeHidden();
   await page.locator('#new').click();

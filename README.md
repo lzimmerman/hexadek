@@ -60,6 +60,18 @@ Tools, in `tools/`:
 | `contrast.js` | Contrast checks for the colour themes |
 | `themes.html` | A preview of every colour theme, light and dark |
 
+### Releases
+
+Versions follow [semantic versioning](https://semver.org): the last number for fixes and tuning,
+the middle one for new features or modes, the first for a change that breaks saved progress. The
+version shows under the title, and `test_rules.js` checks it matches `package.json`. To release:
+
+1. Set the new version in `index.html` (`id="version"`) and in `package.json`, and run the tests.
+2. Commit, tag and push: `git tag v1.2.0 && git push && git push --tags`.
+3. Write the notes: `gh release create v1.2.0 --title "Hexadek 1.2" --notes-file notes.md`.
+
+Pushes between releases still go live; the version says which release they build on.
+
 ## Credits
 
 - **Lexend** typeface, bundled in `fonts/`: Copyright 2018 The Lexend Project Authors

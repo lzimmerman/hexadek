@@ -418,3 +418,11 @@ console.log('daily tests passed');
   assert(!LEVELS.slice(0, 72).some(L => L.holes), 'chapters 1 to 6 keep the full board');
   console.log('custom board tests passed');
 }
+
+// the release under the title matches package.json (bump both for a release: README, "Releases")
+{
+  const shown = (html.match(/id="version">v(\d+\.\d+\.\d+)</) || [])[1];
+  const pkg = JSON.parse(fs.readFileSync(require('path').join(require('path').dirname(process.argv[2]), 'package.json'), 'utf8'));
+  assert.equal(shown, pkg.version, 'the version under the title is package.json\'s');
+  console.log('version tests passed');
+}
