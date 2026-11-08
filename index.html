@@ -1498,7 +1498,7 @@ function start() {
     // announced when it can be seen, in the next stack (play test, 2026-11-07: at the dek that brings it, a few
     // turns before it's dealt, it went unnoticed)
     const nc = tut ? undefined : firstSight(g);
-    if (nc !== undefined) setFlash('New colour: ' + swatchMark(nc) + COLOURS[nc][2] + '!', 4000);
+    if (nc !== undefined) setFlash('New colour: ' + swatchMark(nc) + COLOURS[nc][2] + ' (' + (nc + 1) + ' of ' + CLASSIC_RAMP.max + ')!', 4000);
     const seen = ui.ghostAt === cell; ui.ghostAt = null;   // its preview was already showing there: no fade-in
     if (!still() && !seen) anims.push({ type: 'place', cell, t0: performance.now(), dur: 180 });
     ui.trayPick = null; ui.sel = null;
@@ -1918,7 +1918,8 @@ function start() {
   function hud() {
     $('score').textContent = g.score;
     $('best').textContent = best;
-    $('mode').textContent = gameName(g);
+    // Classic: how far its colours have come (the name stays "Classic", for the log and the end card)
+    $('mode').textContent = gameName(g) + (g.ramp && !tut ? ' · ' + g.colours + '/' + CLASSIC_RAMP.max + ' colours' : '');
     const tap = !!g.level && !tut;   // on a level, the chip reopens the level card
     $('mode').classList.toggle('tap', tap);
     if (tap) { $('mode').setAttribute('role', 'button'); $('mode').tabIndex = 0; $('mode').setAttribute('aria-label', gameName(g) + ': show the level card'); }

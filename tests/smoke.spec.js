@@ -84,7 +84,7 @@ test('New game: Classic, and a Custom game that Restart keeps', async ({ page })
   await expect(page.locator('#newclassic')).toBeHidden();
   await page.locator('#newmode').selectOption('classic');
   await page.locator('#newclassic').click();
-  await expect(page.locator('#mode')).toHaveText('Classic');
+  await expect(page.locator('#mode')).toHaveText('Classic · 5/13 colours');
   await expect(page.locator('#deckbar')).toBeHidden();
   await page.locator('#new').click();
   await expect(page.locator('#newmode')).toHaveValue('classic');
@@ -113,7 +113,7 @@ test('Custom: a board with holes, kept by Restart and a reload', async ({ page, 
   await page.locator('#newmode').selectOption('custom');
   await page.locator('#newboard').selectOption('bridge');
   await page.locator('#newcustom').click();
-  await expect(page.locator('#mode')).toHaveText('Classic · Bridge');
+  await expect(page.locator('#mode')).toHaveText('Classic · Bridge · 5/13 colours');
   const cells = () => game(page, () => Object.keys(window.__t.g.board).length);
   expect(await cells()).toBe(15);
   // a tap on a hole places nothing; a tap on a real cell does
@@ -147,10 +147,10 @@ test('Classic: a new colour is announced when it is first dealt, and the game st
     await tap(page, hasTouch, await cellPoint(page, cells[i]));
     await expect.poll(() => game(page, () => window.__t.g.turn)).toBe(i + 1);
   }
-  await expect(page.locator('#msg')).toHaveText(/^New colour: [a-z ]+!$/);
+  await expect(page.locator('#msg')).toHaveText(/^New colour: [a-z ]+ \((6|7|8|9|10|11|12|13) of 13\)!$/);
   await expect(page.locator('#msg .swatch')).toHaveCount(1);
   // still Classic with its colours grown: the chip, New game's mode, and Restart (from 5 colours, with the ramp)
-  await expect(page.locator('#mode')).toHaveText('Classic');
+  await expect(page.locator('#mode')).toHaveText('Classic · 13/13 colours');
   await page.locator('#new').click();
   await expect(page.locator('#newmode')).toHaveValue('classic');
   await page.locator('#newcancel').click();

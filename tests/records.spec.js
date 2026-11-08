@@ -36,7 +36,7 @@ test('Classic keeps its best under its own key as its colours rise', async ({ pa
   await page.locator('#new').click();
   await page.locator('#newmode').selectOption('classic');
   await page.locator('#newclassic').click();
-  await expect(page.locator('#mode')).toHaveText('Classic');
+  await expect(page.locator('#mode')).toHaveText('Classic · 5/13 colours');
   const r = await page.evaluate(() => {
     const g = window.__t.g;
     for (const k of Object.keys(g.board)) g.board[k] = [];
