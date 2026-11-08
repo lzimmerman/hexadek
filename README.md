@@ -8,8 +8,8 @@ for short), 12 tiles of one colour, to clear it and score. Several hexadeks in o
 
 - **Journey:** 84 levels in 7 chapters, each bringing something new (pour budgets, stones,
   more colours, longer decks), with one to three stars per level.
-- **Daily puzzle:** one deck a day, the same for everyone with the same date (no server: the
-  date picks it), gentle on Monday and hardest on Sunday, with stars, a streak and a two-line result to share.
+- **Daily puzzle:** one deck a day, the same for everyone with the same date (there's no server; the
+  puzzle is chosen from the date), gentle on Monday and hardest on Sunday, with stars, a streak and a two-line result to share.
 - **Endless:** stage after stage on fresh boards, rising to about the last chapter's difficulty,
   with a reward to pick between stages; every deck is checked to be winnable.
 - **Classic:** play until the board fills, for a best score; and **Custom**: 3 to 13 colours,
@@ -22,9 +22,9 @@ for short), 12 tiles of one colour, to clear it and score. Several hexadeks in o
 Play at **https://lzimmerman.github.io/hexadek/**. On a phone it installs as an app (Android:
 browser menu › Install app; iPhone: Share › Add to Home Screen) and then plays offline.
 
-To run it locally, open `index.html` in a browser; `themes.js` and `fonts/` need to sit beside it.
+To run it locally, open `index.html` in a browser; `themes.js` and `fonts/` need to be in the same folder.
 There's no build step, no server and no network use: the game is plain HTML, CSS and JavaScript,
-and keeps progress in the browser's local storage on the device. The app files are
+and saves progress in the browser's local storage on the device. The app files are
 `manifest.webmanifest`, `icons/` and `sw.js`, the offline cache (it works only when served over
 the web). How to play (in the game) explains the rules.
 
@@ -71,7 +71,7 @@ version shows under the title, and `test_rules.js` checks it matches `package.js
 2. Commit, tag and push: `git tag v1.2.0 && git push && git push --tags`.
 3. Write the notes: `gh release create v1.2.0 --title "Hexadek 1.2" --notes-file notes.md`.
 
-Pushes between releases still go live; the version says which release they build on.
+Changes pushed between releases still go live; the version number shows which release they're based on.
 
 ## Credits
 
@@ -83,13 +83,13 @@ Pushes between releases still go live; the version says which release they build
 - The random number generator is **mulberry32**, written in 2017 by Tommy Ettinger and
   dedicated to the public domain
   ([source](https://gist.github.com/tommyettinger/46a874533244883189143505d203312c)). Credited
-  as a courtesy: the dedication asks for nothing.
+  as a courtesy; the dedication doesn't require it.
 - Game design, code, tile symbols and colour themes were made for this project with
   [Claude Code](https://claude.com/claude-code).
 
 ## Licence
 
 The game's code is under the [MIT License](LICENSE), copyright (c) 2026 lzimmerman. This covers
-everything in the repository except `fonts/`: the Lexend font files keep their own SIL Open
+everything in the repository except `fonts/`: the Lexend font files are under their own SIL Open
 Font License ([`fonts/OFL.txt`](fonts/OFL.txt)), as noted under Credits.
 

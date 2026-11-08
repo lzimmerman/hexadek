@@ -8,7 +8,7 @@
 <!-- Link previews (Open Graph): the picture and text shown when the address is shared -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Hexadek: a hex stacking puzzle">
-<meta property="og:description" content="Pour matching colours. Make 12 of a kind. 84 levels, plays in your browser.">
+<meta property="og:description" content="Pour matching colours to build stacks of 12 of a kind, across 84 levels in your browser.">
 <meta property="og:url" content="https://lzimmerman.github.io/hexadek/">
 <meta property="og:image" content="https://lzimmerman.github.io/hexadek/icons/social-preview.png">
 <meta property="og:image:width" content="1280">
@@ -301,7 +301,7 @@ dialog li { margin-bottom: 6px; }
 <body>
 <div id="side">   <!-- a column beside the board on short landscape screens; invisible to layout otherwise -->
 <header>
-  <div class="title"><h1>HEXA<span>DEK</span></h1><span id="version">v1.2.0</span><button id="update" hidden></button></div>   <!-- the release; package.json says the same (test_rules.js checks) -->
+  <div class="title"><h1>HEXA<span>DEK</span></h1><span id="version">v1.2.1</span><button id="update" hidden></button></div>   <!-- the release; package.json says the same (test_rules.js checks) -->
   <nav id="buttons" aria-label="Game">   <!-- icons on the title line, as in most phone games -->
     <button id="new" class="icon" aria-label="New game" title="New game: modes and levels"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.0 2.5 L20.2 7.3 L20.2 16.8 L12.0 21.5 L3.8 16.8 L3.8 7.2 Z"/><path d="M12 8.5v7M8.5 12h7"/></svg></button>
     <button id="restart" class="icon" aria-label="Restart" title="Restart: this game again from the start, with the same stacks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v5h5"/></svg></button>
@@ -362,7 +362,7 @@ dialog li { margin-bottom: 6px; }
 </div>
 <dialog id="rules">
   <div class="dlghead"><h2 tabindex="-1">How to play</h2><button type="button" id="rulesx" class="icon" aria-label="Close" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>   <!-- stays at the top as the help scrolls, so it closes from anywhere -->
-  <p>Hexadek is a puzzle about sorting coloured tiles. Each cell of the board holds a stack of hex tiles.
+  <p>Hexadek is a puzzle about sorting coloured tiles. Each cell of the board has a stack of hex tiles on it.
     Your goal is to build <b>stacks of 12 tiles all of one colour</b>, called a <b>hexadek</b>, or
     <b>dek</b> for short. A finished dek clears from the board and scores points.</p>
   <h3>The buttons at the top</h3>
@@ -378,17 +378,17 @@ dialog li { margin-bottom: 6px; }
   <ul>
     <li>Tap a stack, then tap a neighbouring cell, or drag the stack there.</li>
     <li>Its whole top run moves: onto a stack with the same top colour, or onto an empty cell.</li>
-    <li>Only neighbours: the six cells touching it.</li>
-    <li>A stack holds at most 12 tiles. If the whole run doesn't fit, only what fits moves.</li>
+    <li>You can only pour to a neighbour: one of the six cells touching it.</li>
+    <li>A stack can have at most 12 tiles. If the whole run doesn't fit, only what fits moves.</li>
     <li><b>Journey</b>: 84 levels, each a fixed deck with its own rules. See <i>Journey: levels and stars</i> below.</li>
     <li><b>Daily puzzle</b>: one deck a day, the same for everyone with the same date, with up to 3 stars.
-      Monday's is the gentlest and the week climbs to Sunday. Finish it on days in a row for a streak, and
+      Monday's is the easiest, and they get harder through the week to Sunday. Finish it on days in a row for a streak, and
       Copy result for two lines to paste in a message: your stars and score, and the deks you made.</li>
     <li><b>Endless</b>: a run of stages. Each <b>stage</b> is one deck on a fresh board, and they get harder, up
       to about the difficulty of Journey's last chapter. Clear a stage with enough deks (🎁, shown as it starts)
-      and you earn a reward for the next, one of two: a bigger pour budget, a shorter deck, lighter stacks (more of
+      and you get to choose a reward for the next stage from two options: a bigger pour budget, a shorter deck, lighter stacks (more of
       a single colour) or a stone gone. Losing a stage
-      ends the run; your best is the most stages cleared. Every deck has been checked: it can be finished.</li>
+      ends the run; your best is the most stages cleared. Every deck has been checked to make sure it can be finished.</li>
     <li>So a <b>level</b> is one of Journey's 84, always the same, with stars; a <b>stage</b> is one deck in an
       Endless run, different every run.</li>
     <li><b>Classic</b>: play until the board fills, for a best score. Each pour uses one: you start with 3, get 3 more
@@ -409,7 +409,7 @@ dialog li { margin-bottom: 6px; }
   </ul>
   <h3>Clearing and scoring</h3>
   <div class="fig"><canvas data-fig="full"></canvas>
-    <p>12 tiles of one colour clear: 120 points.</p></div>
+    <p>A stack of 12 tiles of one colour clears and scores 120 points.</p></div>
   <h3>Combos</h3>
   <p>A turn lasts from one placement to the next, and you can pour as often as your pours allow. Each dek
     you make in the same turn is worth more: the first 120, the second 240 (×2), the third 360 (×3), and so on.
@@ -428,7 +428,7 @@ dialog li { margin-bottom: 6px; }
   <p>While you play a level, the line under the title shows where you are in its chapter, such as
     <i>Chapter 2 · 5 of 12</i>, with a dot for each of the chapter's levels: gold once it has stars, ringed for the
     one you're playing. Tap it, or the level name, to see the level's card and your Journey so far.</p>
-  <p>Finishing earns stars, from one to three:</p>
+  <p>Finishing a level gives you one to three stars:</p>
   <ul>
     <li>★ Finish the deck.</li>
     <li>★★ Finish, and reach the level's score target.</li>
@@ -437,7 +437,7 @@ dialog li { margin-bottom: 6px; }
       needs the score and every dek of the colour the deck allows, which can be one more than ★★ asks for.</li>
   </ul>
   <p>Each level's goals show at the start of the game, and the end screen ticks off the ones you met. Your best
-    result for each level is kept, and shown in the level list. A worse game never takes stars away.</p>
+    result for each level is saved and shown in the level list. A worse game never takes stars away.</p>
   <table id="levelstable"></table>
   <h3>Stones</h3>
   <div class="fig"><canvas class="wide" data-fig="stone1"></canvas><span class="arrow">→</span><canvas class="wide" data-fig="stone2"></canvas></div>
@@ -446,9 +446,9 @@ dialog li { margin-bottom: 6px; }
     <li>A stone can't be poured, and nothing can be poured onto it.</li>
     <li>When a stack clears, each stack next to it loses its top stone, and whatever was under it is free again.
       Above, the full red stack clears and breaks the stone beside it, uncovering the yellow tile.</li>
-    <li>Some cells hold two stones, one on top of the other, marked with a <b>2</b>. They need two clears next to
+    <li>Some cells have two stones, one on top of the other, marked with a <b>2</b>. They need two clears next to
       them.</li>
-    <li>Breaking stones earns no points, but it frees up cells, and on a stones level it's the way to ★★★.</li>
+    <li>Breaking stones doesn't score points, but it frees up cells, and on a stones level it's the way to ★★★.</li>
   </ul>
   <h3>Tips</h3>
   <ul>
@@ -457,7 +457,7 @@ dialog li { margin-bottom: 6px; }
     <li>Try not to bury a colour under a different one.</li>
     <li>Keep two or three cells empty when you can, and check the next stack before you place.</li>
     <li>When pours are limited, spend them where they finish or set up a dek, and save the rest for a crowded board.</li>
-    <li>Undo is free until you place, so experiment.</li>
+    <li>Undo is free until you place, so feel free to try things out.</li>
   </ul>
   <h3>Controls</h3>
   <ul>
@@ -476,13 +476,13 @@ dialog li { margin-bottom: 6px; }
       <b>New game</b> deals new stacks.</li>
     <li><b>As an app:</b> on Android, open the browser menu and choose <i>Install app</i> or <i>Add to Home
       screen</i>; on an iPhone, tap Share, then <i>Add to Home Screen</i>. It opens full screen and plays offline.
-      Your progress stays with the browser you install it from. When a new version is out, <i>Update to …</i>
-      shows under the title; tap it to load the new version (your game carries on).</li>
+      Your progress is saved in the browser you install it from. When a new version is out, <i>Update to …</i>
+      shows under the title; tap it to load the new version (you won't lose your current game).</li>
   </ul>
   <div class="row"><button type="button" id="tutor">Play the tutorial</button><span class="spacer"></span><button type="button" id="rulesclose">Close</button></div>
   <div class="extra">   <!-- for testing: below the buttons, out of the way -->
     <h3>Your play data</h3>
-    <p>The game keeps a short log of your finished games on this device (score, stars, deks), for testing and
+    <p>The game saves a short log of your finished games on this device (score, stars, deks), for testing and
       tuning. Copy it to share it.</p>
     <div class="row"><button type="button" id="copylog">Copy play data</button><span id="copied" class="hint"></span></div>
     <textarea id="logtext" readonly hidden aria-label="Play data"></textarea>
@@ -513,7 +513,7 @@ dialog li { margin-bottom: 6px; }
   <div class="modebox" data-mode="classic"><span id="classicabout"></span>
     <div class="row"><button type="button" id="newclassic" class="primary">Play Classic</button></div></div>
   <div class="modebox" data-mode="custom"><span>Your own rules. Fewer colours is easier; 5 is usual. Free pours come
-      with unlimited undos. A board with holes is harder. Each mix keeps its own best score.</span>
+      with unlimited undos. A board with holes is harder. Each setup has its own best score.</span>
     <div class="opts"><label for="newcolours">Colours
         <select id="newcolours"><option>3</option><option>5</option><option>7</option><option>9</option><option>11</option><option>13</option></select></label>
       <label for="newpours">Pours
@@ -528,11 +528,11 @@ dialog li { margin-bottom: 6px; }
 </dialog>
 <dialog id="records">
   <h2 tabindex="-1">Your records</h2>
-  <p class="hint">Kept on this device.</p>
+  <p class="hint">Saved on this device.</p>
   <div id="rectotals"></div>
   <h3 class="rechead" id="rechead">By mode</h3>
   <div id="recrows"></div>
-  <p id="recempty" class="hint">No games yet: finish or leave one and it shows here.</p>
+  <p id="recempty" class="hint">No games yet. Finished or left games show here.</p>
   <div class="row setclose"><span class="spacer"></span><button type="button" id="recordsclose">Close</button></div>
 </dialog>
 <dialog id="whatsnew">   <!-- once after an update: RELEASE_NOTES -->
@@ -557,7 +557,7 @@ dialog li { margin-bottom: 6px; }
 </dialog>
 <dialog id="welcome">
   <h2>Welcome to Hexadek</h2>
-  <p>New to games like this? A short tutorial shows the moves, in about two minutes.</p>
+  <p>New to games like this? A two-minute tutorial shows you how to play.</p>
   <p class="hint">The buttons at the top:</p>
   <ul class="iconkey"></ul>
   <div class="row"><button type="button" id="welcometut">Play the tutorial</button><button type="button" id="welcomeclose">Just play</button></div>
@@ -605,6 +605,7 @@ const UPDATE_EVERY = 30 * 60 * 1000;   // ms between update checks, at most
 // What's new, newest first, a line or two per release, shown once after an update. The first is the version
 // under the title (test_rules.js checks): add a release's lines here when its version changes.
 const RELEASE_NOTES = [
+  ['1.2.1', ['The wording in How to play, the tutorial and the level cards is clearer and more natural.']],
   ['1.2.0', ['The trophy (your records) now comes before Help at the top.', 'How to play has a close button at the top.',
             'After an update, a note like this one says what changed.']],
   ['1.1.1', ['New versions reach the home-screen app sooner: "Update to…" shows under the title.']],
@@ -651,12 +652,12 @@ const STONE_LAYOUTS = {   // by number of stone cells; a stone two high takes tw
 };
 const CHAPTERS = [
   { name: 'First steps', about: 'A gentle start: four colours, and at first you can pour as much as you like.' },
-  { name: 'Tight budget', about: 'Fewer pours to go around. Every one counts, so look before you pour.' },
-  { name: 'Stones', about: 'Grey stones block part of the board. A dek next to a stone breaks it. Stones two high take two.' },
+  { name: 'Tight budget', about: 'You have fewer pours, so make each one count.' },
+  { name: 'Stones', about: 'Grey stones block part of the board. Making a dek next to a stone breaks it; stones stacked two high need two.' },
   { name: 'More colours', about: 'Six colours, then seven. Sorting gets harder: keep each colour together.' },
   { name: 'Long haul', about: 'Longer decks, and later, stacks with more colours mixed in.' },
   { name: 'Mastery', about: 'Everything at once: more colours, a tight budget and stones, over the longest decks.' },
-  { name: 'Shapes', about: 'The board changes shape: holes where cells are missing. Fewer cells and fewer neighbours, so plan your space.' },
+  { name: 'Shapes', about: 'The board changes shape: holes where cells are missing. With fewer cells and fewer neighbours, space is tighter.' },
 ];
 // Chapter 7 (2026-11-03): a new board shape every three levels, easiest first (BOARD_SHAPES' order; Loop is too hard
 // for a level). It eases back from Mastery, as each chapter does, so the shape is what's new.
@@ -710,8 +711,8 @@ function levelAbout(n) {
   const P = LEVELS[n - 2], rule = x => x.pours === undefined ? CFG.pours : x.pours, news = [];
   const stoneCells = x => Object.keys(x.stones || {}).length;
   if (L.colours > P.colours) news.push(L.colours - P.colours === 1 ? 'One more colour.' : 'More colours.');
-  if (P.pours === null && L.pours !== null) news.push('Pours now come from a budget: place stacks to earn more.');
-  else if (rule(L) && rule(P) && rule(L).max < rule(P).max) news.push('Fewer pours to go around.');
+  if (P.pours === null && L.pours !== null) news.push('Pours are now limited; placing a stack gives you more.');
+  else if (rule(L) && rule(P) && rule(L).max < rule(P).max) news.push('You have fewer pours.');
   if (L.bands[0] > P.bands[0] || L.bands[1] > P.bands[1]) news.push('More mixed stacks.');
   if (L.holes && L.holes !== P.holes) news.push('A new board shape: ' + BOARD_SHAPES[L.holes].name + '.');
   if (stoneCells(L) > stoneCells(P)) news.push(stoneCells(P) ? 'More stones.' : 'Stones are back.');
@@ -1280,7 +1281,7 @@ function tutorialGame() {
   return g;
 }
 const TUTORIAL = [
-  { text: 'Each cell holds a stack of hex tiles. The symbol on top shows the top colour, and the number shows ' +
+  { text: 'Each cell has a stack of hex tiles. The symbol on top shows the top colour, and the number shows ' +
           'how many tiles of that colour are on top: the top run. Your goal is to build a stack of 12 tiles all ' +
           'of one colour, called a hexadek, or dek for short.' },
   { text: 'Pouring moves a top run onto a neighbouring stack with the same top colour. Tap the marked red stack ' +
@@ -1296,7 +1297,7 @@ const TUTORIAL = [
   { text: "A dek! It cleared from the board and scored 120 points. Combos: a second dek before you place " +
           "again scores ×2 (240), a third ×3. " +
           "Each turn adds a stack, so the board fills up: the game ends when there's no empty cell and no pour can " +
-          "make one. Undo is free until you place, so experiment. How to play has tips any time.", last: true },
+          "make one. Undo is free until you place, so try things out. How to play has tips.", last: true },
 ];
 
 // ---- the page ----
@@ -1799,7 +1800,7 @@ function start() {
     $('dailyabout').textContent = 'Today, ' + dailyName(d) + ': ' + ['the week\'s hardest', 'the week\'s gentlest', 'an easy one',
       'a steady one', 'a middling one', 'a tricky one', 'a hard one'][day] +
       (dailyShape(d) ? ', on the ' + BOARD_SHAPES[dailyShape(d)].name + ' board' : '') + '. One deck, the same for everyone today, ' +
-      'with up to 3 stars; the puzzles climb from Monday to Sunday.';
+      'with up to 3 stars; the puzzles get harder from Monday to Sunday.';
     $('dailybest').textContent = (r ? 'Today: ' + starText(r[1]) + ' ' + r[0] + ' points. ' : '') +
       (streak ? 'Streak: ' + streak + (streak === 1 ? ' day.' : ' days.') : '');
     $('newdaily').textContent = todayInPlay() ? 'Back to today\'s puzzle' : r ? 'Play it again' : 'Play today\'s puzzle';
@@ -1965,7 +1966,7 @@ function start() {
   function tutWrong() {
     const e = tutExpect(), step = $('coachstep');   // the hint takes the step line's place, so nothing on the page moves
     // short enough for one line on a phone: the board must not move
-    step.textContent = e ? 'Not that one. Start at the blue arrow.' : 'Press Next to carry on.';
+    step.textContent = e ? 'Not that one. Start at the blue arrow.' : 'Press Next to continue.';
     step.classList.add('hint');
     ui.sel = ui.trayPick = null;
     if (tut) tut.nudge = performance.now();
@@ -2126,7 +2127,7 @@ function start() {
       ' Deks: ' + made + (g.level ? ' of ' + deckMax(g) + ' possible.' : g.daily ? ' of ' + dailyTargets(g.daily.date).M + ' possible.' : '.');
     if (goals && state === 'won' && !goals[2].met) {   // every dek the deck allows, but not ★★★: it takes combos (play test, 2026-11-03)
       const T = g.daily ? dailyTargets(g.daily.date) : levelTargets(g.level);
-      if (made >= T.M && g.score < T.top) $('overtext').textContent += ' Every dek the deck allows! ★★★ takes combos: ' +
+      if (made >= T.M && g.score < T.top) $('overtext').textContent += ' You made every dek the deck allows! For ★★★ you need combos: ' +
         'a second dek in the same turn scores double.';
     }
     if (g.daily) { const n = dailyStreak(); if (n) $('overtext').textContent += ' Daily streak: ' + n + (n === 1 ? ' day.' : ' days.'); }
@@ -2138,7 +2139,7 @@ function start() {
       const n = endlessCleared(g), eb = readEndlessStages(), stages = k => k + (k === 1 ? ' stage' : ' stages');
       const need = endlessRewardDeks(g), made = g.hexadeks || 0;
       $('overtext').textContent = state === 'won' ? 'Run total: ' + g.score + ' points. ' + (made >= need ?
-          '🎁 ' + made + ' deks earned a reward: choose one for stage ' + (n + 1) + ', then Next stage.' :
+          '🎁 ' + made + ' deks, so you get a reward: choose one for stage ' + (n + 1) + ', then Next stage.' :
           'No reward this time: ' + made + ' of ' + need + ' deks.') :
         (g.ended ? 'You ended the run' : 'No room left') + '. You cleared ' + stages(n) + ', with ' + g.score + ' points' +
         (n && n >= eb ? ': your best run!' : '. Best: ' + stages(eb) + ', ' + best + ' points.');

@@ -198,7 +198,7 @@ test('end card: every dek but not ★★★ points to combos', async ({ page }) 
   await page.evaluate(() => { const T = window.__t, g = T.g, M = levelTargets(g.level).M;
     g.turn = g.deckSize; g.hexadeks = M; g.score = M * 120; T.after(); });
   await expect(page.locator('#over')).toBeVisible();
-  await expect(page.locator('#overtext')).toContainText('★★★ takes combos');
+  await expect(page.locator('#overtext')).toContainText('For ★★★ you need combos');
   expect(errors).toEqual([]);
 });
 

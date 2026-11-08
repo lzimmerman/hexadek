@@ -23,7 +23,7 @@ Most helpful for layout or display problems.
 
 **Play data** (optional)
 In the game: How to play › Copy play data, then paste it here. It lists your games' levels,
-scores, stars, undos and play times, and holds no personal information.
+scores, stars, undos and play times, and contains no personal information.
 
 <details><summary>Play data</summary>
 
