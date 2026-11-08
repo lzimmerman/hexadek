@@ -135,7 +135,7 @@ test('Custom: a board with holes, kept by Restart and a reload', async ({ page, 
   expect(errors).toEqual([]);
 });
 
-test('Classic: a new colour is announced when it is first dealt, with its swatch', async ({ page, hasTouch }) => {
+test('Classic: a new colour is announced when it is first dealt, and the game stays Classic', async ({ page, hasTouch }) => {
   const errors = await openGame(page);
   await page.locator('#new').click();
   await page.locator('#newmode').selectOption('classic');
@@ -149,6 +149,14 @@ test('Classic: a new colour is announced when it is first dealt, with its swatch
   }
   await expect(page.locator('#msg')).toHaveText(/^New colour: [a-z ]+!$/);
   await expect(page.locator('#msg .swatch')).toHaveCount(1);
+  // still Classic with its colours grown: the chip, New game's mode, and Restart (from 5 colours, with the ramp)
+  await expect(page.locator('#mode')).toHaveText('Classic');
+  await page.locator('#new').click();
+  await expect(page.locator('#newmode')).toHaveValue('classic');
+  await page.locator('#newcancel').click();
+  await page.locator('#restart').click();
+  await page.locator('#askyes').click();
+  await expect.poll(() => game(page, () => [window.__t.g.turn, window.__t.g.colours, !!window.__t.g.ramp])).toEqual([0, 5, true]);
   expect(errors).toEqual([]);
 });
 

@@ -265,20 +265,24 @@ console.log('daily tests passed');
 
 // Classic ramps up: a new colour every CLASSIC_RAMP.every deks, and undo takes it back
 {
-  const g = R.newGame(1, 'standard'); g.hexadeks = 9; g.history = [];
+  const E = R.CLASSIC_RAMP.every, M = R.CLASSIC_RAMP.max;
+  const g = R.newGame(1, 'standard'); g.hexadeks = E - 1; g.history = [];
   for (const k of R.CELLS) g.board[k] = [];
   g.board['0,0'] = Array(9).fill(0); g.board['1,0'] = [0, 0, 0];
   assert(g.ramp && g.colours === 5, 'Classic starts at 5 colours');
   const r = pour(g, '1,0', '0,0');
-  assert(r.clears && g.colours === 6 && r.newColour === 5, 'the tenth dek brings a sixth colour');
+  assert(r.clears && g.colours === 6 && r.newColour === 5, 'the ramp\'s first step brings a sixth colour');
   undo(g); assert.equal(g.colours, 5, 'undo takes the colour back');
   const cap = (hexadeks, colours) => {
     g.hexadeks = hexadeks; g.colours = colours; g.board['0,0'] = Array(9).fill(0); g.board['1,0'] = [0, 0, 0];
     return pour(g, '1,0', '0,0');
   };
-  cap(59, 10); assert.equal(g.colours, R.CLASSIC_RAMP.max, 'the sixtieth dek brings the last colour');
+  cap(E * (M - 5) - 1, M - 1); assert.equal(g.colours, M, 'the last step brings the last colour');
   assert(R.CLASSIC_RAMP.max <= R.COLOURS.length, 'the cap has a colour for each step');
-  cap(69, 11); assert.equal(g.colours, R.CLASSIC_RAMP.max, 'no colour past the cap');
+  cap(E * (M - 5) + 9, M); assert.equal(g.colours, M, 'no colour past the cap');
+  // still Classic once colours have joined: its name, and Restart's settings (from 5, with the ramp)
+  assert.equal(R.gameName(g), 'Classic', 'no "· 13 colours" on a Classic game');
+  assert.equal(R.gameName(R.newGame(1, 'standard', 7)), 'Classic · 7 colours', 'a custom game keeps its count');
   const r2 = cap(75, 9); assert(g.colours === 10 && r2.newColour === 9, 'a save from the old cap of 9 gains one colour at a time');
   assert(!R.newGame(1, 'standard', 7).ramp && !R.newGame(1, 'free').ramp, 'custom games keep their colours');
   // the new colour is announced once, when it's first dealt (in the next stack), not at the dek
