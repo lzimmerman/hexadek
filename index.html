@@ -539,15 +539,15 @@ const CFG = {
   pours: { start: 3, perPlace: 3, perClear: 1, max: 9 },   // Standard games; in Free games pours are free
   undos: 5,           // per Standard game; unlimited in Free games
 };
-// Colour and symbol, so colours can be told apart without colour vision. Each symbol suits its
+// Colour, symbol and the colour's name, so colours can be told apart without colour vision. Each symbol suits its
 // colour (2026-11-01): red heart, yellow star, green clover, blue water drop, purple gem,
 // teal hexagon, pink flower, orange sun, brown mountain, lime leaf, navy night moon,
 // maroon berry, sky-blue cloud.
 const COLOURS = [
-  ['#e5484d', 'heart'], ['#f2b705', 'star'], ['#1f8f4e', 'clover'],
-  ['#3b82e6', 'drop'], ['#9b5de5', 'diamond'], ['#14b8a6', 'hexagon'], ['#f472b6', 'flower'],
-  ['#f97316', 'sun'], ['#8b5e3c', 'triangle'],
-  ['#84cc16', 'leaf'], ['#1e3a8a', 'crescent'], ['#9f1239', 'circle'], ['#38bdf8', 'cloud'],
+  ['#e5484d', 'heart', 'red'], ['#f2b705', 'star', 'yellow'], ['#1f8f4e', 'clover', 'green'],
+  ['#3b82e6', 'drop', 'blue'], ['#9b5de5', 'diamond', 'purple'], ['#14b8a6', 'hexagon', 'teal'], ['#f472b6', 'flower', 'pink'],
+  ['#f97316', 'sun', 'orange'], ['#8b5e3c', 'triangle', 'brown'],
+  ['#84cc16', 'leaf', 'lime'], ['#1e3a8a', 'crescent', 'navy'], ['#9f1239', 'circle', 'maroon'], ['#38bdf8', 'cloud', 'sky blue'],
 ];
 // Classic gets harder as it goes: a new colour every `every` deks, from the usual 5 up to `max`
 // (play test: 233 turns and 75 deks with no change in difficulty, and the game got boring). Up to 11 since
@@ -1462,7 +1462,7 @@ function start() {
         anims.push({ type: 'break', cell: k, at: g.board[k].length, t0: now, wait: pa.dur + stagger * (res.n - 1), dur: 340 });
       setFlash('Dek! +' + res.points + (res.mult > 1 ? ' (×' + res.mult + ')' : '') +
                (res.broke.length ? ' · ' + (res.broke.length > 1 ? res.broke.length + ' stones' : 'a stone') + ' broken' : '') +
-               (res.newColour !== undefined ? ' · new colour: ' + tileName(res.newColour, 1) + '!' : ''));
+               (res.newColour !== undefined ? ' · new colour: ' + swatchMark(res.newColour) + COLOURS[res.newColour][2] + '!' : ''));
       const C = collectGoal(g);
       const aim = C && (madeOf(g, C.colour) <= C.deks ? C.deks : C.all);   // ★★'s deks, then ★★★'s
       if (C && res.colour === C.colour) flash.text += ' · ' + swatchMark(C.colour) + COLOURS[C.colour][1] + ' ' + Math.min(madeOf(g, C.colour), aim) + '/' + aim +
