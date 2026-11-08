@@ -1057,6 +1057,15 @@ function place(g, slot, cell) {
   addPours(g, 'perPlace');
   return true;
 }
+// Classic: a colour the ramp brought in, dealt for the first time in the next stack (the one it's seen in first:
+// the tray fills from it), or undefined. g.seen: the colours seen so far.
+function firstSight(g) {
+  if (!g.ramp || !g.next) return undefined;
+  const c = Math.max(...g.next);
+  if (c < (g.seen || CFG.colours)) return undefined;
+  g.seen = c + 1;
+  return c;
+}
 // 'ok': an empty cell; 'full': none, but some pours make one; 'over': no way to make one
 // (with at most `pours` pours, in a Standard game).
 function roomState(board, pours) {
@@ -1242,6 +1251,8 @@ function start() {
   let g = saved || newGame(LEVEL_SEED + 1, 'level', null, 1);   // a first visit starts at level 1
   if (!g.mode) g.mode = 'free';   // saved before there were modes, when every game was free
   if (!g.colours) g.colours = CFG.colours;
+  if (g.ramp && g.seen === undefined)   // saved before first sightings: the colours dealt so far count as seen
+    g.seen = Math.max(CFG.colours, 1 + Math.max(...cellsOf(g.board).flatMap(k => g.board[k]), ...g.tray.flat().filter(c => c !== null), ...(g.next || [])));
   if (g.level && !g.levels) { g.mode = 'survive'; delete g.level; }   // a level of the old five: carry on as a deck game
   let firstVisit = false;
   try { firstVisit = !saved && !localStorage.getItem('hexadek.seen'); localStorage.setItem('hexadek.seen', '1'); } catch (e) {}
@@ -1461,8 +1472,7 @@ function start() {
       if (!still()) for (const k of res.broke)
         anims.push({ type: 'break', cell: k, at: g.board[k].length, t0: now, wait: pa.dur + stagger * (res.n - 1), dur: 340 });
       setFlash('Dek! +' + res.points + (res.mult > 1 ? ' (×' + res.mult + ')' : '') +
-               (res.broke.length ? ' · ' + (res.broke.length > 1 ? res.broke.length + ' stones' : 'a stone') + ' broken' : '') +
-               (res.newColour !== undefined ? ' · new colour: ' + swatchMark(res.newColour) + COLOURS[res.newColour][2] + '!' : ''));
+               (res.broke.length ? ' · ' + (res.broke.length > 1 ? res.broke.length + ' stones' : 'a stone') + ' broken' : ''));
       const C = collectGoal(g);
       const aim = C && (madeOf(g, C.colour) <= C.deks ? C.deks : C.all);   // ★★'s deks, then ★★★'s
       if (C && res.colour === C.colour) flash.text += ' · ' + swatchMark(C.colour) + COLOURS[C.colour][1] + ' ' + Math.min(madeOf(g, C.colour), aim) + '/' + aim +
@@ -1483,6 +1493,10 @@ function start() {
     if (!tutAllows('place', slot, cell)) { ui.trayPick = null; return; }
     if (!place(g, slot, cell)) return;
     buzz(20);
+    // announced when it can be seen, in the next stack (play test, 2026-11-07: at the dek that brings it, a few
+    // turns before it's dealt, it went unnoticed)
+    const nc = tut ? undefined : firstSight(g);
+    if (nc !== undefined) setFlash('New colour: ' + swatchMark(nc) + COLOURS[nc][2] + '!', 4000);
     const seen = ui.ghostAt === cell; ui.ghostAt = null;   // its preview was already showing there: no fade-in
     if (!still() && !seen) anims.push({ type: 'place', cell, t0: performance.now(), dur: 180 });
     ui.trayPick = null; ui.sel = null;

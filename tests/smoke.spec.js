@@ -135,6 +135,23 @@ test('Custom: a board with holes, kept by Restart and a reload', async ({ page, 
   expect(errors).toEqual([]);
 });
 
+test('Classic: a new colour is announced when it is first dealt, with its swatch', async ({ page, hasTouch }) => {
+  const errors = await openGame(page);
+  await page.locator('#new').click();
+  await page.locator('#newmode').selectOption('classic');
+  await page.locator('#newclassic').click();
+  await game(page, () => { window.__t.g.colours = 13; });   // as if the ramp had brought them all in: the next stack dealt has a new one
+  const cells = ['0,0', '1,0', '-1,0', '0,1', '0,-1'];
+  for (let i = 0; i < cells.length && !(await page.locator('#msg').textContent()).startsWith('New colour'); i++) {
+    await tap(page, hasTouch, await slotPoint(page, 0));
+    await tap(page, hasTouch, await cellPoint(page, cells[i]));
+    await expect.poll(() => game(page, () => window.__t.g.turn)).toBe(i + 1);
+  }
+  await expect(page.locator('#msg')).toHaveText(/^New colour: [a-z ]+!$/);
+  await expect(page.locator('#msg .swatch')).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
 test('See results: a Classic game ends on request, with its end card, and is logged', async ({ page, hasTouch }) => {
   const errors = await openGame(page);
   await page.locator('#new').click();

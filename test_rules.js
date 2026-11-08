@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, dailyShape, hintMove, tallyGame, collectGoal, BOARD_SHAPES, cellsOf, canMakeRoom, CLASSIC_RAMP};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, dailyShape, hintMove, tallyGame, collectGoal, BOARD_SHAPES, cellsOf, canMakeRoom, CLASSIC_RAMP, firstSight};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -281,6 +281,13 @@ console.log('daily tests passed');
   cap(69, 11); assert.equal(g.colours, R.CLASSIC_RAMP.max, 'no colour past the cap');
   const r2 = cap(75, 9); assert(g.colours === 10 && r2.newColour === 9, 'a save from the old cap of 9 gains one colour at a time');
   assert(!R.newGame(1, 'standard', 7).ramp && !R.newGame(1, 'free').ramp, 'custom games keep their colours');
+  // the new colour is announced once, when it's first dealt (in the next stack), not at the dek
+  const s = R.newGame(1, 'standard');
+  s.next = [0, 1]; assert.equal(R.firstSight(s), undefined, 'the first five are no news');
+  s.next = [2, 5]; assert.equal(R.firstSight(s), 5, 'a sixth colour, first dealt');
+  s.next = [5, 5]; assert.equal(R.firstSight(s), undefined, 'announced once');
+  s.next = [6]; assert.equal(R.firstSight(s), 6, 'then the seventh');
+  const cu = R.newGame(1, 'standard', 7); cu.next = [6]; assert.equal(R.firstSight(cu), undefined, 'not in custom games');
   console.log('classic ramp tests passed');
 }
 
