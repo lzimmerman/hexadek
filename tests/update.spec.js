@@ -48,3 +48,40 @@ test('the same release: nothing is offered', async ({ page }) => {
   await expect(page.locator('#version')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test("after an update, what's new once; never on a first visit", async ({ page }) => {
+  const errors = await openGame(page, { played: '1.1.0' });
+  const ver = (await page.locator('#version').textContent()).trim();
+  await expect(page.locator('#whatsnew')).toBeVisible();
+  await expect(page.locator('#wntitle')).toHaveText('Updated to ' + ver);
+  await expect(page.locator('#wnlist li').first()).toBeVisible();
+  await page.locator('#wnok').click();
+  await expect(page.locator('#whatsnew')).toBeHidden();
+  await page.reload();
+  await page.waitForFunction(() => window.__t && window.__t.g);
+  await expect(page.locator('#whatsnew')).toBeHidden();   // once
+  expect(errors).toEqual([]);
+});
+
+test("a first visit: the welcome, not what's new", async ({ page }) => {
+  const errors = await openGame(page, { seen: false, played: null });
+  await expect(page.locator('#welcome')).toBeVisible();
+  await expect(page.locator('#whatsnew')).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('How to play closes from the top, wherever it is scrolled to', async ({ page }) => {
+  const errors = await openGame(page);
+  await page.evaluate(() => document.getElementById('intro').classList.remove('show'));
+  await page.locator('#help').click();
+  await page.waitForTimeout(300);   // opening focuses the heading, which scrolls to the top
+  const at = await page.evaluate(() => {
+    const d = document.getElementById('rules'); d.scrollTop = d.scrollHeight / 2;
+    return [d.scrollTop, document.getElementById('rulesx').getBoundingClientRect().top - d.getBoundingClientRect().top];
+  });
+  expect(at[0]).toBeGreaterThan(1000);   // well down the help...
+  expect(at[1]).toBeLessThan(40);        // ...and the close button still at its top
+  await page.locator('#rulesx').click();
+  await expect(page.locator('#rules')).toBeHidden();
+  expect(errors).toEqual([]);
+});

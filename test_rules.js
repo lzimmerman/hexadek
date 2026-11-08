@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, dailyShape, hintMove, tallyGame, collectGoal, BOARD_SHAPES, cellsOf, canMakeRoom, CLASSIC_RAMP, firstSight, recordKey, addRecord, newerVersion};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, dailyShape, hintMove, tallyGame, collectGoal, BOARD_SHAPES, cellsOf, canMakeRoom, CLASSIC_RAMP, firstSight, recordKey, addRecord, newerVersion, RELEASE_NOTES, notesSince};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -427,5 +427,11 @@ console.log('daily tests passed');
   // the update check: newer by number, not by text
   assert(R.newerVersion('1.1.1', '1.1.0') && R.newerVersion('1.10.0', '1.9.2') && R.newerVersion('2.0.0', '1.99.99'));
   assert(!R.newerVersion('1.1.0', '1.1.0') && !R.newerVersion('1.0.9', '1.1.0'), 'the same or older: no offer');
+  // what's new: the first notes are this version's; since an older version, every release after it, up to three
+  assert.equal(R.RELEASE_NOTES[0][0], shown, 'RELEASE_NOTES starts with this version');
+  assert.deepEqual(R.notesSince('1.1.0', '1.2.0').map(n => n[0]), ['1.2.0', '1.1.1']);
+  assert.deepEqual(R.notesSince(null, '1.2.0').map(n => n[0]), ['1.2.0'], 'from before versions were kept: this one only');
+  assert.deepEqual(R.notesSince('1.2.0', '1.2.0'), []);
+  assert.deepEqual(R.notesSince('9.0.0', '1.2.0'), [], 'an older version than last played: nothing');
   console.log('version tests passed');
 }
