@@ -1,7 +1,7 @@
 const fs = require('fs'), assert = require('assert');
 const html = fs.readFileSync(process.argv[2], 'utf8');
 const js = html.match(/<script>([\s\S]*)<\/script>/)[1];
-eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, dailyShape, hintMove, tallyGame, collectGoal, BOARD_SHAPES, cellsOf, canMakeRoom, CLASSIC_RAMP, firstSight};');
+eval(js + '; global.R = {CFG, CELLS, neighbours, runLen, newGame, newStack, pourResult, pour, undo, place, roomState, legalTargets, tutorialGame, TUTORIAL, poursLeft, undosLeft, isWon, COLOURS, LEVELS, STONE, pourRule, gameName, starsFor, starGoals, deckMax, levelTargets, levelAbout, CHAPTERS, pickBands, ENDLESS_TIERS, ENDLESS_RAMP, ENDLESS_SEED, ENDLESS_POOL, ENDLESS_SKIP, ENDLESS_PERKS, endlessTier, endlessDeckSeed, endlessOffer, endlessGame, STONE_LAYOUTS, DAILY_TIERS, dailyDate, dailyName, dailyTier, dailyGame, dailyTargets, dailyShape, hintMove, tallyGame, collectGoal, BOARD_SHAPES, cellsOf, canMakeRoom, CLASSIC_RAMP, firstSight, recordKey, addRecord};');
 // Checks the game rules in index.html: node test_rules.js index.html
 const {CFG, CELLS, neighbours, runLen, newGame, pourResult, pour, undo, place, roomState} = R;
 assert.equal(CELLS.length, 19);
@@ -329,6 +329,25 @@ console.log('daily tests passed');
   const lv = R.newGame(1001, 'level', null, 1);
   assert.equal(T(lv, { deks: 0, games: 3 }, { chapterDone: 2 }, true)[1], 'Chapter 2, every level ★★★!');
   console.log('record tests passed');
+}
+
+// records by mode, for the records panel: levels as Journey, Daily and Endless as one each, custom games by name
+{
+  const K = R.recordKey;
+  assert.equal(K({ game: 'Level 3 · Ripples', level: 3 }), 'Journey');
+  assert.equal(K({ game: 'Daily · Sat 7 Nov · Ring', level: null }), 'Daily');
+  assert.equal(K({ game: 'Endless · Stage 4 · Second wind', level: null }), 'Endless');
+  assert.equal(K({ game: 'Classic · Ring', level: null }), 'Classic · Ring');
+  const recs = [
+    { t: '2026-11-05 20:00', game: 'Classic', result: 'over', score: 9000, placed: 150, hexadeks: 30 },
+    { t: '2026-11-06 21:00', game: 'Classic', result: 'left', score: 400, placed: 12, hexadeks: 2 },
+    { t: '2026-11-06 21:05', game: 'All progress reset', result: 'reset', score: 0, placed: 0, hexadeks: 0 },
+    { t: '2026-11-07 09:00', game: 'Level 1 · First pour', level: 1, result: 'won', score: 800, placed: 20, hexadeks: 4 },
+  ].reduce(R.addRecord, {});
+  assert.deepEqual(recs.Classic, { games: 2, best: 9000, turns: 150, deks: 32, last: '2026-11-06 21:00' });
+  assert.equal(recs.Journey.games, 1);
+  assert.equal(Object.keys(recs).length, 2, 'a reset line is not a game');
+  console.log('records-by-mode tests passed');
 }
 
 // collect levels: two per chapter, the goal from the deck, ★★ for the colour

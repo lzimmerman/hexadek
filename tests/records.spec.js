@@ -51,3 +51,34 @@ test('Classic keeps its best under its own key as its colours rise', async ({ pa
   await expect(page.locator('#best')).toHaveText(r.classic);
   expect(errors).toEqual([]);
 });
+
+test('the records panel: totals, and records by mode built from the play log', async ({ page }) => {
+  const errors = await openGame(page);
+  await page.evaluate(() => {
+    document.getElementById('intro').classList.remove('show');
+    localStorage.setItem('hexadek.stats', JSON.stringify({ deks: 120, games: 9, combo: 3, classic: 212 }));
+    localStorage.setItem('hexadek.log', JSON.stringify([
+      { t: '2026-11-01 10:00', game: 'Classic', level: null, result: 'over', score: 15000, placed: 180, hexadeks: 40 },
+      { t: '2026-11-02 10:00', game: 'Level 2 · Ripples', level: 2, result: 'won', score: 900, placed: 25, hexadeks: 5 },
+    ]));
+  });
+  await page.locator('#info').click();
+  await expect(page.locator('#records')).toBeVisible();
+  await expect(page.locator('#rectotals')).toContainText('212 turns');   // the longest Classic, from before the log
+  const rows = page.locator('#recrows .recmode');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toHaveText('Classic1\u00a0game · best\u00a015,000 · most\u00a0turns\u00a0212 · last\u00a01\u00a0Nov');   // turns: the lifetime record wins
+  await expect(rows.nth(1)).toHaveText(/Journey/);
+  await page.locator('#recordsclose').click();
+  // a game that's left with moves made counts, under its mode
+  await page.evaluate(() => {
+    const t = window.__t, h = hintMove(t.g);
+    if (h.from) t.doPour(h.from, h.to); else t.doPlace(h.slot, h.to);
+  });
+  await page.locator('#restart').click();
+  const ask = page.locator('#askyes');
+  if (await ask.isVisible()) await ask.click();
+  const recs = await page.evaluate(() => JSON.parse(localStorage.getItem('hexadek.records')));
+  expect(Object.values(recs).reduce((n, o) => n + o.games, 0)).toBe(3);
+  expect(errors).toEqual([]);
+});
