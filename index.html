@@ -301,7 +301,7 @@ dialog li { margin-bottom: 6px; }
 <body>
 <div id="side">   <!-- a column beside the board on short landscape screens; invisible to layout otherwise -->
 <header>
-  <div class="title"><h1>HEXA<span>DEK</span></h1><span id="version">v1.2.1</span><button id="update" hidden></button></div>   <!-- the release; package.json says the same (test_rules.js checks) -->
+  <div class="title"><h1>HEXA<span>DEK</span></h1><span id="version">v1.2.2</span><button id="update" hidden></button></div>   <!-- the release; package.json says the same (test_rules.js checks) -->
   <nav id="buttons" aria-label="Game">   <!-- icons on the title line, as in most phone games -->
     <button id="new" class="icon" aria-label="New game" title="New game: modes and levels"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.0 2.5 L20.2 7.3 L20.2 16.8 L12.0 21.5 L3.8 16.8 L3.8 7.2 Z"/><path d="M12 8.5v7M8.5 12h7"/></svg></button>
     <button id="restart" class="icon" aria-label="Restart" title="Restart: this game again from the start, with the same stacks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v5h5"/></svg></button>
@@ -605,6 +605,7 @@ const UPDATE_EVERY = 30 * 60 * 1000;   // ms between update checks, at most
 // What's new, newest first, a line or two per release, shown once after an update. The first is the version
 // under the title (test_rules.js checks): add a release's lines here when its version changes.
 const RELEASE_NOTES = [
+  ['1.2.2', ['The board no longer changes size between tutorial steps.']],
   ['1.2.1', ['The wording in How to play, the tutorial and the level cards is clearer and more natural.']],
   ['1.2.0', ['The trophy (your records) now comes before Help at the top.', 'How to play has a close button at the top.',
             'After an update, a note like this one says what changed.']],
@@ -2016,6 +2017,17 @@ function start() {
     next.style.display = st.expect ? 'none' : '';
     next.textContent = st.last ? (realG && (realG.turn || realG.history.length) ? 'Back to my game' : 'Start playing') : 'Next';
     $('coachskip').style.display = st.last ? 'none' : '';
+    coachFit();
+  }
+  // The card's text is as tall as the longest step's, so the board keeps its size through the tutorial
+  // (it changed by up to 160px from step to step on a small phone). Measured again when the width changes.
+  function coachFit() {
+    const t = $('coachtext'), shown = t.textContent;
+    t.style.minHeight = '';
+    let h = 0;
+    for (const st of TUTORIAL) { t.textContent = st.text; h = Math.max(h, t.offsetHeight); }
+    t.textContent = shown;
+    t.style.minHeight = h + 'px';
   }
 
   function setFlash(text, ms) { flash = { text, until: performance.now() + (ms || 2500) }; }
@@ -2802,6 +2814,7 @@ function start() {
     requestAnimationFrame(frame);
   }
   new ResizeObserver(resize).observe($('wrap'));
+  window.addEventListener('resize', () => { if (tut) coachFit(); });   // the longest step's height changes with the width
   if (document.fonts) document.fonts.ready.then(() => { dirty = true; });   // redraw the board's numbers in the web font
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', resize);
   applyGameTheme();
